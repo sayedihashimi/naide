@@ -133,7 +133,7 @@ const PlanningMode: React.FC = () => {
       // Reset dirty state after initial prefill
       setPlanDirty(false);
     }
-  }, [state.initialIntentText]);
+  }, [state.initialIntentText, getSectionAnswer, updateSectionAnswer, setPlanDirty]);
 
   const handleRebuildPlan = () => {
     setPlanDirty(false);

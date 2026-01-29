@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 
 interface AppState {
@@ -24,15 +24,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     sections: {},
   });
 
-  const setInitialIntent = (text: string) => {
+  const setInitialIntent = useCallback((text: string) => {
     setState(prev => ({ ...prev, initialIntentText: text }));
-  };
+  }, []);
 
-  const setPlanDirty = (dirty: boolean) => {
+  const setPlanDirty = useCallback((dirty: boolean) => {
     setState(prev => ({ ...prev, planDirty: dirty }));
-  };
+  }, []);
 
-  const updateSectionAnswer = (section: string, questionId: string, value: string) => {
+  const updateSectionAnswer = useCallback((section: string, questionId: string, value: string) => {
     setState(prev => ({
       ...prev,
       sections: {
@@ -44,11 +44,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       },
       planDirty: true,
     }));
-  };
+  }, []);
 
-  const getSectionAnswer = (section: string, questionId: string): string => {
+  const getSectionAnswer = useCallback((section: string, questionId: string): string => {
     return state.sections[section]?.[questionId] || '';
-  };
+  }, [state.sections]);
 
   const value: AppContextType = {
     state,
