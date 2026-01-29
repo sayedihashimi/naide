@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { open } from '@tauri-apps/plugin-dialog';
 
 const sections = [
   'Overview',
@@ -134,7 +135,7 @@ const sectionFileMapping: Record<string, string> = {
 };
 
 const PlanningMode: React.FC = () => {
-  const { state, updateSectionAnswer, getSectionAnswer, setPlanDirty } = useAppContext();
+  const { state, updateSectionAnswer, getSectionAnswer, setPlanDirty, saveProject } = useAppContext();
   const [selectedSection, setSelectedSection] = useState('Overview');
   const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
   const [expandedTextareas, setExpandedTextareas] = useState<Set<string>>(new Set());
@@ -149,14 +150,54 @@ const PlanningMode: React.FC = () => {
     }
   }, [state.initialIntentText, getSectionAnswer, updateSectionAnswer, setPlanDirty]);
 
-  const handleRebuildPlan = () => {
-    setPlanDirty(false);
-    setShowRebuildConfirm(true);
-    setTimeout(() => setShowRebuildConfirm(false), 2000);
+  // Auto-save when content changes (debounced)
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (Object.keys(state.sections).length > 0) {
+        try {
+          await saveProject();
+        } catch (error) {
+          console.error('Auto-save failed:', error);
+        }
+      }
+    }, 1000); // Debounce 1 second
+
+    return () => clearTimeout(timer);
+  }, [state.sections, saveProject]);
+
+  const handleRebuildPlan = async () => {
+    try {
+      await saveProject();
+      setPlanDirty(false);
+      setShowRebuildConfirm(true);
+      setTimeout(() => setShowRebuildConfirm(false), 2000);
+    } catch (error) {
+      console.error('Failed to update plan:', error);
+      alert('Failed to update plan. Please try again.');
+    }
   };
 
   const handleGenerateApp = () => {
     alert('Coming soon: Generate App functionality');
+  };
+
+  const handleProjectNameClick = async () => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Open Naide Project',
+      });
+
+      if (selected) {
+        const projectName = selected.split(/[/\\]/).pop() || 'MyApp';
+        alert(`Project opening: ${projectName}\n(Full loading not yet implemented)`);
+      }
+    } catch (error) {
+      console.error('Error opening project:', error);
+      // Fallback for browser/dev mode
+      alert(`Current project: ${state.projectName}\n\n(Project switching requires Tauri runtime)`);
+    }
   };
 
   const currentQuestions = sectionQuestions[selectedSection] || [];
@@ -202,8 +243,28 @@ const PlanningMode: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">
       {/* Header */}
-      <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4">
+      <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-100">Naide</h1>
+        <button
+          onClick={handleProjectNameClick}
+          className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+          title="Click to open a different project"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+            />
+          </svg>
+          <span className="text-sm font-medium">{state.projectName}</span>
+        </button>
       </div>
 
       {/* Main content area */}
@@ -427,7 +488,7 @@ const PlanningMode: React.FC = () => {
           <div>
             <h4 className="text-sm font-semibold text-gray-400 mb-2">Notes</h4>
             <p className="text-sm text-gray-500">
-              Review your answers and click "Rebuild Plan" when ready to update.
+              Review your answers and click "Update plan" when ready to update.
             </p>
           </div>
         </div>
@@ -448,10 +509,10 @@ const PlanningMode: React.FC = () => {
                 : 'bg-zinc-800 text-gray-500 cursor-not-allowed'
             }`}
           >
-            Rebuild Plan
+            Update plan
           </button>
           {showRebuildConfirm && (
-            <span className="text-sm text-green-500">✓ Plan rebuilt</span>
+            <span className="text-sm text-green-500">✓ Plan updated</span>
           )}
         </div>
 
