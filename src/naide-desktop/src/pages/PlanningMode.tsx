@@ -121,14 +121,16 @@ const sectionQuestions: Record<string, Question[]> = {
       helper: 'This section is informational',
     },
   ],
-  Code: [
-    {
-      id: 'files-list',
-      question: 'Files to be generated',
-      type: 'textarea',
-      helper: 'List of files that will be created or modified',
-    },
-  ],
+};
+
+// File mappings for Code section
+const sectionFileMapping: Record<string, string> = {
+  'Overview': 'Intent.md',
+  'Features': 'AppSpec.md',
+  'Data': 'DataSpec.md',
+  'Access & Rules': 'Rules.md',
+  'Assumptions': 'Assumptions.md',
+  'Plan Status': 'Tasks.json',
 };
 
 const PlanningMode: React.FC = () => {
@@ -252,60 +254,100 @@ const PlanningMode: React.FC = () => {
               {selectedSection}
             </h2>
 
-            <div className="space-y-6">
-              {currentQuestions.map((question) => (
-                <div key={question.id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
-                  <label className="block mb-2">
-                    <span className="text-gray-100 font-medium">{question.question}</span>
-                    {question.helper && (
-                      <span className="block text-sm text-gray-500 mt-1">{question.helper}</span>
-                    )}
-                  </label>
-                  {question.type === 'textarea' ? (
-                    <div className="relative">
-                      <textarea
-                        value={getSectionAnswer(selectedSection, question.id)}
-                        onChange={(e) =>
-                          updateSectionAnswer(selectedSection, question.id, e.target.value)
-                        }
-                        className={`w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                          expandedTextareas.has(question.id) ? 'h-64' : 'h-24'
-                        }`}
-                        placeholder="Your answer..."
-                      />
-                      <button
-                        onClick={() => toggleTextareaSize(question.id)}
-                        className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
-                        title={expandedTextareas.has(question.id) ? 'Collapse' : 'Expand'}
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
+            {selectedSection === codeSection ? (
+              /* Code section - Show file list */
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
+                <h3 className="text-lg font-medium text-gray-100 mb-4">
+                  Files to be generated
+                </h3>
+                <div className="space-y-3">
+                  {Object.entries(sectionFileMapping).map(([section, filename]) => (
+                    <div 
+                      key={section}
+                      className="flex items-center justify-between py-2 px-3 bg-zinc-800 rounded hover:bg-zinc-700 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <svg 
+                          className="w-5 h-5 text-blue-400" 
+                          fill="none" 
+                          stroke="currentColor" 
                           viewBox="0 0 24 24"
                         >
-                          {expandedTextareas.has(question.id) ? (
-                            // Collapse icon
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                            />
-                          ) : (
-                            // Expand icon
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                            />
-                          )}
+                          <path 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            strokeWidth={2} 
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" 
+                          />
                         </svg>
-                      </button>
+                        <div>
+                          <div className="text-gray-100 font-mono text-sm">{filename}</div>
+                          <div className="text-gray-500 text-xs">{section}</div>
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-400 px-2 py-1 bg-zinc-900 rounded">
+                        {filename.endsWith('.json') ? 'JSON' : 'Markdown'}
+                      </span>
                     </div>
-                  ) : (
-                    <input
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* Regular sections - Show Q&A */
+              <div className="space-y-6">
+                {currentQuestions.map((question) => (
+                  <div key={question.id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
+                    <label className="block mb-2">
+                      <span className="text-gray-100 font-medium">{question.question}</span>
+                      {question.helper && (
+                        <span className="block text-sm text-gray-500 mt-1">{question.helper}</span>
+                      )}
+                    </label>
+                    {question.type === 'textarea' ? (
+                      <div className="relative">
+                        <textarea
+                          value={getSectionAnswer(selectedSection, question.id)}
+                          onChange={(e) =>
+                            updateSectionAnswer(selectedSection, question.id, e.target.value)
+                          }
+                          className={`w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                            expandedTextareas.has(question.id) ? 'h-64' : 'h-24'
+                          }`}
+                          placeholder="Your answer..."
+                        />
+                        <button
+                          onClick={() => toggleTextareaSize(question.id)}
+                          className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
+                          title={expandedTextareas.has(question.id) ? 'Collapse' : 'Expand'}
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            {expandedTextareas.has(question.id) ? (
+                              // Collapse icon
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                              />
+                            ) : (
+                              // Expand icon
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                              />
+                            )}
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <input
                       type="text"
                       value={getSectionAnswer(selectedSection, question.id)}
                       onChange={(e) =>
@@ -318,6 +360,7 @@ const PlanningMode: React.FC = () => {
                 </div>
               ))}
             </div>
+            )}
           </div>
         </div>
 
