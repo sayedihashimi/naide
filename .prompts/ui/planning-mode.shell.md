@@ -27,10 +27,12 @@ Suggested layout (approx):
 │               │                                      │                      │
 │ Overview       │ [Section Title]                     │ Plan summary         │
 │ Features       │ Q: ...                              │ - Missing info       │
-│ Data           │ A: ...                              │ - Assumptions        │
-│ Access & Rules │                                      │ - Risks/Notes        │
-│ Assumptions    │                                      │                      │
-│ Plan Status    │                                      │                      │
+│ Data           │ A: [textarea with 💡 and ⛶]        │   (clickable)        │
+│ Access & Rules │                                      │ - Assumptions        │
+│ Assumptions    │                                      │   (+ X more ↕)       │
+│ Plan Status    │                                      │ - Risks/Notes        │
+│ ─────────────  │                                      │                      │
+│ Code           │                                      │                      │
 ├───────────────┴──────────────────────────────────────┴──────────────────────┤
 │  Plan is out of date.  [ Rebuild Plan ]                 [ Generate App ]     │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -44,11 +46,26 @@ Sidebar sections (v1):
 4. Access & Rules
 5. Assumptions
 6. Plan Status
+7. **Code** (separated at bottom with divider line)
+
+## Code Section (required)
+The Code section displays a read-only list of files that will be generated:
+- Overview → Intent.md
+- Features → AppSpec.md
+- Data → DataSpec.md
+- Access & Rules → Rules.md
+- Assumptions → Assumptions.md
+- Plan Status → Tasks.json
+
+Display format:
+- Each file shown with document icon, filename (monospace font), section name, and file type badge
+- **Not editable**: User cannot modify this list
+- Visual styling: cards with hover effects, consistent with dark theme
 
 ## Initial state (required)
 When entering Planning Mode from Screen 1:
 - Select **Overview** by default
-- Pre-fill Overview’s first answer with `initialIntentText` under a prompt like:
+- Pre-fill Overview's first answer with `initialIntentText` under a prompt like:
   - "What do you want to build?"
 - Right panel shows a brief summary (can be placeholders)
 
@@ -60,11 +77,15 @@ When entering Planning Mode from Screen 1:
   - optional helper text
 - Keep questions non-technical.
 
+**Textarea controls**: Each textarea includes two icon buttons:
+- **AI Assist button** (💡 lightbulb, yellow): Placeholder for future AI assistance
+- **Expand/Collapse button** (⛶ resize, gray): Toggles between compact (h-24) and expanded (h-64) height
+
 **Important**: Editing any answer should mark the plan as **dirty**.
 
 ## Plan dirty / rebuild behavior (required)
 - Maintain `planDirty: boolean`
-- Default: `false` when Planning Mode first loads with the Screen 1 text inserted (treat insertion as “current”)
+- Default: `false` when Planning Mode first loads with the Screen 1 text inserted (treat insertion as "current")
 - If user edits any answer → `planDirty = true`
 - Footer state:
   - When `planDirty = true`:
@@ -83,9 +104,14 @@ When entering Planning Mode from Screen 1:
 
 ## Right review panel (required, placeholder ok)
 Include sections:
-- Missing info (list)
-- Assumptions (list)
-- Notes (free text, optional)
+- **Missing info** (list with clickable links)
+  - Each item is a button that navigates to the corresponding section
+  - Shows first 5 items by default
+  - **"+X more" link**: Clickable to expand/collapse full list
+  - When expanded, shows "less" link to collapse
+- **Assumptions** (list)
+- **Notes** (free text, optional)
+
 These can be static placeholders initially but should update minimally:
 - Missing info: if some key fields are empty, list them (simple check)
 - Assumptions: show 1–2 example items
@@ -94,8 +120,10 @@ These can be static placeholders initially but should update minimally:
 - Sidebar click switches section
 - Preserve entered values per section (state)
 - Plan dirty state remains true until rebuild
+- Missing info items navigate to corresponding sections when clicked
 
 ## Out of scope
 - No actual artifact file generation
 - No Copilot SDK calls
 - No persistence required
+- AI Assist button functionality (placeholder only)
