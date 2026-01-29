@@ -63,8 +63,7 @@ const Screen1: React.FC = () => {
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl p-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-semibold text-gray-100 mb-1">Naide</h1>
-            <p className="text-gray-400">Not An IDE</p>
+            <h1 className="text-3xl font-semibold text-gray-100">Naide</h1>
           </div>
 
           {/* Main heading */}
