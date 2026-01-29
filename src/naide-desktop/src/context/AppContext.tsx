@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { initializeProject, saveSectionToFile, formatSectionAsMarkdown } from '../utils/fileSystem';
+import { initializeProject, saveSectionToFile, loadProjectData, checkProjectExists } from '../utils/fileSystem';
 
 interface AppState {
   initialIntentText: string;
   planDirty: boolean;
   sections: Record<string, Record<string, string>>;
   projectName: string;
+  projectLoaded: boolean;
 }
 
 interface AppContextType {
@@ -17,6 +18,8 @@ interface AppContextType {
   getSectionAnswer: (section: string, questionId: string) => string;
   setProjectName: (name: string) => void;
   saveProject: () => Promise<void>;
+  loadProject: (projectName: string) => Promise<boolean>;
+  checkForExistingProject: () => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -37,6 +40,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     planDirty: false,
     sections: {},
     projectName: 'MyApp',
+    projectLoaded: false,
   });
 
   // Initialize project on mount
@@ -116,6 +120,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [state.projectName, state.sections]);
 
+  const loadProject = useCallback(async (projectName: string): Promise<boolean> => {
+    try {
+      const projectExists = await checkProjectExists(projectName);
+      if (!projectExists) {
+        console.log(`Project ${projectName} does not exist`);
+        return false;
+      }
+
+      const projectData = await loadProjectData(projectName);
+      setState(prev => ({
+        ...prev,
+        projectName,
+        sections: projectData,
+        projectLoaded: true,
+        planDirty: false,
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error('Error loading project:', error);
+      return false;
+    }
+  }, []);
+
+  const checkForExistingProject = useCallback(async (): Promise<boolean> => {
+    try {
+      return await checkProjectExists(state.projectName);
+    } catch (error) {
+      console.error('Error checking for existing project:', error);
+      return false;
+    }
+  }, [state.projectName]);
+
   const value: AppContextType = {
     state,
     setInitialIntent,
@@ -124,6 +161,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     getSectionAnswer,
     setProjectName,
     saveProject,
+    loadProject,
+    checkForExistingProject,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

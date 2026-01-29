@@ -93,3 +93,88 @@ export function formatSectionAsMarkdown(
   
   return markdown;
 }
+
+// Parse markdown file to extract question/answer pairs
+export function parseMarkdownFile(content: string): Record<string, string> {
+  const answers: Record<string, string> = {};
+  
+  // Split by ## headings (questions)
+  const sections = content.split(/^## /m).slice(1); // Skip the # title
+  
+  sections.forEach((section) => {
+    const lines = section.trim().split('\n');
+    const questionLine = lines[0];
+    const answerLines = lines.slice(1).join('\n').trim();
+    
+    // Convert question back to question ID
+    // e.g., "What To Build" -> "what-to-build"
+    const questionId = questionLine
+      .toLowerCase()
+      .replace(/[?]/g, '')
+      .trim()
+      .replace(/\s+/g, '-');
+    
+    // Extract answer (skip "_No answer provided_")
+    if (answerLines && !answerLines.startsWith('_No answer provided_')) {
+      answers[questionId] = answerLines;
+    }
+  });
+  
+  return answers;
+}
+
+// Check if a project exists
+export async function checkProjectExists(projectName: string): Promise<boolean> {
+  try {
+    const projectPath = await getProjectPath(projectName);
+    return await exists(projectPath);
+  } catch (error) {
+    console.error('Error checking project existence:', error);
+    return false;
+  }
+}
+
+// Load all project data from files
+export async function loadProjectData(projectName: string): Promise<Record<string, Record<string, string>>> {
+  const allSections: Record<string, Record<string, string>> = {};
+  
+  const fileMapping: Record<string, string> = {
+    'Overview': 'Intent.md',
+    'Features': 'AppSpec.md',
+    'Data': 'DataSpec.md',
+    'Access & Rules': 'Rules.md',
+    'Assumptions': 'Assumptions.md',
+    'Plan Status': 'Tasks.json',
+  };
+  
+  try {
+    for (const [section, filename] of Object.entries(fileMapping)) {
+      if (filename.endsWith('.json')) {
+        // Load JSON file
+        const content = await readSectionFromFile(projectName, filename);
+        if (content) {
+          try {
+            allSections[section] = JSON.parse(content);
+          } catch (e) {
+            console.error(`Error parsing ${filename}:`, e);
+            allSections[section] = {};
+          }
+        } else {
+          allSections[section] = {};
+        }
+      } else {
+        // Load and parse markdown file
+        const content = await readSectionFromFile(projectName, filename);
+        if (content) {
+          allSections[section] = parseMarkdownFile(content);
+        } else {
+          allSections[section] = {};
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error loading project data:', error);
+  }
+  
+  return allSections;
+}

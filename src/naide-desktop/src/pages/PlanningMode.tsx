@@ -135,7 +135,7 @@ const sectionFileMapping: Record<string, string> = {
 };
 
 const PlanningMode: React.FC = () => {
-  const { state, updateSectionAnswer, getSectionAnswer, setPlanDirty, saveProject } = useAppContext();
+  const { state, updateSectionAnswer, getSectionAnswer, setPlanDirty, saveProject, loadProject } = useAppContext();
   const [selectedSection, setSelectedSection] = useState('Overview');
   const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
   const [expandedTextareas, setExpandedTextareas] = useState<Set<string>>(new Set());
@@ -150,20 +150,14 @@ const PlanningMode: React.FC = () => {
     }
   }, [state.initialIntentText, getSectionAnswer, updateSectionAnswer, setPlanDirty]);
 
-  // Auto-save when content changes (debounced)
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (Object.keys(state.sections).length > 0) {
-        try {
-          await saveProject();
-        } catch (error) {
-          console.error('Auto-save failed:', error);
-        }
-      }
-    }, 1000); // Debounce 1 second
-
-    return () => clearTimeout(timer);
-  }, [state.sections, saveProject]);
+  // Save handler for textareas (on blur)
+  const handleTextareaBlur = async () => {
+    try {
+      await saveProject();
+    } catch (error) {
+      console.error('Save on blur failed:', error);
+    }
+  };
 
   const handleRebuildPlan = async () => {
     try {
@@ -183,6 +177,9 @@ const PlanningMode: React.FC = () => {
 
   const handleProjectNameClick = async () => {
     try {
+      // Save current project first
+      await saveProject();
+      
       const selected = await open({
         directory: true,
         multiple: false,
@@ -191,7 +188,17 @@ const PlanningMode: React.FC = () => {
 
       if (selected) {
         const projectName = selected.split(/[/\\]/).pop() || 'MyApp';
-        alert(`Project opening: ${projectName}\n(Full loading not yet implemented)`);
+        const loaded = await loadProject(projectName);
+        
+        if (loaded) {
+          // Project loaded successfully, refresh the view
+          setSelectedSection('Overview');
+          alert(`Project "${projectName}" loaded successfully`);
+        } else {
+          // Project folder doesn't have Naide files, treat as new project
+          alert(`Creating new project "${projectName}"`);
+          // The App will handle initialization
+        }
       }
     } catch (error) {
       console.error('Error opening project:', error);
@@ -371,6 +378,7 @@ const PlanningMode: React.FC = () => {
                           onChange={(e) =>
                             updateSectionAnswer(selectedSection, question.id, e.target.value)
                           }
+                          onBlur={handleTextareaBlur}
                           className={`w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
                             expandedTextareas.has(question.id) ? 'h-64' : 'h-24'
                           }`}
@@ -424,14 +432,15 @@ const PlanningMode: React.FC = () => {
                       </div>
                     ) : (
                       <input
-                      type="text"
-                      value={getSectionAnswer(selectedSection, question.id)}
-                      onChange={(e) =>
-                        updateSectionAnswer(selectedSection, question.id, e.target.value)
-                      }
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Your answer..."
-                    />
+                        type="text"
+                        value={getSectionAnswer(selectedSection, question.id)}
+                        onChange={(e) =>
+                          updateSectionAnswer(selectedSection, question.id, e.target.value)
+                        }
+                        onBlur={handleTextareaBlur}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Your answer..."
+                      />
                   )}
                 </div>
               ))}
