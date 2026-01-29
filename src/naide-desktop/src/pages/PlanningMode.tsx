@@ -10,6 +10,8 @@ const sections = [
   'Plan Status',
 ];
 
+const codeSection = 'Code';
+
 interface Question {
   id: string;
   question: string;
@@ -119,12 +121,22 @@ const sectionQuestions: Record<string, Question[]> = {
       helper: 'This section is informational',
     },
   ],
+  Code: [
+    {
+      id: 'files-list',
+      question: 'Files to be generated',
+      type: 'textarea',
+      helper: 'List of files that will be created or modified',
+    },
+  ],
 };
 
 const PlanningMode: React.FC = () => {
   const { state, updateSectionAnswer, getSectionAnswer, setPlanDirty } = useAppContext();
   const [selectedSection, setSelectedSection] = useState('Overview');
   const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
+  const [expandedTextareas, setExpandedTextareas] = useState<Set<string>>(new Set());
+  const [showAllMissing, setShowAllMissing] = useState(false);
 
   // Pre-fill the initial intent text into Overview
   useEffect(() => {
@@ -147,17 +159,43 @@ const PlanningMode: React.FC = () => {
 
   const currentQuestions = sectionQuestions[selectedSection] || [];
 
-  // Calculate missing info
-  const missingInfo: string[] = [];
+  const toggleTextareaSize = (questionId: string) => {
+    setExpandedTextareas(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(questionId)) {
+        newSet.delete(questionId);
+      } else {
+        newSet.add(questionId);
+      }
+      return newSet;
+    });
+  };
+
+  // Calculate missing info with section and question ID mapping
+  interface MissingInfoItem {
+    section: string;
+    questionId: string;
+    text: string;
+  }
+  
+  const missingInfoItems: MissingInfoItem[] = [];
   sections.forEach((section) => {
     const questions = sectionQuestions[section];
-    questions.forEach((q) => {
+    questions?.forEach((q) => {
       const answer = getSectionAnswer(section, q.id);
       if (!answer || answer.trim() === '') {
-        missingInfo.push(`${section}: ${q.question}`);
+        missingInfoItems.push({
+          section,
+          questionId: q.id,
+          text: `${section}: ${q.question}`,
+        });
       }
     });
   });
+
+  const handleMissingInfoClick = (item: MissingInfoItem) => {
+    setSelectedSection(item.section);
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">
@@ -188,6 +226,21 @@ const PlanningMode: React.FC = () => {
                   {section}
                 </button>
               ))}
+              
+              {/* Separator before Code section */}
+              <div className="my-4 border-t border-zinc-700"></div>
+              
+              <button
+                key={codeSection}
+                onClick={() => setSelectedSection(codeSection)}
+                className={`w-full text-left px-3 py-2 rounded mb-1 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  selectedSection === codeSection
+                    ? 'bg-zinc-800 text-gray-100 font-medium'
+                    : 'text-gray-400 hover:bg-zinc-800/50 hover:text-gray-100'
+                }`}
+              >
+                {codeSection}
+              </button>
             </nav>
           </div>
         </div>
@@ -209,14 +262,48 @@ const PlanningMode: React.FC = () => {
                     )}
                   </label>
                   {question.type === 'textarea' ? (
-                    <textarea
-                      value={getSectionAnswer(selectedSection, question.id)}
-                      onChange={(e) =>
-                        updateSectionAnswer(selectedSection, question.id, e.target.value)
-                      }
-                      className="w-full h-24 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Your answer..."
-                    />
+                    <div className="relative">
+                      <textarea
+                        value={getSectionAnswer(selectedSection, question.id)}
+                        onChange={(e) =>
+                          updateSectionAnswer(selectedSection, question.id, e.target.value)
+                        }
+                        className={`w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                          expandedTextareas.has(question.id) ? 'h-64' : 'h-24'
+                        }`}
+                        placeholder="Your answer..."
+                      />
+                      <button
+                        onClick={() => toggleTextareaSize(question.id)}
+                        className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
+                        title={expandedTextareas.has(question.id) ? 'Collapse' : 'Expand'}
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          {expandedTextareas.has(question.id) ? (
+                            // Collapse icon
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                            />
+                          ) : (
+                            // Expand icon
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                            />
+                          )}
+                        </svg>
+                      </button>
+                    </div>
                   ) : (
                     <input
                       type="text"
@@ -241,13 +328,27 @@ const PlanningMode: React.FC = () => {
           {/* Missing Info */}
           <div className="mb-6">
             <h4 className="text-sm font-semibold text-gray-400 mb-2">Missing Information</h4>
-            {missingInfo.length > 0 ? (
+            {missingInfoItems.length > 0 ? (
               <ul className="text-sm text-gray-500 space-y-1">
-                {missingInfo.slice(0, 5).map((info, i) => (
-                  <li key={i} className="truncate">• {info}</li>
+                {(showAllMissing ? missingInfoItems : missingInfoItems.slice(0, 5)).map((item, i) => (
+                  <li key={i} className="truncate">
+                    <button
+                      onClick={() => handleMissingInfoClick(item)}
+                      className="text-left hover:text-blue-400 transition-colors cursor-pointer"
+                    >
+                      • {item.text}
+                    </button>
+                  </li>
                 ))}
-                {missingInfo.length > 5 && (
-                  <li className="text-gray-500">+ {missingInfo.length - 5} more</li>
+                {missingInfoItems.length > 5 && (
+                  <li>
+                    <button
+                      onClick={() => setShowAllMissing(!showAllMissing)}
+                      className="text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                    >
+                      {showAllMissing ? 'less' : `+ ${missingInfoItems.length - 5} more`}
+                    </button>
+                  </li>
                 )}
               </ul>
             ) : (

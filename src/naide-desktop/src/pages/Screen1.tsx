@@ -29,6 +29,7 @@ const chipPrompts = [
 const Screen1: React.FC = () => {
   const [textValue, setTextValue] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [textareaExpanded, setTextareaExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
   const { setInitialIntent } = useAppContext();
@@ -77,14 +78,46 @@ const Screen1: React.FC = () => {
           </div>
 
           {/* Textarea */}
-          <div className="mb-6">
+          <div className="mb-6 relative">
             <textarea
               ref={textareaRef}
               value={textValue}
               onChange={(e) => setTextValue(e.target.value)}
-              className="w-full h-48 bg-zinc-800 border border-zinc-700 rounded px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full bg-zinc-800 border border-zinc-700 rounded px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                textareaExpanded ? 'h-96' : 'h-48'
+              }`}
               placeholder="I want an app for my team to track customer requests...&#10;&#10;Or: I have a spreadsheet that's getting messy..."
             />
+            <button
+              onClick={() => setTextareaExpanded(!textareaExpanded)}
+              className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
+              title={textareaExpanded ? 'Collapse' : 'Expand'}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                {textareaExpanded ? (
+                  // Collapse icon
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                  />
+                ) : (
+                  // Expand icon
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                  />
+                )}
+              </svg>
+            </button>
           </div>
 
           {/* Chips */}
