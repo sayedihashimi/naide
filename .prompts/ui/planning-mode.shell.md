@@ -1,13 +1,16 @@
 # UI — Planning Mode Shell (Naide)
 
 Planning Mode is a **section-based guided Q&A** that persists after app creation (though app creation is out of scope for v1).
-For this prototype, implement the *shell* UI and core state transitions.
+For this prototype, implement the *shell* UI and core state transitions with full file persistence.
 
 ## Route
 - Planning Mode route: `/planning`
+- App checks for existing project on startup
+- If project exists: Load and go directly to Planning Mode
+- If no project: Show Screen 1 first
 
 ## Purpose
-Turn the user's Screen 1 intent into a structured plan. In v1, this is UI-only.
+Turn the user's Screen 1 intent into a structured plan. In v1, this includes full file persistence to markdown files.
 
 ## Layout requirements (text-based mockup)
 Match the approved Planning Mode mockup:
@@ -15,26 +18,27 @@ Match the approved Planning Mode mockup:
 - **Left sidebar**: sections
 - **Center**: guided questions for the selected section
 - **Right panel**: Review / Assumptions / Notes summary
-- **Footer**: "Plan is out of date → Rebuild Plan" and primary action
+- **Footer**: "Plan is out of date → Update plan" and primary action
+- **Title bar**: Clickable project name with folder icon
 
 Suggested layout (approx):
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ Naide                                                                       │
+│ Naide                                                     [📁 MyApp]         │
 ├───────────────┬──────────────────────────────────────┬──────────────────────┤
 │ Sidebar        │ Guided Q&A (center)                  │ Review (right)       │
 │               │                                      │                      │
 │ Overview       │ [Section Title]                     │ Plan summary         │
 │ Features       │ Q: ...                              │ - Missing info       │
 │ Data           │ A: [textarea with 💡 and ⛶]        │   (clickable)        │
-│ Access & Rules │                                      │ - Assumptions        │
+│ Access & Rules │    (saves on blur)                   │ - Assumptions        │
 │ Assumptions    │                                      │   (+ X more ↕)       │
 │ Plan Status    │                                      │ - Risks/Notes        │
 │ ─────────────  │                                      │                      │
 │ Code           │                                      │                      │
 ├───────────────┴──────────────────────────────────────┴──────────────────────┤
-│  Plan is out of date.  [ Rebuild Plan ]                 [ Generate App ]     │
+│  Plan is out of date.  [ Update plan ]                  [ Generate App ]     │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -69,6 +73,12 @@ When entering Planning Mode from Screen 1:
   - "What do you want to build?"
 - Right panel shows a brief summary (can be placeholders)
 
+When entering Planning Mode from app startup (existing project):
+- Load all section data from files
+- Populate textareas with saved content
+- Select **Overview** by default
+- Plan is NOT marked as dirty (freshly loaded state)
+
 ## Guided Q&A mechanics (required)
 - Each section shows 3–5 question cards.
 - Cards have:
@@ -81,21 +91,27 @@ When entering Planning Mode from Screen 1:
 - **AI Assist button** (💡 lightbulb, yellow): Placeholder for future AI assistance
 - **Expand/Collapse button** (⛶ resize, gray): Toggles between compact (h-24) and expanded (h-64) height
 
+**Save behavior**:
+- Save on textarea blur (when user clicks away)
+- Save on text input blur
+- Save when "Update plan" clicked
+- Save before project switching
+
 **Important**: Editing any answer should mark the plan as **dirty**.
 
 ## Plan dirty / rebuild behavior (required)
 - Maintain `planDirty: boolean`
-- Default: `false` when Planning Mode first loads with the Screen 1 text inserted (treat insertion as "current")
+- Default: `false` when Planning Mode first loads (either from Screen 1 or from file loading)
 - If user edits any answer → `planDirty = true`
 - Footer state:
   - When `planDirty = true`:
     - show label: "Plan is out of date"
-    - enable + highlight **Rebuild Plan** button
+    - enable + highlight **Update plan** button
     - disable (or visually deemphasize) **Generate App** button (Generate App is a stub anyway)
-  - When user clicks **Rebuild Plan**:
-    - simulate a rebuild (short fake progress state is optional)
+  - When user clicks **Update plan**:
+    - save all changes to files
     - set `planDirty = false`
-    - show a small confirmation (toast or inline message): "Plan rebuilt"
+    - show a small confirmation (toast or inline message): "Plan updated"
 
 ## Generate App button (stub)
 - Present on the footer for realism
@@ -119,11 +135,19 @@ These can be static placeholders initially but should update minimally:
 ## Navigation
 - Sidebar click switches section
 - Preserve entered values per section (state)
-- Plan dirty state remains true until rebuild
+- Plan dirty state remains true until update
 - Missing info items navigate to corresponding sections when clicked
 
+## Project Management
+- **Title bar**: Shows project name (e.g., "MyApp") with folder icon
+- **Click project name**: 
+  - Save current project
+  - Show folder picker dialog
+  - Load selected project or create new one
+  - If project has files: Load and show Planning Mode
+  - If empty folder: Create files and show Screen 1
+
 ## Out of scope
-- No actual artifact file generation
+- No actual app generation
 - No Copilot SDK calls
-- No persistence required
 - AI Assist button functionality (placeholder only)
