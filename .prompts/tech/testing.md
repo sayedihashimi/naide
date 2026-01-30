@@ -18,16 +18,13 @@ Available test commands in `package.json`:
 - `npm run test:ui` - Run tests with Vitest UI
 - `npm run test:coverage` - Run tests with coverage report
 
-## Current Status
+## Vite Configuration
 
-**Note**: The test infrastructure has been set up with comprehensive test cases,  but currently has compatibility issues with the `rolldown-vite` bundler used in this project. The tests are fully written and ready to run once the compatibility issue is resolved. This is a known limitation of using rolldown-vite (an experimental Rust-based Vite implementation) instead of standard Vite.
+The project uses two separate Vite configurations:
+- **rolldown-vite** for development and production builds (`npm run dev`, `npm run build`)
+- **Standard vite** for testing (`npm test`)
 
-### Resolution Options:
-1. Wait for rolldown-vite to improve test compatibility
-2. Use standard Vite for the project instead of rolldown-vite
-3. Configure a separate Vite installation specifically for testing
-
-The test files themselves are complete and follow best practices for React testing.
+This dual setup allows us to benefit from rolldown-vite's performance in development while maintaining full test compatibility with Vitest.
 
 ## Test Structure
 
@@ -41,7 +38,8 @@ Tests are colocated with source files using the `.test.tsx` or `.test.ts` naming
 
 ### Test Setup
 - `src/test/setup.ts` - Global test setup and Tauri API mocks
-- `vitest.config.ts` - Vitest configuration
+- `vitest.config.ts` - Vitest configuration (uses standard Vite)
+- `vite.config.ts` - Development configuration (uses rolldown-vite)
 
 ## Test Coverage
 
@@ -122,7 +120,7 @@ describe('MyComponent', () => {
 
 ## Continuous Integration
 
-Once the rolldown-vite compatibility is resolved, tests should be run:
+Tests should be run:
 - Before committing code
 - In CI/CD pipelines
 - Before merging pull requests
@@ -135,4 +133,4 @@ The test suite is designed to be fast and reliable for development workflows.
 - Tauri desktop environment is not required to run tests
 - Tests focus on user behavior and requirements, not implementation details
 - All tests are written in TypeScript for type safety
-- Test infrastructure is complete but awaiting rolldown-vite compatibility fix
+- Development uses rolldown-vite for performance; testing uses standard vite for compatibility
