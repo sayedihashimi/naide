@@ -150,6 +150,24 @@ const PlanningMode: React.FC = () => {
     }
   }, [state.initialIntentText, getSectionAnswer, updateSectionAnswer, setPlanDirty]);
 
+  // Save when window is about to close
+  useEffect(() => {
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+      if (state.planDirty) {
+        // Save changes before closing
+        try {
+          await saveProject();
+          console.log('[PlanningMode] Saved on window close');
+        } catch (error) {
+          console.error('[PlanningMode] Error saving on close:', error);
+        }
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [state.planDirty, saveProject]);
+
   // Save handler for textareas (on blur)
   const handleTextareaBlur = async () => {
     try {

@@ -6,6 +6,112 @@ export interface ProjectConfig {
   path: string;
 }
 
+export interface ProjectInfo {
+  name: string;
+  path: string;
+  createdAt: string;
+}
+
+export interface NaideConfig {
+  lastUsedProject: string | null;
+  projects: ProjectInfo[];
+}
+
+// Get the config directory path (.naide in Documents)
+export async function getConfigPath(): Promise<string> {
+  const docsPath = await documentDir();
+  return await join(docsPath, '.naide');
+}
+
+// Get the config file path
+export async function getConfigFilePath(): Promise<string> {
+  const configDir = await getConfigPath();
+  return await join(configDir, 'config.json');
+}
+
+// Load config from .naide/config.json
+export async function loadConfig(): Promise<NaideConfig> {
+  try {
+    const configFilePath = await getConfigFilePath();
+    const configExists = await exists(configFilePath);
+    
+    if (!configExists) {
+      console.log('[Config] No config file found, returning default');
+      return {
+        lastUsedProject: null,
+        projects: []
+      };
+    }
+    
+    const content = await readTextFile(configFilePath);
+    const config = JSON.parse(content);
+    console.log('[Config] Loaded config:', config);
+    return config;
+  } catch (error) {
+    console.error('[Config] Error loading config:', error);
+    return {
+      lastUsedProject: null,
+      projects: []
+    };
+  }
+}
+
+// Save config to .naide/config.json
+export async function saveConfig(config: NaideConfig): Promise<void> {
+  try {
+    const configDir = await getConfigPath();
+    const configDirExists = await exists(configDir);
+    
+    if (!configDirExists) {
+      console.log('[Config] Creating config directory:', configDir);
+      await mkdir(configDir, { recursive: true });
+    }
+    
+    const configFilePath = await getConfigFilePath();
+    const content = JSON.stringify(config, null, 2);
+    console.log('[Config] Saving config to:', configFilePath);
+    await writeTextFile(configFilePath, content);
+    console.log('[Config] Config saved successfully');
+  } catch (error) {
+    console.error('[Config] Error saving config:', error);
+    throw error;
+  }
+}
+
+// Update last used project in config
+export async function updateLastUsedProject(projectPath: string): Promise<void> {
+  try {
+    const config = await loadConfig();
+    config.lastUsedProject = projectPath;
+    await saveConfig(config);
+    console.log('[Config] Updated last used project:', projectPath);
+  } catch (error) {
+    console.error('[Config] Error updating last used project:', error);
+  }
+}
+
+// Add a project to the projects list
+export async function addProjectToConfig(projectInfo: ProjectInfo): Promise<void> {
+  try {
+    const config = await loadConfig();
+    
+    // Check if project already exists
+    const existingIndex = config.projects.findIndex(p => p.path === projectInfo.path);
+    if (existingIndex >= 0) {
+      // Update existing project
+      config.projects[existingIndex] = projectInfo;
+    } else {
+      // Add new project
+      config.projects.push(projectInfo);
+    }
+    
+    await saveConfig(config);
+    console.log('[Config] Added/updated project in config:', projectInfo.name);
+  } catch (error) {
+    console.error('[Config] Error adding project to config:', error);
+  }
+}
+
 // Get the base project directory path
 export async function getProjectsBasePath(): Promise<string> {
   const docsPath = await documentDir();
@@ -39,6 +145,56 @@ export async function initializeProject(projectName: string): Promise<void> {
   } catch (error) {
     console.error('[FileSystem] Error initializing project:', error);
     // Don't throw - just log, as this might fail in browser/dev mode
+  }
+}
+
+// Create all project files (can be empty)
+export async function createAllProjectFiles(projectName: string, initialIntent?: string): Promise<void> {
+  try {
+    console.log(`[FileSystem] Creating all project files for: ${projectName}`);
+    
+    // Ensure project folder exists
+    await initializeProject(projectName);
+    
+    const projectPath = await getProjectPath(projectName);
+    
+    // Define all files
+    const files = [
+      { name: 'Intent.md', content: initialIntent ? `# Overview\n\n## What do you want to build?\n\n${initialIntent}\n\n` : '# Overview\n\n' },
+      { name: 'AppSpec.md', content: '# Features\n\n' },
+      { name: 'DataSpec.md', content: '# Data\n\n' },
+      { name: 'Rules.md', content: '# Access & Rules\n\n' },
+      { name: 'Assumptions.md', content: '# Assumptions\n\n' },
+      { name: 'Tasks.json', content: '{}' }
+    ];
+    
+    // Create each file
+    for (const file of files) {
+      const filePath = await join(projectPath, file.name);
+      const fileExists = await exists(filePath);
+      
+      if (!fileExists) {
+        console.log(`[FileSystem] Creating ${file.name}`);
+        await writeTextFile(filePath, file.content);
+      } else {
+        console.log(`[FileSystem] ${file.name} already exists, skipping`);
+      }
+    }
+    
+    console.log(`[FileSystem] All project files created successfully`);
+    
+    // Update config
+    const projectInfo: ProjectInfo = {
+      name: projectName,
+      path: projectPath,
+      createdAt: new Date().toISOString()
+    };
+    await addProjectToConfig(projectInfo);
+    await updateLastUsedProject(projectPath);
+    
+  } catch (error) {
+    console.error('[FileSystem] Error creating project files:', error);
+    throw error;
   }
 }
 

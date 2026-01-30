@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { initializeProject, saveSectionToFile, loadProjectData, checkProjectExists } from '../utils/fileSystem';
+import { 
+  initializeProject, 
+  saveSectionToFile, 
+  loadProjectData, 
+  checkProjectExists,
+  getProjectPath,
+  updateLastUsedProject
+} from '../utils/fileSystem';
 
 interface AppState {
   initialIntentText: string;
@@ -119,6 +126,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
       console.log('[AppContext] saveProject completed successfully');
+      
+      // Update config with last used project
+      const projectPath = await getProjectPath(state.projectName);
+      await updateLastUsedProject(projectPath);
+      console.log('[AppContext] Updated last used project in config');
     } catch (error) {
       console.error('[AppContext] Error saving project:', error);
       throw error;

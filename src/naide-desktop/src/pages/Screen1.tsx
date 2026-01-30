@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import Modal from '../components/Modal';
+import { createAllProjectFiles } from '../utils/fileSystem';
 
 const chipPrompts = [
   {
@@ -32,7 +33,7 @@ const Screen1: React.FC = () => {
   const [textareaExpanded, setTextareaExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
-  const { setInitialIntent } = useAppContext();
+  const { setInitialIntent, state } = useAppContext();
 
   const handleChipClick = (chipText: string) => {
     if (textValue.trim() === '') {
@@ -43,13 +44,26 @@ const Screen1: React.FC = () => {
     textareaRef.current?.focus();
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     const trimmedText = textValue.trim();
     if (trimmedText === '') {
       setShowModal(true);
     } else {
-      setInitialIntent(trimmedText);
-      navigate('/planning');
+      try {
+        // Create project folder and all files
+        console.log('[Screen1] Creating project files...');
+        await createAllProjectFiles(state.projectName, trimmedText);
+        console.log('[Screen1] Project files created successfully');
+        
+        // Set initial intent and navigate
+        setInitialIntent(trimmedText);
+        navigate('/planning');
+      } catch (error) {
+        console.error('[Screen1] Error creating project files:', error);
+        // Still navigate even if file creation fails (for browser mode)
+        setInitialIntent(trimmedText);
+        navigate('/planning');
+      }
     }
   };
 

@@ -12,6 +12,9 @@
       "allow": [
         {
           "path": "$DOCUMENT/naide/**"
+        },
+        {
+          "path": "$DOCUMENT/.naide/**"
         }
       ]
     },
@@ -20,6 +23,9 @@
       "allow": [
         {
           "path": "$DOCUMENT/naide/**"
+        },
+        {
+          "path": "$DOCUMENT/.naide/**"
         }
       ]
     },
@@ -28,6 +34,9 @@
       "allow": [
         {
           "path": "$DOCUMENT/naide/**"
+        },
+        {
+          "path": "$DOCUMENT/.naide/**"
         }
       ]
     },
@@ -36,6 +45,9 @@
       "allow": [
         {
           "path": "$DOCUMENT/naide/**"
+        },
+        {
+          "path": "$DOCUMENT/.naide/**"
         }
       ]
     },
