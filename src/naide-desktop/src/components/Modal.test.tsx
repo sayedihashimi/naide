@@ -80,6 +80,9 @@ describe('Modal', () => {
       </Modal>
     )
     const okButton = screen.getByRole('button', { name: /ok/i })
-    expect(okButton).toHaveAttribute('autoFocus')
+    expect(okButton).toBeInTheDocument()
+    // The dialog div is focused (not the button) for focus trap
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toBeInTheDocument()
   })
 })

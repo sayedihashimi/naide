@@ -86,6 +86,9 @@ describe('fileSystem utilities', () => {
         ]
       }
       
+      // Mock exists to return false so it creates the directory
+      vi.mocked(exists).mockResolvedValue(false)
+      
       await saveConfig(mockConfig)
       
       expect(mkdir).toHaveBeenCalled()

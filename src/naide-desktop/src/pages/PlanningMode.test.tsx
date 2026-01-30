@@ -45,11 +45,14 @@ describe('PlanningMode', () => {
 
   it('should render all main sections in sidebar', () => {
     renderPlanningMode()
-    expect(screen.getByText('Overview')).toBeInTheDocument()
+    // Use getAllByText for sections that appear multiple times
+    const overviewElements = screen.getAllByText('Overview')
+    expect(overviewElements.length).toBeGreaterThan(0)
     expect(screen.getByText('Features')).toBeInTheDocument()
     expect(screen.getByText('Data')).toBeInTheDocument()
     expect(screen.getByText('Access & Rules')).toBeInTheDocument()
-    expect(screen.getByText('Assumptions')).toBeInTheDocument()
+    const assumptionsElements = screen.getAllByText('Assumptions')
+    expect(assumptionsElements.length).toBeGreaterThan(0)
   })
 
   it('should render Code section separately', () => {

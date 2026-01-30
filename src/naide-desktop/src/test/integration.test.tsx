@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { AppProvider } from '../context/AppContext'
 import Screen1 from '../pages/Screen1'
 import PlanningMode from '../pages/PlanningMode'
@@ -25,16 +25,16 @@ vi.mock('../utils/fileSystem', () => ({
   updateLastUsedProject: vi.fn().mockResolvedValue(undefined),
 }))
 
-const renderApp = () => {
+const renderApp = (initialRoute = '/') => {
   return render(
-    <BrowserRouter>
+    <MemoryRouter initialEntries={[initialRoute]}>
       <AppProvider>
         <Routes>
           <Route path="/" element={<Screen1 />} />
           <Route path="/planning" element={<PlanningMode />} />
         </Routes>
       </AppProvider>
-    </BrowserRouter>
+    </MemoryRouter>
   )
 }
 
