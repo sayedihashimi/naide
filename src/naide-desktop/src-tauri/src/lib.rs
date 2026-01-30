@@ -48,12 +48,10 @@ pub fn run() {
     .on_window_event(|_window, event| {
       // Clean up sidecar on app exit
       if let tauri::WindowEvent::CloseRequested { .. } = event {
-        if let Some(state) = _window.state::<Mutex<SidecarState>>().try_lock().ok() {
-          if let Some(ref mut child) = &mut *state {
-            if let Some(mut process) = child.process.take() {
-              println!("[Tauri] Stopping sidecar process...");
-              let _ = process.kill();
-            }
+        if let Some(mut state) = _window.state::<Mutex<SidecarState>>().try_lock().ok() {
+          if let Some(mut process) = state.process.take() {
+            println!("[Tauri] Stopping sidecar process...");
+            let _ = process.kill();
           }
         }
       }
