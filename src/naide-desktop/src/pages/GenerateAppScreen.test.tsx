@@ -28,6 +28,12 @@ vi.mock('../utils/fileSystem', () => ({
   saveConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock chat persistence utilities
+vi.mock('../utils/chatPersistence', () => ({
+  loadChatSession: vi.fn().mockResolvedValue([]),
+  saveChatSession: vi.fn().mockResolvedValue(undefined),
+}));
+
 const renderGenerateAppScreen = () => {
   return render(
     <BrowserRouter>
@@ -43,7 +49,7 @@ describe('GenerateAppScreen', () => {
     mockNavigate.mockClear();
   });
 
-  it('renders the Generate App screen with 3-column layout', () => {
+  it('renders the Generate App screen with 3-column layout', async () => {
     renderGenerateAppScreen();
 
     // Check header
@@ -58,7 +64,10 @@ describe('GenerateAppScreen', () => {
     // Check center chat area
     expect(screen.getByRole('heading', { name: 'Generate App' })).toBeInTheDocument();
     expect(screen.getByText(/Talk to Naide to generate and refine your app/i)).toBeInTheDocument();
-    expect(screen.getByText(/I'm ready. I'll generate an app based on your plan./i)).toBeInTheDocument();
+    
+    // Wait for welcome messages to load
+    expect(await screen.findByText(/I'm ready. I'll generate an app based on your plan./i)).toBeInTheDocument();
+    
     expect(screen.getByPlaceholderText(/Type your message.../i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
 
@@ -89,13 +98,18 @@ describe('GenerateAppScreen', () => {
     expect(filesButton).toHaveClass('text-gray-500', 'cursor-not-allowed');
   });
 
-  it('has disabled chat input and buttons', () => {
+  it('has enabled chat input but Send disabled when empty', async () => {
     renderGenerateAppScreen();
+
+    // Wait for component to load
+    await screen.findByPlaceholderText(/Type your message.../i);
 
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
     const sendButton = screen.getByRole('button', { name: 'Send' });
 
-    expect(messageInput).toBeDisabled();
+    // Input should be enabled
+    expect(messageInput).not.toBeDisabled();
+    // Send button should be disabled when input is empty
     expect(sendButton).toBeDisabled();
   });
 
@@ -119,10 +133,65 @@ describe('GenerateAppScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/planning');
   });
 
-  it('displays placeholder assistant messages', () => {
+  it('displays placeholder assistant messages', async () => {
     renderGenerateAppScreen();
 
-    expect(screen.getByText(/I'm ready. I'll generate an app based on your plan./i)).toBeInTheDocument();
+    // Wait for welcome messages to load
+    expect(await screen.findByText(/I'm ready. I'll generate an app based on your plan./i)).toBeInTheDocument();
     expect(screen.getByText(/Before I start, is there anything you want to emphasize or clarify?/i)).toBeInTheDocument();
+  });
+
+  it('enables Send button when user types message', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+    const sendButton = screen.getByRole('button', { name: 'Send' });
+
+    // Initially disabled
+    expect(sendButton).toBeDisabled();
+
+    // Type a message
+    await user.type(messageInput, 'Hello');
+
+    // Should be enabled now
+    expect(sendButton).not.toBeDisabled();
+  });
+
+  it('has expand/collapse button for textarea', async () => {
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const expandButton = screen.getByTitle(/Expand/i);
+    expect(expandButton).toBeInTheDocument();
+  });
+
+  it('toggles textarea height when expand/collapse button is clicked', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+    const expandButton = screen.getByTitle(/Expand/i);
+
+    // Initially compact (h-20)
+    expect(messageInput).toHaveClass('h-20');
+
+    // Click to expand
+    await user.click(expandButton);
+
+    // Should be expanded (h-40)
+    expect(messageInput).toHaveClass('h-40');
+
+    // Click to collapse
+    const collapseButton = screen.getByTitle(/Collapse/i);
+    await user.click(collapseButton);
+
+    // Should be compact again
+    expect(messageInput).toHaveClass('h-20');
   });
 });

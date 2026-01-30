@@ -1,9 +1,139 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '../context/useAppContext';
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
 
 const GenerateAppScreen: React.FC = () => {
   const navigate = useNavigate();
+  const { state } = useAppContext();
   const [messageInput, setMessageInput] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load chat session on mount
+  useEffect(() => {
+    const loadChat = async () => {
+      try {
+        const { loadChatSession } = await import('../utils/chatPersistence');
+        const loadedMessages = await loadChatSession(state.projectName);
+        if (loadedMessages.length > 0) {
+          setMessages(loadedMessages);
+        } else {
+          // Initialize with welcome messages
+          setMessages([
+            {
+              id: '1',
+              role: 'assistant',
+              content: "I'm ready. I'll generate an app based on your plan.",
+              timestamp: new Date().toISOString(),
+            },
+            {
+              id: '2',
+              role: 'assistant',
+              content: 'Before I start, is there anything you want to emphasize or clarify?',
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error('[GenerateApp] Error loading chat:', error);
+        // Fallback to welcome messages
+        setMessages([
+          {
+            id: '1',
+            role: 'assistant',
+            content: "I'm ready. I'll generate an app based on your plan.",
+            timestamp: new Date().toISOString(),
+          },
+          {
+            id: '2',
+            role: 'assistant',
+            content: 'Before I start, is there anything you want to emphasize or clarify?',
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+    };
+    loadChat();
+  }, [state.projectName]);
+
+  // Save chat when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      const saveChat = async () => {
+        try {
+          const { saveChatSession } = await import('../utils/chatPersistence');
+          await saveChatSession(state.projectName, messages);
+        } catch (error) {
+          console.error('[GenerateApp] Error saving chat:', error);
+        }
+      };
+      // Debounce save to avoid excessive writes
+      const timer = setTimeout(saveChat, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [messages, state.projectName]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (transcriptRef.current) {
+      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || isLoading) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: messageInput.trim(),
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setMessageInput('');
+    setIsLoading(true);
+
+    // Simulate assistant response
+    setTimeout(() => {
+      const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'naide response coming soon',
+        timestamp: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      setIsLoading(false);
+      
+      // Focus back on textarea
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    }, 500);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ctrl+Enter or Cmd+Enter to send
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+    // Just Enter adds a new line (default behavior)
+  };
+
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">
@@ -60,58 +190,64 @@ const GenerateAppScreen: React.FC = () => {
           </div>
 
           {/* Transcript area */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div ref={transcriptRef} className="flex-1 overflow-y-auto p-6">
             <div className="max-w-3xl mx-auto space-y-4">
-              {/* Placeholder assistant messages */}
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                  <svg
-                    className="w-5 h-5 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-                    <p className="text-gray-100">
-                      I'm ready. I'll generate an app based on your plan.
-                    </p>
+              {messages.map((message) => (
+                <div key={message.id} className="flex gap-3">
+                  {message.role === 'assistant' && (
+                    <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                      <svg
+                        className="w-5 h-5 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                  <div className={`flex-1 ${message.role === 'user' ? 'ml-11' : ''}`}>
+                    <div className={`rounded-lg p-4 ${
+                      message.role === 'assistant'
+                        ? 'bg-zinc-900 border border-zinc-800'
+                        : 'bg-blue-600'
+                    }`}>
+                      <p className={message.role === 'assistant' ? 'text-gray-100' : 'text-white'}>
+                        {message.content}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                  <svg
-                    className="w-5 h-5 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-                    <p className="text-gray-100">
-                      Before I start, is there anything you want to emphasize or clarify?
-                    </p>
+              ))}
+              {isLoading && (
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                    <svg
+                      className="w-5 h-5 text-white animate-pulse"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+                      <p className="text-gray-400">Thinking...</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -119,17 +255,58 @@ const GenerateAppScreen: React.FC = () => {
           <div className="border-t border-zinc-800 p-6">
             <div className="max-w-3xl mx-auto">
               <div className="flex gap-3">
-                <textarea
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  placeholder="Type your message..."
-                  className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20"
-                  disabled
-                />
+                <div className="flex-1 relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type your message... (Ctrl/Cmd+Enter to send)"
+                    className={`w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                      isExpanded ? 'h-40' : 'h-20'
+                    }`}
+                  />
+                  {/* Expand/Collapse button */}
+                  <button
+                    onClick={toggleExpand}
+                    className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
+                    title={isExpanded ? 'Collapse' : 'Expand'}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      {isExpanded ? (
+                        // Collapse icon
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                        />
+                      ) : (
+                        // Expand icon
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                        />
+                      )}
+                    </svg>
+                  </button>
+                </div>
                 <div className="flex flex-col gap-2">
                   <button
-                    disabled
-                    className="px-4 py-2 bg-zinc-800 text-gray-500 rounded-lg cursor-not-allowed"
+                    onClick={handleSendMessage}
+                    disabled={!messageInput.trim() || isLoading}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      !messageInput.trim() || isLoading
+                        ? 'bg-zinc-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
                   >
                     Send
                   </button>
