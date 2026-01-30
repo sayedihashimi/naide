@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/useAppContext';
 import { open } from '@tauri-apps/plugin-dialog';
 
@@ -123,6 +124,7 @@ const sectionFileMapping: Record<string, string> = {
 };
 
 const PlanningMode: React.FC = () => {
+  const navigate = useNavigate();
   const { state, updateSectionAnswer, getSectionAnswer, setPlanDirty, saveProject, loadProject } = useAppContext();
   const [selectedSection, setSelectedSection] = useState('Overview');
   const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
@@ -178,7 +180,10 @@ const PlanningMode: React.FC = () => {
   };
 
   const handleGenerateApp = () => {
-    alert('Coming soon: Generate App functionality');
+    // Navigate to Generate App screen when plan is not dirty
+    if (!state.planDirty) {
+      navigate('/generate');
+    }
   };
 
   const handleProjectNameClick = async () => {
