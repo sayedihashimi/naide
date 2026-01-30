@@ -189,7 +189,7 @@ const GenerateAppScreen: React.FC = () => {
         body: JSON.stringify({
           mode: copilotMode,
           message: userInput,
-          workspaceRoot: process.cwd(),
+          workspaceRoot: '', // Sidecar will use its own cwd
         }),
       });
 
