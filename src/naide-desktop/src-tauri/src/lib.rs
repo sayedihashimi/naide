@@ -22,11 +22,7 @@ pub fn run() {
       }
       
       // Start the copilot sidecar
-      let sidecar_path = if cfg!(target_os = "windows") {
-        "../../copilot-sidecar/dist/index.js"
-      } else {
-        "../../copilot-sidecar/dist/index.js"
-      };
+      let sidecar_path = "../../copilot-sidecar/dist/index.js";
       
       println!("[Tauri] Starting copilot sidecar...");
       
@@ -48,6 +44,19 @@ pub fn run() {
         }
       
       Ok(())
+    })
+    .on_window_event(|_window, event| {
+      // Clean up sidecar on app exit
+      if let tauri::WindowEvent::CloseRequested { .. } = event {
+        if let Some(state) = _window.state::<Mutex<SidecarState>>().try_lock().ok() {
+          if let Some(ref mut child) = &mut *state {
+            if let Some(mut process) = child.process.take() {
+              println!("[Tauri] Stopping sidecar process...");
+              let _ = process.kill();
+            }
+          }
+        }
+      }
     })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

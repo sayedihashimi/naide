@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url';
 import { dirname, join, resolve, sep } from 'path';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { CopilotClient } from '@github/copilot-sdk';
-import type { CopilotSession } from '@github/copilot-sdk';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,9 +21,8 @@ app.use(express.json());
 // Port for the sidecar API
 const PORT = 3001;
 
-// Track Copilot client and session
+// Track Copilot client
 let copilotClient: CopilotClient | null = null;
-let copilotSession: CopilotSession | null = null;
 let copilotReady = false;
 
 // Initialize Copilot client
@@ -234,45 +232,71 @@ app.post('/api/copilot/chat', async (req, res) => {
       // Combine system prompt with learnings
       const fullSystemPrompt = systemPrompt + learnings;
       
-      // Create or reuse session
-      if (!copilotSession) {
-        console.log('[Sidecar] Creating new Copilot session for Planning mode');
-        copilotSession = await copilotClient!.createSession({
-          model: 'gpt-4o',
-          systemMessage: {
-            content: fullSystemPrompt
-          }
-        });
-      }
+      // Create a new session for each request to avoid conflicts
+      console.log('[Sidecar] Creating new Copilot session for Planning mode');
+      const session = await copilotClient!.createSession({
+        model: 'gpt-4o',
+        systemMessage: {
+          content: fullSystemPrompt
+        }
+      });
       
       // Send user message and collect response
       const responseChunks: string[] = [];
       
-      // Set up event listeners for the response
+      // Set up event listeners for the response BEFORE sending
       const responsePromise = new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Response timeout'));
-        }, 60000); // 60 second timeout
+        let timeoutHandle: NodeJS.Timeout;
         
-        copilotSession!.on('assistant.message', (event) => {
+        // Set up event listeners and get unsubscribe functions
+        const unsubscribeAssistant = session.on('assistant.message', (event) => {
           if (event.data.content) {
             responseChunks.push(event.data.content);
           }
         });
         
-        copilotSession!.on('session.idle', () => {
-          clearTimeout(timeout);
+        const unsubscribeIdle = session.on('session.idle', () => {
+          clearTimeout(timeoutHandle);
+          // Clean up listeners
+          unsubscribeAssistant();
+          unsubscribeIdle();
+          unsubscribeError();
+          
+          // Destroy session after use
+          session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
+          
           resolve(responseChunks.join(''));
         });
         
-        copilotSession!.on('session.error', (event) => {
-          clearTimeout(timeout);
+        const unsubscribeError = session.on('session.error', (event) => {
+          clearTimeout(timeoutHandle);
+          // Clean up listeners
+          unsubscribeAssistant();
+          unsubscribeIdle();
+          unsubscribeError();
+          
+          // Destroy session after error
+          session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
+          
           reject(new Error(event.data.message || 'Copilot session error'));
         });
+        
+        // Set timeout
+        timeoutHandle = setTimeout(() => {
+          // Clean up listeners on timeout
+          unsubscribeAssistant();
+          unsubscribeIdle();
+          unsubscribeError();
+          
+          // Destroy session after timeout
+          session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
+          
+          reject(new Error('Response timeout'));
+        }, 60000); // 60 second timeout
       });
       
-      // Send the message
-      await copilotSession.send({ prompt: message });
+      // Send the message AFTER setting up listeners
+      await session.send({ prompt: message });
       
       // Wait for the response
       const replyText = await responsePromise;
@@ -325,10 +349,6 @@ process.on('SIGINT', async () => {
   
   try {
     // Clean up Copilot resources
-    if (copilotSession) {
-      await copilotSession.destroy();
-      copilotSession = null;
-    }
     if (copilotClient) {
       await copilotClient.stop();
       copilotClient = null;
