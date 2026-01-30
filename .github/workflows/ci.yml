@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: src/naide-desktop/package-lock.json
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Rust cache
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: './src/naide-desktop/src-tauri -> target'
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+    - name: Install npm dependencies
+      working-directory: src/naide-desktop
+      run: npm ci
+
+    - name: Run linter
+      working-directory: src/naide-desktop
+      run: npm run lint
+
+    - name: Run tests
+      working-directory: src/naide-desktop
+      run: npm run testonly
+
+    - name: Build frontend
+      working-directory: src/naide-desktop
+      run: npm run build
+
+    - name: Build Tauri app
+      working-directory: src/naide-desktop
+      run: npm run tauri build

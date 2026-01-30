@@ -1,4 +1,4 @@
-import { create, exists, readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
+import { exists, readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
 import { join, documentDir } from '@tauri-apps/api/path';
 
 export interface ProjectConfig {
