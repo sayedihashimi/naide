@@ -213,6 +213,36 @@ describe('GenerateAppScreen', () => {
     expect(descSpan).toBeInTheDocument();
   });
 
+  it('does not change messages when mode is changed after chat is initialized', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByLabelText(/Mode:/i);
+
+    // Send a message to initialize the chat
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+    await user.type(messageInput, 'Test message');
+    await user.keyboard('{Control>}{Enter}{/Control}');
+
+    // Wait for user message and response
+    expect(await screen.findByText('Test message')).toBeInTheDocument();
+    expect(await screen.findByText('naide response coming soon')).toBeInTheDocument();
+
+    // Now change the mode
+    const modeSelect = screen.getByLabelText(/Mode:/i);
+    await user.selectOptions(modeSelect, 'Building');
+
+    // The original messages should still be there
+    expect(screen.getByText('Test message')).toBeInTheDocument();
+    expect(screen.getByText('naide response coming soon')).toBeInTheDocument();
+    
+    // The Planning mode welcome messages should still be visible
+    expect(screen.getByText(/I'm in Planning Mode/i)).toBeInTheDocument();
+    
+    // The Building mode welcome messages should NOT appear
+    expect(screen.queryByText(/I'm in Building Mode/i)).not.toBeInTheDocument();
+  });
+
   it('enables Send button when user types message', async () => {
     const user = userEvent.setup();
     renderGenerateAppScreen();

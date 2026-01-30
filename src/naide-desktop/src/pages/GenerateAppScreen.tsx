@@ -5,61 +5,70 @@ import type { ChatMessage } from '../utils/chatPersistence';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
-const PLANNING_WELCOME_MESSAGES: ChatMessage[] = [
-  {
-    id: 'welcome-1',
-    role: 'assistant',
-    content: "I'm in Planning Mode. I'll help you create and update spec files without touching your code.",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: 'welcome-2',
-    role: 'assistant',
-    content: 'What would you like to plan or refine in your specifications?',
-    timestamp: new Date().toISOString(),
-  },
-];
-
-const BUILDING_WELCOME_MESSAGES: ChatMessage[] = [
-  {
-    id: 'welcome-1',
-    role: 'assistant',
-    content: "I'm in Building Mode. I'll help you implement your app and update specs as needed.",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: 'welcome-2',
-    role: 'assistant',
-    content: 'What feature would you like me to build or modify?',
-    timestamp: new Date().toISOString(),
-  },
-];
-
-const ANALYZING_WELCOME_MESSAGES: ChatMessage[] = [
-  {
-    id: 'welcome-1',
-    role: 'assistant',
-    content: "I'm in Analyzing Mode. This mode is coming soon.",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: 'welcome-2',
-    role: 'assistant',
-    content: 'I will help you analyze your code and provide insights.',
-    timestamp: new Date().toISOString(),
-  },
-];
-
 const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
+  const timestamp = new Date().toISOString();
+  
   switch (mode) {
     case 'Planning':
-      return PLANNING_WELCOME_MESSAGES;
+      return [
+        {
+          id: 'welcome-1',
+          role: 'assistant',
+          content: "I'm in Planning Mode. I'll help you create and update spec files without touching your code.",
+          timestamp,
+        },
+        {
+          id: 'welcome-2',
+          role: 'assistant',
+          content: 'What would you like to plan or refine in your specifications?',
+          timestamp,
+        },
+      ];
     case 'Building':
-      return BUILDING_WELCOME_MESSAGES;
+      return [
+        {
+          id: 'welcome-1',
+          role: 'assistant',
+          content: "I'm in Building Mode. I'll help you implement your app and update specs as needed.",
+          timestamp,
+        },
+        {
+          id: 'welcome-2',
+          role: 'assistant',
+          content: 'What feature would you like me to build or modify?',
+          timestamp,
+        },
+      ];
     case 'Analyzing':
-      return ANALYZING_WELCOME_MESSAGES;
+      return [
+        {
+          id: 'welcome-1',
+          role: 'assistant',
+          content: "I'm in Analyzing Mode. This mode will be available soon.",
+          timestamp,
+        },
+        {
+          id: 'welcome-2',
+          role: 'assistant',
+          content: 'In the future, I will help you analyze your code and provide insights.',
+          timestamp,
+        },
+      ];
     default:
-      return PLANNING_WELCOME_MESSAGES;
+      return [
+        {
+          id: 'welcome-1',
+          role: 'assistant',
+          content: "I'm in Planning Mode. I'll help you create and update spec files without touching your code.",
+          timestamp,
+        },
+        {
+          id: 'welcome-2',
+          role: 'assistant',
+          content: 'What would you like to plan or refine in your specifications?',
+          timestamp,
+        },
+      ];
   }
 };
 
@@ -96,7 +105,8 @@ const GenerateAppScreen: React.FC = () => {
       }
     };
     loadChat();
-  }, [state.projectName, copilotMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.projectName]); // copilotMode intentionally excluded - mode changes are handled by handleModeChange
 
   // Save chat when messages change (but only after initialization with user messages)
   useEffect(() => {
