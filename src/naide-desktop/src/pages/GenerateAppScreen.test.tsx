@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import GenerateAppScreen from './GenerateAppScreen';
+import { AppProvider } from '../context/AppContext';
 
 // Mock useNavigate
 const mockNavigate = vi.fn();
@@ -14,13 +15,36 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-describe('GenerateAppScreen', () => {
-  it('renders the Generate App screen with 3-column layout', () => {
-    render(
-      <BrowserRouter>
+// Mock file system utilities
+vi.mock('../utils/fileSystem', () => ({
+  createAllProjectFiles: vi.fn().mockResolvedValue(undefined),
+  initializeProject: vi.fn().mockResolvedValue(undefined),
+  saveSectionToFile: vi.fn().mockResolvedValue(undefined),
+  loadProjectData: vi.fn().mockResolvedValue({}),
+  checkProjectExists: vi.fn().mockResolvedValue(false),
+  getProjectPath: vi.fn().mockResolvedValue('/mock/path/MyApp'),
+  updateLastUsedProject: vi.fn().mockResolvedValue(undefined),
+  loadConfig: vi.fn().mockResolvedValue({ lastUsedProject: null, projects: [] }),
+  saveConfig: vi.fn().mockResolvedValue(undefined),
+}));
+
+const renderGenerateAppScreen = () => {
+  return render(
+    <BrowserRouter>
+      <AppProvider>
         <GenerateAppScreen />
-      </BrowserRouter>
-    );
+      </AppProvider>
+    </BrowserRouter>
+  );
+};
+
+describe('GenerateAppScreen', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+  });
+
+  it('renders the Generate App screen with 3-column layout', () => {
+    renderGenerateAppScreen();
 
     // Check header
     expect(screen.getByRole('heading', { name: 'Naide' })).toBeInTheDocument();
@@ -47,22 +71,14 @@ describe('GenerateAppScreen', () => {
   });
 
   it('has Generate button highlighted in navigation', () => {
-    render(
-      <BrowserRouter>
-        <GenerateAppScreen />
-      </BrowserRouter>
-    );
+    renderGenerateAppScreen();
 
     const generateButton = screen.getByRole('button', { name: 'Generate' });
     expect(generateButton).toHaveClass('bg-zinc-800', 'text-gray-100', 'font-medium');
   });
 
   it('has disabled Activity and Files buttons', () => {
-    render(
-      <BrowserRouter>
-        <GenerateAppScreen />
-      </BrowserRouter>
-    );
+    renderGenerateAppScreen();
 
     const activityButton = screen.getByRole('button', { name: 'Activity' });
     const filesButton = screen.getByRole('button', { name: 'Files' });
@@ -74,11 +90,7 @@ describe('GenerateAppScreen', () => {
   });
 
   it('has disabled chat input and buttons', () => {
-    render(
-      <BrowserRouter>
-        <GenerateAppScreen />
-      </BrowserRouter>
-    );
+    renderGenerateAppScreen();
 
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
     const sendButton = screen.getByRole('button', { name: 'Send' });
@@ -88,11 +100,7 @@ describe('GenerateAppScreen', () => {
   });
 
   it('has disabled preview control buttons', () => {
-    render(
-      <BrowserRouter>
-        <GenerateAppScreen />
-      </BrowserRouter>
-    );
+    renderGenerateAppScreen();
 
     const startButton = screen.getByRole('button', { name: 'Start' });
     const stopButton = screen.getByRole('button', { name: 'Stop' });
@@ -103,11 +111,7 @@ describe('GenerateAppScreen', () => {
 
   it('navigates back to Planning Mode when Planning button is clicked', async () => {
     const user = userEvent.setup();
-    render(
-      <BrowserRouter>
-        <GenerateAppScreen />
-      </BrowserRouter>
-    );
+    renderGenerateAppScreen();
 
     const planningButton = screen.getByRole('button', { name: 'Planning' });
     await user.click(planningButton);
@@ -116,11 +120,7 @@ describe('GenerateAppScreen', () => {
   });
 
   it('displays placeholder assistant messages', () => {
-    render(
-      <BrowserRouter>
-        <GenerateAppScreen />
-      </BrowserRouter>
-    );
+    renderGenerateAppScreen();
 
     expect(screen.getByText(/I'm ready. I'll generate an app based on your plan./i)).toBeInTheDocument();
     expect(screen.getByText(/Before I start, is there anything you want to emphasize or clarify?/i)).toBeInTheDocument();
