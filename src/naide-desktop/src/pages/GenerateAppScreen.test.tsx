@@ -15,6 +15,9 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+// Mock fetch
+global.fetch = vi.fn();
+
 // Mock file system utilities
 vi.mock('../utils/fileSystem', () => ({
   createAllProjectFiles: vi.fn().mockResolvedValue(undefined),
@@ -219,6 +222,12 @@ describe('GenerateAppScreen', () => {
 
     await screen.findByLabelText(/Mode:/i);
 
+    // Mock fetch to return a Planning mode response
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ replyText: 'Planning mode response' }),
+    });
+
     // Send a message to initialize the chat
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
     await user.type(messageInput, 'Test message');
@@ -226,7 +235,7 @@ describe('GenerateAppScreen', () => {
 
     // Wait for user message and response
     expect(await screen.findByText('Test message')).toBeInTheDocument();
-    expect(await screen.findByText('naide response coming soon')).toBeInTheDocument();
+    expect(await screen.findByText('Planning mode response')).toBeInTheDocument();
 
     // Now change the mode
     const modeSelect = screen.getByLabelText(/Mode:/i);
@@ -234,7 +243,7 @@ describe('GenerateAppScreen', () => {
 
     // The original messages should still be there
     expect(screen.getByText('Test message')).toBeInTheDocument();
-    expect(screen.getByText('naide response coming soon')).toBeInTheDocument();
+    expect(screen.getByText('Planning mode response')).toBeInTheDocument();
     
     // The Planning mode welcome messages should still be visible
     expect(screen.getByText(/I'm in Planning Mode/i)).toBeInTheDocument();
@@ -306,6 +315,12 @@ describe('GenerateAppScreen', () => {
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
     const sendButton = screen.getByRole('button', { name: 'Send' });
 
+    // Mock fetch to return a Planning mode response
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ replyText: 'Planning mode response' }),
+    });
+
     // Type a message
     await user.type(messageInput, 'Test message');
     await user.click(sendButton);
@@ -313,8 +328,8 @@ describe('GenerateAppScreen', () => {
     // User message should appear
     expect(await screen.findByText('Test message')).toBeInTheDocument();
     
-    // Assistant response should appear after delay
-    expect(await screen.findByText('naide response coming soon')).toBeInTheDocument();
+    // Assistant response should appear
+    expect(await screen.findByText('Planning mode response')).toBeInTheDocument();
   });
 
   it('sends message when Ctrl+Enter is pressed', async () => {
@@ -325,6 +340,12 @@ describe('GenerateAppScreen', () => {
     
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
 
+    // Mock fetch to return a Planning mode response
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ replyText: 'Planning mode response' }),
+    });
+
     // Type a message
     await user.type(messageInput, 'Test message');
     
@@ -334,8 +355,8 @@ describe('GenerateAppScreen', () => {
     // User message should appear
     expect(await screen.findByText('Test message')).toBeInTheDocument();
     
-    // Assistant response should appear after delay
-    expect(await screen.findByText('naide response coming soon')).toBeInTheDocument();
+    // Assistant response should appear
+    expect(await screen.findByText('Planning mode response')).toBeInTheDocument();
   });
 
   it('adds new line when Enter is pressed without Ctrl', async () => {
@@ -355,5 +376,51 @@ describe('GenerateAppScreen', () => {
 
     // Should have multiline content
     expect(messageInput.value).toContain('Line 1\nLine 2');
+  });
+
+  it('returns "Building coming soon" when in Building mode', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByLabelText(/Mode:/i);
+    
+    const modeSelect = screen.getByLabelText(/Mode:/i);
+    await user.selectOptions(modeSelect, 'Building');
+
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+    const sendButton = screen.getByRole('button', { name: 'Send' });
+
+    // Type a message
+    await user.type(messageInput, 'Build something');
+    await user.click(sendButton);
+
+    // User message should appear
+    expect(await screen.findByText('Build something')).toBeInTheDocument();
+    
+    // Should get stub response
+    expect(await screen.findByText('Building coming soon')).toBeInTheDocument();
+  });
+
+  it('returns "Analyzing coming soon" when in Analyzing mode', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByLabelText(/Mode:/i);
+    
+    const modeSelect = screen.getByLabelText(/Mode:/i);
+    await user.selectOptions(modeSelect, 'Analyzing');
+
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+    const sendButton = screen.getByRole('button', { name: 'Send' });
+
+    // Type a message
+    await user.type(messageInput, 'Analyze something');
+    await user.click(sendButton);
+
+    // User message should appear
+    expect(await screen.findByText('Analyze something')).toBeInTheDocument();
+    
+    // Should get stub response
+    expect(await screen.findByText('Analyzing coming soon')).toBeInTheDocument();
   });
 });
