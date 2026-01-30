@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context/useAppContext';
 import { open } from '@tauri-apps/plugin-dialog';
 
 const sections = [
@@ -140,7 +140,7 @@ const PlanningMode: React.FC = () => {
 
   // Save when window is about to close
   useEffect(() => {
-    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = async () => {
       if (state.planDirty) {
         // Save changes before closing
         try {
