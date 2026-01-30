@@ -7,27 +7,116 @@ This repo contains a prototype of **Naide**, a desktop app for non‑pro develop
 - Planning Mode shell: section-based guided Q&A layout with a dirty-state footer:
   - "Plan is out of date → Rebuild Plan"
 - Navigation: Screen 1 → Planning Mode with initial intent text prefilled
+- **NEW**: Copilot SDK integration via Node.js sidecar
+  - Planning mode with AI-assisted specification creation
+  - Building and Analyzing modes (stub implementations)
+  - Learnings capture system
 
-## What is intentionally missing
-- No Copilot SDK integration
-- No project creation/update
-- No artifact generation
-- No persistence
+## Architecture
+
+### Components
+- **Frontend**: Tauri app with React + Vite (`src/naide-desktop`)
+- **Sidecar**: Node.js service for Copilot SDK integration (`src/copilot-sidecar`)
+
+### Communication
+The frontend communicates with the sidecar via HTTP API on `localhost:3001`.
+
+## Prerequisites
+
+- Node.js 18+
+- Rust and Tauri CLI
+- GitHub Copilot CLI (install and authenticate before using)
+  - Install: Follow instructions at https://github.com/github/gh-copilot
+  - Authenticate: Run `copilot` then `/login`
 
 ## How to run
+
+**Note**: The sidecar is now automatically built and started when you run the Tauri app. No separate terminal needed!
+
 From `src/naide-desktop`:
 
 ```sh
-tauri dev
+npm install
+npm run tauri:dev
+```
+
+The app will:
+1. Build the sidecar automatically
+2. Start the Tauri app
+3. Launch the sidecar in the background
+
+### Manual sidecar development (optional)
+
+If you want to run the sidecar separately for development:
+
+From `src/copilot-sidecar`:
+
+```sh
+npm install
+npm run dev
+```
+
+The sidecar will run on `http://localhost:3001`.
+
+Then start the Tauri app normally:
+
+From `src/naide-desktop`:
+
+```sh
+npm run tauri:dev
 ```
 
 ## How to build
+
+The build process also automatically builds the sidecar first.
+
 From `src/naide-desktop`:
 
 ```sh
-tauri build
+npm run tauri:build
 ```
 
-## Next steps (not implemented)
-- Implement artifact generation from Planning Mode
-- Connect to Copilot SDK (sidecar) to generate/update an app from artifacts
+### Manual sidecar build (optional)
+
+From `src/copilot-sidecar`:
+
+```sh
+npm run build
+```
+
+## Project Structure
+
+```
+/
+├── .prompts/
+│   ├── features/          # Feature specifications
+│   ├── plan/             # Planning documents
+│   └── system/           # System prompts for AI
+├── .naide/
+│   └── learnings/        # Project memory (created at runtime)
+├── src/
+│   ├── naide-desktop/    # Tauri React app
+│   └── copilot-sidecar/  # Node.js sidecar service
+└── README.naide.md       # This file
+```
+
+## Modes
+
+### Planning Mode
+- AI-assisted planning and specification creation
+- Updates files under `.prompts/plan/**` and `.prompts/features/**`
+- Does not modify code
+
+### Building Mode (Coming Soon)
+- Will update both code and specs
+- Currently returns "Building coming soon"
+
+### Analyzing Mode (Coming Soon)
+- Will analyze code and provide insights
+- Currently returns "Analyzing coming soon"
+
+## Next steps
+- Complete Copilot SDK integration (currently using placeholder)
+- Implement Building mode functionality
+- Implement Analyzing mode functionality
+- Add automatic learnings capture on corrections

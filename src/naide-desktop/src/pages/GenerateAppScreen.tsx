@@ -142,17 +142,84 @@ const GenerateAppScreen: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const userInput = messageInput.trim();
     setMessageInput('');
     setIsLoading(true);
 
-    // Simulate assistant response
-    setTimeout(() => {
+    try {
+      // For Building and Analyzing modes, use stub responses
+      if (copilotMode === 'Building') {
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          role: 'assistant',
+          content: 'Building coming soon',
+          timestamp: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsLoading(false);
+        
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        }
+        return;
+      }
+
+      if (copilotMode === 'Analyzing') {
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          role: 'assistant',
+          content: 'Analyzing coming soon',
+          timestamp: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsLoading(false);
+        
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        }
+        return;
+      }
+
+      // For Planning mode, call the sidecar
+      const response = await fetch('http://localhost:3001/api/copilot/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mode: copilotMode,
+          message: userInput,
+          workspaceRoot: '', // Sidecar will use its own cwd
+        }),
+      });
+
+      if (!response.ok) {
+        // Handle non-OK responses
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          role: 'assistant',
+          content: errorData.replyText || errorData.error || 'An error occurred',
+          timestamp: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsLoading(false);
+        
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        }
+        return;
+      }
+
+      const data = await response.json();
+
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
-        content: 'naide response coming soon',
+        content: data.replyText || data.error || 'An error occurred',
         timestamp: new Date().toISOString(),
       };
+
       setMessages(prev => [...prev, assistantMessage]);
       setIsLoading(false);
       
@@ -160,7 +227,23 @@ const GenerateAppScreen: React.FC = () => {
       if (textareaRef.current) {
         textareaRef.current.focus();
       }
-    }, 500);
+    } catch (error) {
+      console.error('[GenerateApp] Error calling sidecar:', error);
+      
+      const errorMessage: ChatMessage = {
+        id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        role: 'assistant',
+        content: 'Unable to connect to the Copilot service. Please make sure the sidecar is running.',
+        timestamp: new Date().toISOString(),
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      setIsLoading(false);
+      
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
