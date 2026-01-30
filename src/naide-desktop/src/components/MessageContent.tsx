@@ -10,8 +10,6 @@ interface MessageContentProps {
 
 interface CodeProps extends React.HTMLAttributes<HTMLElement> {
   inline?: boolean;
-  className?: string;
-  children?: React.ReactNode;
 }
 
 // Helper function to validate href for security
