@@ -1,0 +1,57 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables the default permissions",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [
+        {
+          "path": "$DOCUMENT/naide/**"
+        },
+        {
+          "path": "$DOCUMENT/.naide/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [
+        {
+          "path": "$DOCUMENT/naide/**"
+        },
+        {
+          "path": "$DOCUMENT/.naide/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [
+        {
+          "path": "$DOCUMENT/naide/**"
+        },
+        {
+          "path": "$DOCUMENT/.naide/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [
+        {
+          "path": "$DOCUMENT/naide/**"
+        },
+        {
+          "path": "$DOCUMENT/.naide/**"
+        }
+      ]
+    },
+    "dialog:default"
+  ]
+}
+
