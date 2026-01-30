@@ -5,6 +5,12 @@ import type { ChatMessage } from '../utils/chatPersistence';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
+const MODE_DESCRIPTIONS: Record<CopilotMode, string> = {
+  Planning: '(Create/update specs only)',
+  Building: '(Update code and specs)',
+  Analyzing: '(Coming soon)',
+};
+
 const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
   const timestamp = new Date().toISOString();
   
@@ -12,13 +18,13 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
     case 'Planning':
       return [
         {
-          id: 'welcome-1',
+          id: 'welcome-planning-1',
           role: 'assistant',
           content: "I'm in Planning Mode. I'll help you create and update spec files without touching your code.",
           timestamp,
         },
         {
-          id: 'welcome-2',
+          id: 'welcome-planning-2',
           role: 'assistant',
           content: 'What would you like to plan or refine in your specifications?',
           timestamp,
@@ -27,13 +33,13 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
     case 'Building':
       return [
         {
-          id: 'welcome-1',
+          id: 'welcome-building-1',
           role: 'assistant',
           content: "I'm in Building Mode. I'll help you implement your app and update specs as needed.",
           timestamp,
         },
         {
-          id: 'welcome-2',
+          id: 'welcome-building-2',
           role: 'assistant',
           content: 'What feature would you like me to build or modify?',
           timestamp,
@@ -42,33 +48,21 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
     case 'Analyzing':
       return [
         {
-          id: 'welcome-1',
+          id: 'welcome-analyzing-1',
           role: 'assistant',
           content: "I'm in Analyzing Mode. This mode will be available soon.",
           timestamp,
         },
         {
-          id: 'welcome-2',
+          id: 'welcome-analyzing-2',
           role: 'assistant',
           content: 'In the future, I will help you analyze your code and provide insights.',
           timestamp,
         },
       ];
     default:
-      return [
-        {
-          id: 'welcome-1',
-          role: 'assistant',
-          content: "I'm in Planning Mode. I'll help you create and update spec files without touching your code.",
-          timestamp,
-        },
-        {
-          id: 'welcome-2',
-          role: 'assistant',
-          content: 'What would you like to plan or refine in your specifications?',
-          timestamp,
-        },
-      ];
+      // Fall through to Planning mode for any unknown modes
+      return getWelcomeMessages('Planning');
   }
 };
 
@@ -325,9 +319,7 @@ const GenerateAppScreen: React.FC = () => {
                   <option value="Analyzing">Analyzing</option>
                 </select>
                 <span className="text-xs text-gray-500">
-                  {copilotMode === 'Planning' && '(Create/update specs only)'}
-                  {copilotMode === 'Building' && '(Update code and specs)'}
-                  {copilotMode === 'Analyzing' && '(Coming soon)'}
+                  {MODE_DESCRIPTIONS[copilotMode]}
                 </span>
               </div>
               <div className="flex gap-3">
