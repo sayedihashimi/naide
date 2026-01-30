@@ -1,13 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/useAppContext';
+import type { ChatMessage } from '../utils/chatPersistence';
 
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-}
+const WELCOME_MESSAGES: ChatMessage[] = [
+  {
+    id: 'welcome-1',
+    role: 'assistant',
+    content: "I'm ready. I'll generate an app based on your plan.",
+    timestamp: new Date().toISOString(),
+  },
+  {
+    id: 'welcome-2',
+    role: 'assistant',
+    content: 'Before I start, is there anything you want to emphasize or clarify?',
+    timestamp: new Date().toISOString(),
+  },
+];
 
 const GenerateAppScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +25,7 @@ const GenerateAppScreen: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [chatInitialized, setChatInitialized] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -27,48 +37,24 @@ const GenerateAppScreen: React.FC = () => {
         const loadedMessages = await loadChatSession(state.projectName);
         if (loadedMessages.length > 0) {
           setMessages(loadedMessages);
+          setChatInitialized(true);
         } else {
           // Initialize with welcome messages
-          setMessages([
-            {
-              id: '1',
-              role: 'assistant',
-              content: "I'm ready. I'll generate an app based on your plan.",
-              timestamp: new Date().toISOString(),
-            },
-            {
-              id: '2',
-              role: 'assistant',
-              content: 'Before I start, is there anything you want to emphasize or clarify?',
-              timestamp: new Date().toISOString(),
-            },
-          ]);
+          setMessages(WELCOME_MESSAGES);
+          // Don't set chatInitialized yet - wait for user interaction
         }
       } catch (error) {
         console.error('[GenerateApp] Error loading chat:', error);
         // Fallback to welcome messages
-        setMessages([
-          {
-            id: '1',
-            role: 'assistant',
-            content: "I'm ready. I'll generate an app based on your plan.",
-            timestamp: new Date().toISOString(),
-          },
-          {
-            id: '2',
-            role: 'assistant',
-            content: 'Before I start, is there anything you want to emphasize or clarify?',
-            timestamp: new Date().toISOString(),
-          },
-        ]);
+        setMessages(WELCOME_MESSAGES);
       }
     };
     loadChat();
   }, [state.projectName]);
 
-  // Save chat when messages change
+  // Save chat when messages change (but only after initialization with user messages)
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && chatInitialized) {
       const saveChat = async () => {
         try {
           const { saveChatSession } = await import('../utils/chatPersistence');
@@ -81,7 +67,7 @@ const GenerateAppScreen: React.FC = () => {
       const timer = setTimeout(saveChat, 500);
       return () => clearTimeout(timer);
     }
-  }, [messages, state.projectName]);
+  }, [messages, state.projectName, chatInitialized]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -93,8 +79,13 @@ const GenerateAppScreen: React.FC = () => {
   const handleSendMessage = async () => {
     if (!messageInput.trim() || isLoading) return;
 
+    // Mark chat as initialized on first user message
+    if (!chatInitialized) {
+      setChatInitialized(true);
+    }
+
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       role: 'user',
       content: messageInput.trim(),
       timestamp: new Date().toISOString(),
@@ -107,7 +98,7 @@ const GenerateAppScreen: React.FC = () => {
     // Simulate assistant response
     setTimeout(() => {
       const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
         content: 'naide response coming soon',
         timestamp: new Date().toISOString(),

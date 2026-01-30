@@ -194,4 +194,64 @@ describe('GenerateAppScreen', () => {
     // Should be compact again
     expect(messageInput).toHaveClass('h-20');
   });
+
+  it('sends message when Send button is clicked', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+    const sendButton = screen.getByRole('button', { name: 'Send' });
+
+    // Type a message
+    await user.type(messageInput, 'Test message');
+    await user.click(sendButton);
+
+    // User message should appear
+    expect(await screen.findByText('Test message')).toBeInTheDocument();
+    
+    // Assistant response should appear after delay
+    expect(await screen.findByText('naide response coming soon')).toBeInTheDocument();
+  });
+
+  it('sends message when Ctrl+Enter is pressed', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+    // Type a message
+    await user.type(messageInput, 'Test message');
+    
+    // Press Ctrl+Enter
+    await user.keyboard('{Control>}{Enter}{/Control}');
+
+    // User message should appear
+    expect(await screen.findByText('Test message')).toBeInTheDocument();
+    
+    // Assistant response should appear after delay
+    expect(await screen.findByText('naide response coming soon')).toBeInTheDocument();
+  });
+
+  it('adds new line when Enter is pressed without Ctrl', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i) as HTMLTextAreaElement;
+
+    // Type a message
+    await user.type(messageInput, 'Line 1');
+    
+    // Press Enter (without Ctrl)
+    await user.keyboard('{Enter}');
+    await user.type(messageInput, 'Line 2');
+
+    // Should have multiline content
+    expect(messageInput.value).toContain('Line 1\nLine 2');
+  });
 });
