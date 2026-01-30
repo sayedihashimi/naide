@@ -1,0 +1,88 @@
+{
+  "tasks": [
+    {
+      "id": "setup-sidecar",
+      "title": "Set up Node.js sidecar service",
+      "status": "completed",
+      "description": "Create sidecar with HTTP API for Copilot SDK integration",
+      "dependencies": []
+    },
+    {
+      "id": "sidecar-api",
+      "title": "Implement /api/copilot/chat endpoint",
+      "status": "completed",
+      "description": "Handle Planning, Building, and Analyzing modes",
+      "dependencies": ["setup-sidecar"]
+    },
+    {
+      "id": "system-prompts",
+      "title": "Load system prompts from .prompts/system/",
+      "status": "completed",
+      "description": "Load base and mode-specific system prompts",
+      "dependencies": ["setup-sidecar"]
+    },
+    {
+      "id": "learnings-support",
+      "title": "Add learnings read/write support",
+      "status": "completed",
+      "description": "Read learnings from .naide/learnings/ and write new entries",
+      "dependencies": ["setup-sidecar"]
+    },
+    {
+      "id": "safe-file-write",
+      "title": "Implement safe file write",
+      "status": "completed",
+      "description": "Only allow writes to .prompts/plan/** and .prompts/features/**",
+      "dependencies": ["setup-sidecar"]
+    },
+    {
+      "id": "frontend-integration",
+      "title": "Update GenerateAppScreen to call sidecar",
+      "status": "completed",
+      "description": "Replace stub with sidecar API calls",
+      "dependencies": ["sidecar-api"]
+    },
+    {
+      "id": "mode-behavior",
+      "title": "Implement mode-specific behavior",
+      "status": "completed",
+      "description": "Planning calls Copilot, Building/Analyzing return stubs",
+      "dependencies": ["frontend-integration"]
+    },
+    {
+      "id": "error-handling",
+      "title": "Add error handling for missing CLI",
+      "status": "completed",
+      "description": "Show user-friendly message if Copilot CLI not available",
+      "dependencies": ["frontend-integration"]
+    },
+    {
+      "id": "update-tests",
+      "title": "Update test suite",
+      "status": "completed",
+      "description": "Update tests for new behavior and add mode-specific tests",
+      "dependencies": ["mode-behavior"]
+    },
+    {
+      "id": "tauri-sidecar-config",
+      "title": "Configure Tauri to launch sidecar",
+      "status": "pending",
+      "description": "Add sidecar to tauri.conf.json and test with tauri dev",
+      "dependencies": ["frontend-integration"]
+    },
+    {
+      "id": "copilot-sdk-integration",
+      "title": "Integrate actual Copilot SDK",
+      "status": "pending",
+      "description": "Replace placeholder with real @github/copilot-sdk calls",
+      "dependencies": ["tauri-sidecar-config"]
+    },
+    {
+      "id": "learnings-capture-logic",
+      "title": "Implement learnings capture logic",
+      "status": "pending",
+      "description": "Detect corrections and automatically write learnings",
+      "dependencies": ["copilot-sdk-integration"]
+    }
+  ]
+}
