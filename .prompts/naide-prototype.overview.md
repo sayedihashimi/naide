@@ -27,6 +27,8 @@ Implement only:
 - Window: default **1200×800**, **resizable**
 - Repo layout: app lives under **src/naide-desktop**
 - Build commands: `tauri dev` and `tauri build`
+- Testing: **Vitest** + **React Testing Library** (see `tech/testing.md`)
+- Vite setup: **rolldown-vite** for dev/build, **standard vite** for tests
 
 ## UX decisions (locked)
 - Screen 1 **Continue** button is **always enabled**

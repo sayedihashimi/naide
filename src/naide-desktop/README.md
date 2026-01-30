@@ -1,3 +1,88 @@
+# Naide Desktop
+
+A Tauri desktop application for non-pro developers to create and maintain apps using AI.
+
+## Setup
+
+### Prerequisites
+- Node.js (v18 or later)
+- npm
+
+### Installation
+
+```bash
+# Navigate to the project directory
+cd src/naide-desktop
+
+# Install dependencies
+npm install
+```
+
+### Running the Application
+
+```bash
+# Development mode (uses rolldown-vite for performance)
+npm run dev
+
+# Development mode with Tauri
+npm run tauri:dev
+
+# Build for production
+npm run build
+
+# Build Tauri app
+npm run tauri:build
+```
+
+### Testing
+
+```bash
+# Run tests in watch mode
+npm test
+
+# Run tests once
+npm test -- --run
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+**Note**: If you see `ReferenceError: __vite_ssr_exportName__ is not defined`, you need to reinstall dependencies. See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for details.
+
+### Dual Vite Configuration
+
+This project uses two Vite implementations:
+- **rolldown-vite** for development and builds (performance benefits)
+- **Standard vite** for testing (Vitest compatibility)
+
+This allows us to benefit from rolldown-vite's performance while maintaining full test compatibility.
+
+## Project Structure
+
+```
+src/naide-desktop/
+├── src/              # React source code
+│   ├── components/   # React components
+│   ├── pages/        # Page components
+│   ├── context/      # React context providers
+│   ├── utils/        # Utility functions
+│   └── test/         # Test setup and integration tests
+├── src-tauri/        # Tauri Rust backend
+├── public/           # Static assets
+└── dist/             # Build output
+```
+
+## Documentation
+
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Solutions for common issues
+- [Test Documentation](../../.prompts/tech/testing.md) - Testing infrastructure details
+- [Project Requirements](../../.prompts/naide-prototype.overview.md) - Project specifications
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
