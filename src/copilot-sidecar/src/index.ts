@@ -1,9 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve, sep } from 'path';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { CopilotClient } from '@github/copilot-sdk';
+import type { CopilotSession } from '@github/copilot-sdk';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,42 +22,53 @@ app.use(express.json());
 // Port for the sidecar API
 const PORT = 3001;
 
-// Track Copilot CLI server status
-let copilotServerProcess: any = null;
-let copilotServerReady = false;
+// Track Copilot client and session
+let copilotClient: CopilotClient | null = null;
+let copilotSession: CopilotSession | null = null;
+let copilotReady = false;
 
-// Simple function to check if Copilot CLI is installed and authenticated
-async function checkCopilotCLI(): Promise<{ installed: boolean; authenticated: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    // Check if copilot CLI is installed
-    const checkProcess = spawn('which', ['copilot']);
-    let installed = false;
-
-    checkProcess.on('exit', (code) => {
-      installed = code === 0;
-      
-      if (!installed) {
-        resolve({ 
-          installed: false, 
-          authenticated: false, 
-          error: 'Copilot CLI is not installed. Please install GitHub Copilot CLI and run `copilot` then `/login`.'
-        });
-        return;
-      }
-
-      // If installed, try to check auth status (simplified check)
-      // In a real implementation, you'd use the Copilot SDK's auth check
-      resolve({ installed: true, authenticated: true });
+// Initialize Copilot client
+async function initializeCopilot(): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log('[Sidecar] Initializing Copilot client...');
+    
+    // Create client
+    copilotClient = new CopilotClient({
+      useLoggedInUser: true,
+      autoStart: true,
+      autoRestart: true,
     });
-
-    checkProcess.on('error', () => {
-      resolve({ 
-        installed: false, 
-        authenticated: false, 
-        error: 'Unable to check Copilot CLI installation.'
-      });
-    });
-  });
+    
+    // Start the client
+    await copilotClient.start();
+    console.log('[Sidecar] Copilot client started successfully');
+    
+    copilotReady = true;
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('[Sidecar] Failed to initialize Copilot:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Check for common error cases
+    if (errorMessage.includes('not found') || errorMessage.includes('ENOENT')) {
+      return {
+        success: false,
+        error: 'Copilot CLI is not installed. Please install GitHub Copilot CLI and run `copilot` then `/login`.'
+      };
+    }
+    
+    if (errorMessage.includes('auth') || errorMessage.includes('login')) {
+      return {
+        success: false,
+        error: 'Copilot CLI is not authenticated. Please run `copilot` then `/login`.'
+      };
+    }
+    
+    return {
+      success: false,
+      error: `Failed to start Copilot: ${errorMessage}`
+    };
+  }
 }
 
 // Load system prompts from the repository
@@ -201,15 +213,17 @@ app.post('/api/copilot/chat', async (req, res) => {
     });
   }
   
-  // For Planning mode, check Copilot CLI and call it
+  // For Planning mode, use Copilot SDK
   if (mode === 'Planning') {
-    const cliStatus = await checkCopilotCLI();
-    
-    if (!cliStatus.installed || !cliStatus.authenticated) {
-      return res.status(400).json({
-        error: cliStatus.error || 'Copilot CLI is not installed or not signed in. Please install GitHub Copilot CLI and run `copilot` then `/login`, then try again.',
-        replyText: cliStatus.error || 'Copilot CLI is not installed or not signed in. Please install GitHub Copilot CLI and run `copilot` then `/login`, then try again.'
-      });
+    // Check if Copilot is initialized
+    if (!copilotReady || !copilotClient) {
+      const initResult = await initializeCopilot();
+      if (!initResult.success) {
+        return res.status(400).json({
+          error: initResult.error,
+          replyText: initResult.error
+        });
+      }
     }
     
     try {
@@ -217,21 +231,64 @@ app.post('/api/copilot/chat', async (req, res) => {
       const systemPrompt = loadSystemPrompts(mode, workspaceRoot || process.cwd());
       const learnings = await loadLearnings(workspaceRoot || process.cwd());
       
-      // For MVP, we'll simulate a Copilot response
-      // In a real implementation, you would use @github/copilot-sdk here
-      // This is a placeholder that shows the structure
+      // Combine system prompt with learnings
+      const fullSystemPrompt = systemPrompt + learnings;
+      
+      // Create or reuse session
+      if (!copilotSession) {
+        console.log('[Sidecar] Creating new Copilot session for Planning mode');
+        copilotSession = await copilotClient!.createSession({
+          model: 'gpt-4o',
+          systemMessage: {
+            content: fullSystemPrompt
+          }
+        });
+      }
+      
+      // Send user message and collect response
+      const responseChunks: string[] = [];
+      
+      // Set up event listeners for the response
+      const responsePromise = new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Response timeout'));
+        }, 60000); // 60 second timeout
+        
+        copilotSession!.on('assistant.message', (event) => {
+          if (event.data.content) {
+            responseChunks.push(event.data.content);
+          }
+        });
+        
+        copilotSession!.on('session.idle', () => {
+          clearTimeout(timeout);
+          resolve(responseChunks.join(''));
+        });
+        
+        copilotSession!.on('session.error', (event) => {
+          clearTimeout(timeout);
+          reject(new Error(event.data.message || 'Copilot session error'));
+        });
+      });
+      
+      // Send the message
+      await copilotSession.send({ prompt: message });
+      
+      // Wait for the response
+      const replyText = await responsePromise;
       
       const response = {
-        replyText: `I understand you want to work in Planning mode. ${message}\n\nSystem prompts loaded successfully. This is a simulated response - full Copilot SDK integration coming next.`,
+        replyText: replyText || 'No response from Copilot',
         actions: []
       };
       
       return res.json(response);
     } catch (error: unknown) {
       console.error('[Sidecar] Error calling Copilot:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       return res.status(500).json({
         error: 'Failed to communicate with Copilot',
-        replyText: 'An error occurred while communicating with Copilot. Please try again.'
+        replyText: `An error occurred while communicating with Copilot: ${errorMessage}`
       });
     }
   }
@@ -245,19 +302,40 @@ app.post('/api/copilot/chat', async (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', copilotReady: copilotServerReady });
+  res.json({ status: 'ok', copilotReady });
 });
 
-// Start the server
-app.listen(PORT, () => {
+// Start the server and initialize Copilot
+app.listen(PORT, async () => {
   console.log(`[Sidecar] Copilot sidecar running on http://localhost:${PORT}`);
+  
+  // Initialize Copilot on startup
+  const initResult = await initializeCopilot();
+  if (initResult.success) {
+    console.log('[Sidecar] Copilot initialized and ready');
+  } else {
+    console.warn('[Sidecar] Failed to initialize Copilot on startup:', initResult.error);
+    console.warn('[Sidecar] Will attempt to initialize on first request');
+  }
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('[Sidecar] Shutting down...');
-  if (copilotServerProcess) {
-    copilotServerProcess.kill();
+  
+  try {
+    // Clean up Copilot resources
+    if (copilotSession) {
+      await copilotSession.destroy();
+      copilotSession = null;
+    }
+    if (copilotClient) {
+      await copilotClient.stop();
+      copilotClient = null;
+    }
+  } catch (error) {
+    console.error('[Sidecar] Error during cleanup:', error);
   }
+  
   process.exit(0);
 });
