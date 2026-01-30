@@ -98,14 +98,20 @@ Elements:
 
 3. Input row:
    - Text input or textarea
+   - **Expand/Collapse control**: All textareas must include an expand/collapse button (similar to Planning Mode) to toggle between compact and expanded height
    - Buttons:
-     - Send (disabled)
+     - Send (enabled when user types)
      - Attach (disabled)
+   - **Keyboard behavior**:
+     - Enter: adds a new line
+     - Ctrl+Enter (Cmd+Enter on macOS): submits the message
 
 Behavior:
-- No real sending or streaming
-- Typing can be allowed visually but does nothing
-- No message state management required beyond placeholders
+- User can type messages in the textarea
+- Ctrl/Cmd+Enter submits the message
+- Enter adds a new line without submitting
+- Messages are persisted to disk in `.naide/chatsessions/` folder within the project
+- Stub response: "naide response coming soon" for all user messages
 
 ---
 

@@ -3,6 +3,7 @@ import { AppProvider } from './context/AppContext';
 import { useAppContext } from './context/useAppContext';
 import Screen1 from './pages/Screen1';
 import PlanningMode from './pages/PlanningMode';
+import GenerateAppScreen from './pages/GenerateAppScreen';
 import { useEffect, useState } from 'react';
 import { loadConfig } from './utils/fileSystem';
 
@@ -68,6 +69,7 @@ function AppRoutes() {
         element={hasExistingProject ? <Navigate to="/planning" replace /> : <Screen1 />} 
       />
       <Route path="/planning" element={<PlanningMode />} />
+      <Route path="/generate" element={<GenerateAppScreen />} />
     </Routes>
   );
 }
