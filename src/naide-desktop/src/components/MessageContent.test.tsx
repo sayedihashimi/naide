@@ -24,7 +24,7 @@ describe('MessageContent', () => {
     render(<MessageContent content="Use `console.log()` to debug" role="assistant" />);
     const codeElement = screen.getByText('console.log()');
     expect(codeElement.tagName).toBe('CODE');
-    expect(codeElement).toHaveClass('bg-zinc-800');
+    expect(codeElement).toHaveClass('text-blue-300');
   });
 
   it('renders markdown code blocks', () => {
@@ -74,14 +74,14 @@ describe('MessageContent', () => {
 
   it('applies correct text color for assistant role', () => {
     const { container } = render(<MessageContent content="Test" role="assistant" />);
-    const proseDiv = container.querySelector('.prose');
-    expect(proseDiv).toHaveClass('text-gray-100');
+    const outerDiv = container.querySelector('div');
+    expect(outerDiv).toHaveClass('text-gray-100');
   });
 
   it('applies correct text color for user role', () => {
     const { container } = render(<MessageContent content="Test" role="user" />);
-    const proseDiv = container.querySelector('.prose');
-    expect(proseDiv).toHaveClass('text-white');
+    const outerDiv = container.querySelector('div');
+    expect(outerDiv).toHaveClass('text-white');
   });
 
   it('renders GitHub Flavored Markdown tables', () => {
