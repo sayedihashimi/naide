@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/useAppContext';
 import type { ChatMessage } from '../utils/chatPersistence';
+import MessageContent from '../components/MessageContent';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -349,9 +350,7 @@ const GenerateAppScreen: React.FC = () => {
                         ? 'bg-zinc-900 border border-zinc-800'
                         : 'bg-blue-600'
                     }`}>
-                      <p className={message.role === 'assistant' ? 'text-gray-100' : 'text-white'}>
-                        {message.content}
-                      </p>
+                      <MessageContent content={message.content} role={message.role} />
                     </div>
                   </div>
                 </div>

@@ -423,4 +423,69 @@ describe('GenerateAppScreen', () => {
     // Should get stub response
     expect(await screen.findByText('Analyzing coming soon')).toBeInTheDocument();
   });
+
+  it('renders markdown in assistant messages', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+    const sendButton = screen.getByRole('button', { name: 'Send' });
+
+    // Mock fetch to return a markdown response
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ 
+        replyText: 'Here is some **bold** text and *italic* text.\n\n- Item 1\n- Item 2\n\nAnd a `code` snippet.' 
+      }),
+    });
+
+    // Type a message
+    await user.type(messageInput, 'Test markdown');
+    await user.click(sendButton);
+
+    // Wait for response
+    await screen.findByText(/Here is some/i);
+    
+    // Check markdown elements are rendered
+    const boldText = screen.getByText('bold');
+    expect(boldText.tagName).toBe('STRONG');
+    
+    const italicText = screen.getByText('italic');
+    expect(italicText.tagName).toBe('EM');
+    
+    const codeText = screen.getByText('code');
+    expect(codeText.tagName).toBe('CODE');
+    
+    expect(screen.getByText('Item 1')).toBeInTheDocument();
+    expect(screen.getByText('Item 2')).toBeInTheDocument();
+  });
+
+  it('renders markdown in user messages', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+    const sendButton = screen.getByRole('button', { name: 'Send' });
+
+    // Mock fetch to return a simple response
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ replyText: 'Got it' }),
+    });
+
+    // Type a message with markdown
+    await user.type(messageInput, 'Please create a **function** for me');
+    await user.click(sendButton);
+
+    // Wait for user message to appear
+    await screen.findByText(/Please create a/i);
+    
+    // Check markdown is rendered in user message
+    const boldText = screen.getByText('function');
+    expect(boldText.tagName).toBe('STRONG');
+  });
 });
