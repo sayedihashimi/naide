@@ -8,6 +8,12 @@ import { AppProvider } from '../context/AppContext'
 // Mock file system utilities
 vi.mock('../utils/fileSystem', () => ({
   createAllProjectFiles: vi.fn().mockResolvedValue(undefined),
+  initializeProject: vi.fn().mockResolvedValue(undefined),
+  saveSectionToFile: vi.fn().mockResolvedValue(undefined),
+  loadProjectData: vi.fn().mockResolvedValue({}),
+  checkProjectExists: vi.fn().mockResolvedValue(false),
+  getProjectPath: vi.fn().mockResolvedValue('/mock/path/MyApp'),
+  updateLastUsedProject: vi.fn().mockResolvedValue(undefined),
 }))
 
 const renderScreen1 = () => {

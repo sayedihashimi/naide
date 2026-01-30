@@ -16,6 +16,11 @@ vi.mock('../utils/fileSystem', () => ({
   loadProjectData: vi.fn().mockResolvedValue({}),
   createAllProjectFiles: vi.fn().mockResolvedValue(undefined),
   projectExists: vi.fn().mockResolvedValue(false),
+  initializeProject: vi.fn().mockResolvedValue(undefined),
+  saveSectionToFile: vi.fn().mockResolvedValue(undefined),
+  checkProjectExists: vi.fn().mockResolvedValue(false),
+  getProjectPath: vi.fn().mockResolvedValue('/mock/path/MyApp'),
+  updateLastUsedProject: vi.fn().mockResolvedValue(undefined),
 }))
 
 const renderPlanningMode = () => {
