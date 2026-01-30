@@ -65,8 +65,8 @@ describe('GenerateAppScreen', () => {
     expect(screen.getByRole('heading', { name: 'Generate App' })).toBeInTheDocument();
     expect(screen.getByText(/Talk to Naide to generate and refine your app/i)).toBeInTheDocument();
     
-    // Wait for welcome messages to load
-    expect(await screen.findByText(/I'm ready. I'll generate an app based on your plan./i)).toBeInTheDocument();
+    // Wait for welcome messages to load (Planning mode by default)
+    expect(await screen.findByText(/I'm in Planning Mode/i)).toBeInTheDocument();
     
     expect(screen.getByPlaceholderText(/Type your message.../i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
@@ -136,9 +136,81 @@ describe('GenerateAppScreen', () => {
   it('displays placeholder assistant messages', async () => {
     renderGenerateAppScreen();
 
-    // Wait for welcome messages to load
-    expect(await screen.findByText(/I'm ready. I'll generate an app based on your plan./i)).toBeInTheDocument();
-    expect(screen.getByText(/Before I start, is there anything you want to emphasize or clarify?/i)).toBeInTheDocument();
+    // Wait for welcome messages to load (Planning mode by default)
+    expect(await screen.findByText(/I'm in Planning Mode/i)).toBeInTheDocument();
+    expect(screen.getByText(/What would you like to plan or refine in your specifications?/i)).toBeInTheDocument();
+  });
+
+  it('has mode selector dropdown with three options', async () => {
+    renderGenerateAppScreen();
+
+    await screen.findByLabelText(/Mode:/i);
+
+    const modeSelect = screen.getByLabelText(/Mode:/i);
+    expect(modeSelect).toBeInTheDocument();
+    
+    // Check all three options exist
+    const options = Array.from(modeSelect.querySelectorAll('option'));
+    expect(options).toHaveLength(3);
+    expect(options[0]).toHaveTextContent('Planning');
+    expect(options[1]).toHaveTextContent('Building');
+    expect(options[2]).toHaveTextContent('Analyzing');
+  });
+
+  it('defaults to Planning mode', async () => {
+    renderGenerateAppScreen();
+
+    await screen.findByLabelText(/Mode:/i);
+
+    const modeSelect = screen.getByLabelText(/Mode:/i) as HTMLSelectElement;
+    expect(modeSelect.value).toBe('Planning');
+    
+    // Check Planning mode description is shown
+    expect(screen.getByText(/Create\/update specs only/i)).toBeInTheDocument();
+  });
+
+  it('changes welcome messages when mode is changed', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByLabelText(/Mode:/i);
+
+    const modeSelect = screen.getByLabelText(/Mode:/i);
+
+    // Initially Planning mode messages
+    expect(await screen.findByText(/I'm in Planning Mode/i)).toBeInTheDocument();
+
+    // Switch to Building mode
+    await user.selectOptions(modeSelect, 'Building');
+
+    // Should see Building mode messages
+    expect(await screen.findByText(/I'm in Building Mode/i)).toBeInTheDocument();
+    expect(screen.getByText(/What feature would you like me to build or modify?/i)).toBeInTheDocument();
+  });
+
+  it('shows correct description for each mode', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByLabelText(/Mode:/i);
+
+    const modeSelect = screen.getByLabelText(/Mode:/i);
+
+    // Planning mode
+    expect(screen.getByText(/Create\/update specs only/i)).toBeInTheDocument();
+
+    // Switch to Building mode
+    await user.selectOptions(modeSelect, 'Building');
+    expect(await screen.findByText(/Update code and specs/i)).toBeInTheDocument();
+
+    // Switch to Analyzing mode
+    await user.selectOptions(modeSelect, 'Analyzing');
+    // Use getAllByText to handle multiple matches and check that the span has the text
+    const comingSoonElements = screen.getAllByText(/Coming soon/i);
+    expect(comingSoonElements.length).toBeGreaterThan(0);
+    // Check that one of them is the span with the specific class
+    const descSpan = comingSoonElements.find(el => el.className.includes('text-xs'));
+    expect(descSpan).toBeInTheDocument();
   });
 
   it('enables Send button when user types message', async () => {

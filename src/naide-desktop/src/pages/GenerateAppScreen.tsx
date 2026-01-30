@@ -3,20 +3,65 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/useAppContext';
 import type { ChatMessage } from '../utils/chatPersistence';
 
-const WELCOME_MESSAGES: ChatMessage[] = [
+export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
+
+const PLANNING_WELCOME_MESSAGES: ChatMessage[] = [
   {
     id: 'welcome-1',
     role: 'assistant',
-    content: "I'm ready. I'll generate an app based on your plan.",
+    content: "I'm in Planning Mode. I'll help you create and update spec files without touching your code.",
     timestamp: new Date().toISOString(),
   },
   {
     id: 'welcome-2',
     role: 'assistant',
-    content: 'Before I start, is there anything you want to emphasize or clarify?',
+    content: 'What would you like to plan or refine in your specifications?',
     timestamp: new Date().toISOString(),
   },
 ];
+
+const BUILDING_WELCOME_MESSAGES: ChatMessage[] = [
+  {
+    id: 'welcome-1',
+    role: 'assistant',
+    content: "I'm in Building Mode. I'll help you implement your app and update specs as needed.",
+    timestamp: new Date().toISOString(),
+  },
+  {
+    id: 'welcome-2',
+    role: 'assistant',
+    content: 'What feature would you like me to build or modify?',
+    timestamp: new Date().toISOString(),
+  },
+];
+
+const ANALYZING_WELCOME_MESSAGES: ChatMessage[] = [
+  {
+    id: 'welcome-1',
+    role: 'assistant',
+    content: "I'm in Analyzing Mode. This mode is coming soon.",
+    timestamp: new Date().toISOString(),
+  },
+  {
+    id: 'welcome-2',
+    role: 'assistant',
+    content: 'I will help you analyze your code and provide insights.',
+    timestamp: new Date().toISOString(),
+  },
+];
+
+const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
+  switch (mode) {
+    case 'Planning':
+      return PLANNING_WELCOME_MESSAGES;
+    case 'Building':
+      return BUILDING_WELCOME_MESSAGES;
+    case 'Analyzing':
+      return ANALYZING_WELCOME_MESSAGES;
+    default:
+      return PLANNING_WELCOME_MESSAGES;
+  }
+};
 
 const GenerateAppScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +71,7 @@ const GenerateAppScreen: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [chatInitialized, setChatInitialized] = useState(false);
+  const [copilotMode, setCopilotMode] = useState<CopilotMode>('Planning');
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,18 +85,18 @@ const GenerateAppScreen: React.FC = () => {
           setMessages(loadedMessages);
           setChatInitialized(true);
         } else {
-          // Initialize with welcome messages
-          setMessages(WELCOME_MESSAGES);
+          // Initialize with welcome messages based on mode
+          setMessages(getWelcomeMessages(copilotMode));
           // Don't set chatInitialized yet - wait for user interaction
         }
       } catch (error) {
         console.error('[GenerateApp] Error loading chat:', error);
         // Fallback to welcome messages
-        setMessages(WELCOME_MESSAGES);
+        setMessages(getWelcomeMessages(copilotMode));
       }
     };
     loadChat();
-  }, [state.projectName]);
+  }, [state.projectName, copilotMode]);
 
   // Save chat when messages change (but only after initialization with user messages)
   useEffect(() => {
@@ -124,6 +170,14 @@ const GenerateAppScreen: React.FC = () => {
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
+  };
+
+  const handleModeChange = (newMode: CopilotMode) => {
+    setCopilotMode(newMode);
+    // Reset chat with new welcome messages for the mode
+    if (!chatInitialized) {
+      setMessages(getWelcomeMessages(newMode));
+    }
   };
 
   return (
@@ -245,6 +299,27 @@ const GenerateAppScreen: React.FC = () => {
           {/* Input row */}
           <div className="border-t border-zinc-800 p-6">
             <div className="max-w-3xl mx-auto">
+              {/* Mode selector */}
+              <div className="mb-3 flex items-center gap-2">
+                <label htmlFor="mode-select" className="text-sm text-gray-400">
+                  Mode:
+                </label>
+                <select
+                  id="mode-select"
+                  value={copilotMode}
+                  onChange={(e) => handleModeChange(e.target.value as CopilotMode)}
+                  className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Planning">Planning</option>
+                  <option value="Building">Building</option>
+                  <option value="Analyzing">Analyzing</option>
+                </select>
+                <span className="text-xs text-gray-500">
+                  {copilotMode === 'Planning' && '(Create/update specs only)'}
+                  {copilotMode === 'Building' && '(Update code and specs)'}
+                  {copilotMode === 'Analyzing' && '(Coming soon)'}
+                </span>
+              </div>
               <div className="flex gap-3">
                 <div className="flex-1 relative">
                   <textarea

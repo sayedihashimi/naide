@@ -3,23 +3,71 @@
 ## Goal
 When the user clicks Generate App in Planning Mode, navigate to a new screen that sets up the next phase of Naide:
 - Left column: navigation
-- Center column: large chat area (conversation UI shell only)
+- Center column: large chat area with mode selector
 - Right column: running app preview area (placeholder only)
 
-This feature is UI layout only. Do not implement any AI functionality or app preview functionality yet.
+This feature includes a mode selector for different Copilot chat modes: Planning, Building, and Analyzing.
+
+---
+
+## Copilot Modes
+
+The Generate App screen supports three different modes for the Copilot chat:
+
+### Planning Mode
+- **Purpose**: Create and update specification files without touching actual code
+- **System Prompts**: Uses planning system prompts from `.prompts/system/planning.system.md`
+- **Behavior**: 
+  - Goal is to create/update spec files (intent.md, app-spec.md, data-spec.md, rules.md, tasks.json)
+  - Does NOT write or modify code
+  - Reads context from .prompts/plan/**, .prompts/features/**, .naide/learnings/**
+- **Welcome Messages**: Introduces the mode and explains it focuses on specs only
+- **Default**: This is the default mode (will be changed to Building mode later)
+
+### Building Mode
+- **Purpose**: Update user code and spec files as needed
+- **System Prompts**: Uses building system prompts from `.prompts/system/building.system.md`
+- **Behavior**:
+  - Goal is to implement features and update code
+  - Also updates spec files when features change
+  - Follows "UI first, then functionality" approach
+  - Ensures builds/tests pass after changes
+  - Records learnings for future reference
+- **Welcome Messages**: Introduces the mode and explains it focuses on implementation
+
+### Analyzing Mode
+- **Purpose**: Analyze code and provide insights (coming soon)
+- **System Prompts**: No prompts defined yet; will be added later
+- **Behavior**: Placeholder mode for future functionality
+- **Welcome Messages**: Indicates the mode is coming soon
+
+### Mode Selection UI
+- A dropdown is placed near the chat input area (above the textarea)
+- Shows the current mode with a brief description
+- User can switch modes at any time
+- When mode is changed before the first user message, welcome messages update to match the new mode
+
+### Copilot Integration
+The actual integration with Copilot SDK will be implemented later. For now:
+- Mode selection updates the UI and welcome messages
+- Different system prompts are associated with each mode (documented above)
+- The selected mode will be passed to the Copilot agent when integration is implemented
+- Copilot will use the appropriate system prompt based on the selected mode
 
 ---
 
 ## Scope (this iteration)
-- Add a new route/screen for “Generate App”
-- Hook up Planning Mode’s Generate App button to navigate to it
+- Add a new route/screen for "Generate App"
+- Hook up Planning Mode's Generate App button to navigate to it
 - Implement a 3-column layout with correct visual hierarchy and spacing
+- Add mode selector dropdown with Planning, Building, and Analyzing options
+- Display mode-specific welcome messages
 - Add placeholder controls/content in each column
 - Keep styling consistent with existing Planning Mode mockup (dark mode, panels, typography)
 
 Do NOT implement:
-- Copilot SDK integration
-- real chat sending/streaming
+- Copilot SDK integration (document behavior only)
+- real chat sending/streaming with AI
 - real app creation/running
 - iframe/webview embedding a real app
 - persistence
@@ -60,8 +108,9 @@ Text-based mockup reference:
 │ • Activity    │  │                                         │  │  │ (placeholder)        │ │
 │ • Files       │  └─────────────────────────────────────────┘  │  └─────────────────────┘ │
 │               │  ┌─────────────────────────────────────────┐  │                           │
-│               │  │ Input row:                              │  │  Status panel (optional) │
-│               │  │ [ message input..................... ]  │  │  - “Not running yet”     │
+│               │  │ Mode: [Planning ▼] (Create/update specs)│  │  Status panel (optional) │
+│               │  │ Input row:                              │  │  - "Not running yet"     │
+│               │  │ [ message input..................... ]  │  │                           │
 │               │  │ [ Send ]  [ Attach ] (disabled)         │  │                           │
 │               │  └─────────────────────────────────────────┘  │                           │
 └───────────────┴───────────────────────────────────────────────┴───────────────────────────┘
@@ -88,15 +137,18 @@ Notes:
 Elements:
 1. Header row:
    - Title: Generate App
-   - Subtitle: “Talk to Naide to generate and refine your app.” (or similar)
+   - Subtitle: "Talk to Naide to generate and refine your app." (or similar)
 
 2. Transcript panel:
    - Scrollable area
-   - Include 1–2 placeholder assistant messages:
-     - “I’m ready. I’ll generate an app based on your plan.”
-     - “Before I start, anything you want to emphasize?”
+   - Display mode-specific welcome messages based on selected mode
 
-3. Input row:
+3. Mode selector (above input row):
+   - Dropdown with options: Planning, Building, Analyzing
+   - Shows current mode and brief description
+   - Default to Planning mode
+
+4. Input row:
    - Text input or textarea
    - **Expand/Collapse control**: All textareas must include an expand/collapse button (similar to Planning Mode) to toggle between compact and expanded height
    - Buttons:
@@ -112,6 +164,7 @@ Behavior:
 - Enter adds a new line without submitting
 - Messages are persisted to disk in `.naide/chatsessions/` folder within the project
 - Stub response: "naide response coming soon" for all user messages
+- Mode changes update welcome messages if chat hasn't been initialized yet
 
 ---
 
@@ -120,8 +173,8 @@ Behavior:
 Implement:
 - Panel title: Running App
 - Large empty state:
-  - Text: “Your app will appear here once generated.”
-  - Subtext: “Not running yet.”
+  - Text: "Your app will appear here once generated."
+  - Subtext: "Not running yet."
 
 Optional footer:
 - Start button (disabled)
@@ -144,6 +197,8 @@ Do not embed an iframe or real app runtime.
 - Clicking Generate App navigates to the new screen
 - 3-column layout renders correctly
 - Left nav can return to Planning Mode
-- Center chat area shows placeholder messages and input row
-- Right panel shows a clear “not running” state
+- Center chat area shows mode selector dropdown
+- Mode selector has three options: Planning (default), Building, Analyzing
+- Mode-specific welcome messages display correctly
+- Right panel shows a clear "not running" state
 - No AI or runtime functionality is implemented
