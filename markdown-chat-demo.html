@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Chat Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background-color: #0a0a0a;
+            color: #e5e5e5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #9ca3af;
+            margin-bottom: 30px;
+        }
+        .message {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .avatar {
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            background-color: #2563eb;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .avatar svg {
+            width: 20px;
+            height: 20px;
+            color: white;
+        }
+        .message-content {
+            flex: 1;
+        }
+        .message-bubble {
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .assistant .message-bubble {
+            background-color: #18181b;
+            border: 1px solid #27272a;
+            color: #f4f4f5;
+        }
+        .user {
+            margin-left: 44px;
+        }
+        .user .message-bubble {
+            background-color: #2563eb;
+            color: white;
+        }
+        /* Markdown styles */
+        strong { font-weight: 700; }
+        em { font-style: italic; }
+        code {
+            background-color: #27272a;
+            color: #93c5fd;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        pre {
+            background-color: #27272a;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #f4f4f5;
+        }
+        ul, ol {
+            margin: 8px 0;
+            padding-left: 24px;
+        }
+        li {
+            margin: 4px 0;
+        }
+        a {
+            color: #60a5fa;
+            text-decoration: underline;
+        }
+        a:hover {
+            color: #93c5fd;
+        }
+        h2, h3 {
+            margin-top: 12px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        h2 { font-size: 1.25rem; }
+        h3 { font-size: 1.125rem; }
+        p { margin: 8px 0; }
+        p:last-child { margin-bottom: 0; }
+        blockquote {
+            border-left: 4px solid #52525b;
+            padding-left: 16px;
+            font-style: italic;
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Generate App - Markdown Chat Demo</h1>
+        <p class="subtitle">Chat messages now support rich markdown formatting</p>
+
+        <!-- Assistant message with markdown -->
+        <div class="message assistant">
+            <div class="avatar">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+            </div>
+            <div class="message-content">
+                <div class="message-bubble">
+                    <p>I'm in Planning Mode. I'll help you create and update spec files without touching your code.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- User message -->
+        <div class="message user">
+            <div class="message-content">
+                <div class="message-bubble">
+                    <p>Can you help me create a <strong>user authentication</strong> feature? I need:</p>
+                    <ol>
+                        <li>Login page</li>
+                        <li>Registration</li>
+                        <li>Password reset</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Assistant response with rich markdown -->
+        <div class="message assistant">
+            <div class="avatar">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+            </div>
+            <div class="message-content">
+                <div class="message-bubble">
+                    <p>Great! I'll help you create a comprehensive authentication system. Here's what I propose:</p>
+                    
+                    <h2>Authentication Features</h2>
+                    
+                    <h3>1. User Login</h3>
+                    <ul>
+                        <li><strong>Email/username</strong> and <strong>password</strong> fields</li>
+                        <li>"Remember me" option</li>
+                        <li>Link to password reset</li>
+                    </ul>
+                    
+                    <h3>2. Registration</h3>
+                    <p>The registration form will include:</p>
+                    <ul>
+                        <li>Email validation using <code>regex</code></li>
+                        <li>Password strength requirements</li>
+                        <li>Terms of service acceptance</li>
+                    </ul>
+                    
+                    <h3>3. Password Reset</h3>
+                    <p>We'll implement a secure flow:</p>
+                    <pre><code>1. User requests reset → Email sent
+2. Click link → Verify token
+3. Set new password → Update database</code></pre>
+                    
+                    <blockquote>
+                        <p><strong>Note:</strong> All passwords will be hashed using <code>bcrypt</code> before storage</p>
+                    </blockquote>
+                    
+                    <p>For more details on security best practices, see <a href="#">OWASP Authentication Guide</a></p>
+                    
+                    <p>Would you like me to proceed with this plan?</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- User confirmation with code -->
+        <div class="message user">
+            <div class="message-content">
+                <div class="message-bubble">
+                    <p>Yes! Also, can you make sure the password validation includes <code>!@#$%</code> special characters?</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Assistant acknowledgment -->
+        <div class="message assistant">
+            <div class="avatar">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+            </div>
+            <div class="message-content">
+                <div class="message-bubble">
+                    <p>Perfect! I'll add password validation that requires:</p>
+                    <ul>
+                        <li>At least <em>8 characters</em></li>
+                        <li>One <strong>uppercase</strong> letter</li>
+                        <li>One <strong>lowercase</strong> letter</li>
+                        <li>One <strong>number</strong></li>
+                        <li>One special character from <code>!@#$%^&*()</code></li>
+                    </ul>
+                    <p>Let me create the specification files now. ✨</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
