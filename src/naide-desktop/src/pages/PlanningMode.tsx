@@ -8,7 +8,7 @@ const sections = [
   'Data',
   'Access & Rules',
   'Assumptions',
-  'Plan Status',
+  'Plan',
 ];
 
 const codeSection = 'Code';
@@ -104,24 +104,12 @@ const sectionQuestions: Record<string, Question[]> = {
       helper: 'e.g., must run on Windows, cloud-only',
     },
     {
-      id: 'timeline',
-      question: 'When do you need this?',
-      type: 'text',
-    },
-    {
       id: 'other-notes',
       question: 'Anything else we should know?',
       type: 'textarea',
     },
   ],
-  'Plan Status': [
-    {
-      id: 'plan-ready',
-      question: 'Is the plan ready to generate?',
-      type: 'text',
-      helper: 'This section is informational',
-    },
-  ],
+  'Plan': [],
 };
 
 // File mappings for Code section
@@ -131,7 +119,7 @@ const sectionFileMapping: Record<string, string> = {
   'Data': 'DataSpec.md',
   'Access & Rules': 'Rules.md',
   'Assumptions': 'Assumptions.md',
-  'Plan Status': 'Tasks.json',
+  'Plan': 'Tasks.json',
 };
 
 const PlanningMode: React.FC = () => {
@@ -377,6 +365,11 @@ const PlanningMode: React.FC = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            ) : selectedSection === 'Plan' ? (
+              /* Plan section - Show coming soon */
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-8 text-center">
+                <p className="text-gray-400 text-lg">Coming soon</p>
               </div>
             ) : (
               /* Regular sections - Show Q&A */
