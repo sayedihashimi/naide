@@ -1,13 +1,21 @@
 import express from 'express';
+import cors from 'cors';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, resolve, sep } from 'path';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
+
+// Enable CORS for Tauri app
+app.use(cors({
+  origin: ['http://localhost:5173', 'tauri://localhost', 'http://tauri.localhost'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 // Port for the sidecar API
@@ -112,6 +120,7 @@ async function loadLearnings(workspaceRoot: string): Promise<string> {
 }
 
 // Write a learning entry
+// Note: This function is defined for future use when automatic learnings capture is implemented
 function writeLearning(workspaceRoot: string, category: string, content: string): void {
   const learningsDir = join(workspaceRoot, '.naide', 'learnings');
   
@@ -141,10 +150,15 @@ function safeFileWrite(workspaceRoot: string, relativePath: string, content: str
     join(workspaceRoot, '.prompts', 'features')
   ];
   
+  // Resolve and normalize the full path to prevent path traversal
   const fullPath = join(workspaceRoot, relativePath);
+  const resolvedPath = resolve(fullPath);
   
-  // Check if the path starts with any of the allowed directories
-  const isAllowed = allowedDirs.some(dir => fullPath.startsWith(dir));
+  // Check if the resolved path starts with any of the allowed directories
+  const isAllowed = allowedDirs.some(dir => {
+    const resolvedDir = resolve(dir);
+    return resolvedPath.startsWith(resolvedDir + sep);
+  });
   
   if (!isAllowed) {
     console.error(`Blocked write to disallowed path: ${relativePath}`);
@@ -213,7 +227,7 @@ app.post('/api/copilot/chat', async (req, res) => {
       };
       
       return res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[Sidecar] Error calling Copilot:', error);
       return res.status(500).json({
         error: 'Failed to communicate with Copilot',

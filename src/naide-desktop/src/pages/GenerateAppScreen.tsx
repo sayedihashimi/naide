@@ -193,6 +193,24 @@ const GenerateAppScreen: React.FC = () => {
         }),
       });
 
+      if (!response.ok) {
+        // Handle non-OK responses
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          role: 'assistant',
+          content: errorData.replyText || errorData.error || 'An error occurred',
+          timestamp: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsLoading(false);
+        
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        }
+        return;
+      }
+
       const data = await response.json();
 
       const assistantMessage: ChatMessage = {
