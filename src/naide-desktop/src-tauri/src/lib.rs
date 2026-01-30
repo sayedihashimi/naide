@@ -1,5 +1,7 @@
-use std::process::{Command, Child};
+use std::process::{Command, Child, Stdio};
 use std::sync::Mutex;
+use std::env;
+use std::path::PathBuf;
 use tauri::Manager;
 
 // Global state to track the sidecar process
@@ -22,26 +24,63 @@ pub fn run() {
       }
       
       // Start the copilot sidecar
-      let sidecar_path = "../../copilot-sidecar/dist/index.js";
+      // Get the current executable directory and construct path to sidecar
+      let sidecar_relative_path = if cfg!(target_os = "windows") {
+        r"..\..\copilot-sidecar\dist\index.js"
+      } else {
+        "../../copilot-sidecar/dist/index.js"
+      };
       
-      println!("[Tauri] Starting copilot sidecar...");
+      // Try to resolve the path relative to current directory
+      let sidecar_path = env::current_dir()
+        .ok()
+        .and_then(|dir| {
+          let path = dir.join(sidecar_relative_path);
+          if path.exists() {
+            Some(path)
+          } else {
+            // Try from the app directory
+            app.path().app_data_dir()
+              .ok()
+              .and_then(|app_dir| {
+                let alt_path = app_dir.join(sidecar_relative_path);
+                if alt_path.exists() {
+                  Some(alt_path)
+                } else {
+                  None
+                }
+              })
+          }
+        });
       
-      match Command::new("node")
-        .arg(sidecar_path)
-        .spawn() {
-          Ok(child) => {
-            println!("[Tauri] Copilot sidecar started with PID: {:?}", child.id());
-            
-            // Store the process handle for cleanup
-            app.manage(Mutex::new(SidecarState {
-              process: Some(child),
-            }));
+      if let Some(path) = sidecar_path {
+        println!("[Tauri] Starting copilot sidecar from: {:?}", path);
+        
+        match Command::new("node")
+          .arg(path)
+          .stdout(Stdio::piped())
+          .stderr(Stdio::piped())
+          .spawn() {
+            Ok(child) => {
+              println!("[Tauri] Copilot sidecar started with PID: {:?}", child.id());
+              println!("[Tauri] Sidecar should be accessible at http://localhost:3001");
+              
+              // Store the process handle for cleanup
+              app.manage(Mutex::new(SidecarState {
+                process: Some(child),
+              }));
+            }
+            Err(e) => {
+              eprintln!("[Tauri] Failed to start copilot sidecar: {}", e);
+              eprintln!("[Tauri] Make sure Node.js is installed and in PATH");
+              eprintln!("[Tauri] App will continue, but copilot features will not work");
+            }
           }
-          Err(e) => {
-            eprintln!("[Tauri] Failed to start copilot sidecar: {}", e);
-            eprintln!("[Tauri] App will continue, but copilot features will not work");
-          }
-        }
+      } else {
+        eprintln!("[Tauri] Sidecar not found at expected path: {}", sidecar_relative_path);
+        eprintln!("[Tauri] Make sure to build the sidecar with: cd src/copilot-sidecar && npm run build");
+        eprintln!("[Tauri] App will continue, but copilot features will not work");
+      }
       
       Ok(())
     })

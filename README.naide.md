@@ -31,7 +31,23 @@ The frontend communicates with the sidecar via HTTP API on `localhost:3001`.
 
 ## How to run
 
-### 1. Start the sidecar
+**Note**: The sidecar is now automatically built and started when you run the Tauri app. No separate terminal needed!
+
+From `src/naide-desktop`:
+
+```sh
+npm install
+npm run tauri:dev
+```
+
+The app will:
+1. Build the sidecar automatically
+2. Start the Tauri app
+3. Launch the sidecar in the background
+
+### Manual sidecar development (optional)
+
+If you want to run the sidecar separately for development:
 
 From `src/copilot-sidecar`:
 
@@ -42,29 +58,30 @@ npm run dev
 
 The sidecar will run on `http://localhost:3001`.
 
-### 2. Start the Tauri app
+Then start the Tauri app normally:
 
 From `src/naide-desktop`:
 
 ```sh
-npm install
 npm run tauri:dev
 ```
 
 ## How to build
 
-### Build the sidecar
-From `src/copilot-sidecar`:
+The build process also automatically builds the sidecar first.
 
-```sh
-npm run build
-```
-
-### Build the Tauri app
 From `src/naide-desktop`:
 
 ```sh
 npm run tauri:build
+```
+
+### Manual sidecar build (optional)
+
+From `src/copilot-sidecar`:
+
+```sh
+npm run build
 ```
 
 ## Project Structure
