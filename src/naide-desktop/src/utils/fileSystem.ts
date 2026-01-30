@@ -23,15 +23,21 @@ export async function initializeProject(projectName: string): Promise<void> {
   const projectPath = await getProjectPath(projectName);
   
   try {
+    console.log(`[FileSystem] Initializing project at: ${projectPath}`);
     const projectExists = await exists(projectPath);
+    console.log(`[FileSystem] Project exists: ${projectExists}`);
+    
     if (!projectExists) {
       // Create project directory (recursively)
       const basePath = await getProjectsBasePath();
+      console.log(`[FileSystem] Creating base path: ${basePath}`);
       await mkdir(basePath, { recursive: true });
+      console.log(`[FileSystem] Creating project path: ${projectPath}`);
       await mkdir(projectPath);
+      console.log(`[FileSystem] Project initialized successfully`);
     }
   } catch (error) {
-    console.error('Error initializing project:', error);
+    console.error('[FileSystem] Error initializing project:', error);
     // Don't throw - just log, as this might fail in browser/dev mode
   }
 }
@@ -45,9 +51,12 @@ export async function saveSectionToFile(
   try {
     const projectPath = await getProjectPath(projectName);
     const filePath = await join(projectPath, filename);
+    console.log(`[FileSystem] Saving ${filename} to: ${filePath}`);
+    console.log(`[FileSystem] Content length: ${content.length} characters`);
     await writeTextFile(filePath, content);
+    console.log(`[FileSystem] Successfully saved ${filename}`);
   } catch (error) {
-    console.error(`Error saving ${filename}:`, error);
+    console.error(`[FileSystem] Error saving ${filename}:`, error);
     throw error;
   }
 }

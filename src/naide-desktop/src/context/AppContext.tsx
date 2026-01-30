@@ -87,10 +87,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const saveProject = useCallback(async () => {
     try {
+      console.log('[AppContext] Starting saveProject for:', state.projectName);
+      console.log('[AppContext] Sections to save:', Object.keys(state.sections));
+      
       // We'll need to pass section questions from the component
       // For now, save the raw data and format it simply
       for (const [section, filename] of Object.entries(sectionFileMapping)) {
         const sectionData = state.sections[section] || {};
+        console.log(`[AppContext] Processing section "${section}" (${filename}):`, Object.keys(sectionData).length, 'answers');
         
         if (filename.endsWith('.json')) {
           // For JSON files (like Tasks.json), save as JSON
@@ -114,8 +118,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           await saveSectionToFile(state.projectName, filename, markdown);
         }
       }
+      console.log('[AppContext] saveProject completed successfully');
     } catch (error) {
-      console.error('Error saving project:', error);
+      console.error('[AppContext] Error saving project:', error);
       throw error;
     }
   }, [state.projectName, state.sections]);
