@@ -55,7 +55,8 @@ function AppRoutes() {
       }
     };
     initializeApp();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   if (loading) {
     return (

@@ -5,16 +5,6 @@ import userEvent from '@testing-library/user-event';
 import GenerateAppScreen from './GenerateAppScreen';
 import { AppProvider } from '../context/AppContext';
 
-// Mock useNavigate
-const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  };
-});
-
 // Mock fetch
 global.fetch = vi.fn();
 
@@ -48,18 +38,13 @@ const renderGenerateAppScreen = () => {
 };
 
 describe('GenerateAppScreen', () => {
-  beforeEach(() => {
-    mockNavigate.mockClear();
-  });
-
   it('renders the Generate App screen with 3-column layout', async () => {
     renderGenerateAppScreen();
 
     // Check header
     expect(screen.getByRole('heading', { name: 'Naide' })).toBeInTheDocument();
 
-    // Check left navigation
-    expect(screen.getByRole('button', { name: 'Planning' })).toBeInTheDocument();
+    // Check left navigation - only Generate button should be present
     expect(screen.getByRole('button', { name: 'Generate' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Activity' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Files' })).toBeInTheDocument();
@@ -124,16 +109,6 @@ describe('GenerateAppScreen', () => {
 
     expect(startButton).toBeDisabled();
     expect(stopButton).toBeDisabled();
-  });
-
-  it('navigates back to Planning Mode when Planning button is clicked', async () => {
-    const user = userEvent.setup();
-    renderGenerateAppScreen();
-
-    const planningButton = screen.getByRole('button', { name: 'Planning' });
-    await user.click(planningButton);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/planning');
   });
 
   it('displays placeholder assistant messages', async () => {
