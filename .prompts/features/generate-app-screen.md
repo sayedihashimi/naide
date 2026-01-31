@@ -1,5 +1,31 @@
 # Feature: Generate App Screen (3-column layout)
 
+**Status**: ✅ IMPLEMENTED in PR #7, #9, #15
+
+## Implementation Summary
+
+The Generate App screen was implemented with the following key features:
+
+1. **Base Screen (PR #7)**: 3-column layout with chat interface
+   - Left: Navigation sidebar with Planning/Generate/Activity/Files
+   - Center: Interactive chat UI with message input
+   - Right: App preview panel (placeholder)
+   - Chat persistence to `.naide/chatsessions/default-chat.json`
+
+2. **Mode Selector (PR #9)**: Dropdown for Planning/Building/Analyzing modes
+   - Mode-specific welcome messages
+   - Mode changes update UI before chat initialization
+   - Default mode: Planning
+
+3. **Markdown Rendering (PR #15)**: Full markdown support in chat messages
+   - Uses `react-markdown` and `remark-gfm` packages
+   - Supports: bold, italic, strikethrough, code blocks, lists, links, headings, blockquotes, tables
+   - XSS protection with URL validation
+   - Custom dark theme styling
+   - Memoized components for performance
+
+---
+
 ## Goal
 When the user clicks Generate App in Planning Mode, navigate to a new screen that sets up the next phase of Naide:
 - Left column: navigation
@@ -132,7 +158,9 @@ Notes:
 
 ---
 
-## Center column: Chat area (shell only)
+## Center column: Chat area
+
+**Implementation Status**: ✅ Fully functional with markdown support
 
 Elements:
 1. Header row:
@@ -142,6 +170,15 @@ Elements:
 2. Transcript panel:
    - Scrollable area
    - Display mode-specific welcome messages based on selected mode
+   - **Markdown rendering**: All messages support full markdown formatting:
+     - Rich text: bold, italic, strikethrough
+     - Code: inline code and fenced code blocks with syntax highlighting
+     - Lists: ordered and unordered
+     - Links: clickable with XSS protection
+     - Headings: H1, H2, H3
+     - Blockquotes and tables (GitHub Flavored Markdown)
+   - Auto-scroll to bottom on new messages
+   - Messages persisted to `.naide/chatsessions/default-chat.json`
 
 3. Mode selector (above input row):
    - Dropdown with options: Planning, Building, Analyzing
@@ -150,11 +187,11 @@ Elements:
 
 4. Input row:
    - Text input or textarea
-   - **Expand/Collapse control**: All textareas must include an expand/collapse button (similar to Planning Mode) to toggle between compact and expanded height
+   - **Expand/Collapse control**: ✅ IMPLEMENTED - Textarea includes an expand/collapse button to toggle between compact and expanded height
    - Buttons:
      - Send (enabled when user types)
      - Attach (disabled)
-   - **Keyboard behavior**:
+   - **Keyboard behavior**: ✅ IMPLEMENTED
      - Enter: adds a new line
      - Ctrl+Enter (Cmd+Enter on macOS): submits the message
 
@@ -163,7 +200,7 @@ Behavior:
 - Ctrl/Cmd+Enter submits the message
 - Enter adds a new line without submitting
 - Messages are persisted to disk in `.naide/chatsessions/` folder within the project
-- Stub response: "naide response coming soon" for all user messages
+- Stub response: "naide response coming soon" for all user messages (replaced with Copilot integration in PR #13)
 - Mode changes update welcome messages if chat hasn't been initialized yet
 
 ---

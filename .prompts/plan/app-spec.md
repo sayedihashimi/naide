@@ -4,10 +4,11 @@
 Naide is a Tauri desktop application with a React + Vite frontend that helps non-professional developers create and maintain applications using AI assistance.
 
 ## Architecture
-- **Frontend**: React + TypeScript + Vite
-- **Backend**: Tauri (Rust)
+- **Frontend**: React 19 + TypeScript + Vite
+- **Backend**: Tauri 2 (Rust)
 - **Sidecar**: Node.js + TypeScript service for Copilot SDK integration
 - **Communication**: HTTP API between frontend and sidecar (localhost:3001)
+- **Build System**: GitHub Actions CI/CD for ubuntu-latest, windows-latest, and macos-latest
 
 ## Core Features
 
@@ -16,6 +17,7 @@ Naide is a Tauri desktop application with a React + Vite frontend that helps non
 - Updates files under `.prompts/plan/**` and `.prompts/features/**`
 - Reads and applies learnings from `.naide/learnings/**`
 - Does not modify code files
+- Interactive chat interface with Copilot integration
 
 ### 2. Building Mode (Stub)
 - Returns "Building coming soon" message
@@ -27,15 +29,30 @@ Naide is a Tauri desktop application with a React + Vite frontend that helps non
 
 ## User Interface
 
+### Screen 1: Intent Capture
+- Initial screen for project creation
+- Starter prompt chips for common use cases
+- Navigation to Planning Mode
+
+### Planning Mode
+- Section-based guided Q&A
+- File persistence to markdown files
+- Project management with folder picker
+
 ### Generate App Screen
-- **Left Panel**: Navigation sidebar
-- **Center Panel**: Chat interface with mode selector
-- **Right Panel**: Running app preview (not yet functional)
+- **Left Panel**: Navigation sidebar (Planning/Generate/Activity/Files)
+- **Center Panel**: 
+  - Interactive chat interface with markdown rendering support
+  - Mode selector dropdown (Planning/Building/Analyzing)
+  - Message persistence to `.naide/chatsessions/`
+  - Expand/collapse textarea control
+  - Keyboard shortcuts (Enter for newline, Ctrl/Cmd+Enter to submit)
+- **Right Panel**: Running app preview (placeholder, not yet functional)
 
 ### Mode Selector
 Dropdown with three options:
-- Planning (Create/update specs only)
-- Building (Update code and specs)
+- Planning (Create/update specs only) - Default
+- Building (Update code and specs) - Coming soon
 - Analyzing (Coming soon)
 
 ## Data Flow
@@ -43,5 +60,18 @@ Dropdown with three options:
 2. Frontend calls sidecar API at `/api/copilot/chat`
 3. Sidecar loads system prompts and learnings
 4. Sidecar calls Copilot SDK (or returns stub for Building/Analyzing)
-5. Response displayed in chat
+5. Response displayed in chat with markdown rendering
 6. Files updated as needed (Planning mode only)
+
+## Copilot Sidecar Integration
+- Auto-started by Tauri on application launch
+- Built with TypeScript, compiled to `src/copilot-sidecar/dist/index.js`
+- Uses `@github/copilot-sdk` for AI interactions
+- Exposes HTTP API on localhost:3001
+- Logs startup with PID to console
+
+## Testing
+- **Test Framework**: Vitest + React Testing Library
+- **Test Command**: `npm run testonly` (excludes integration tests by default)
+- **Coverage**: 81+ tests across UI components and utilities
+- **CI/CD**: Automated testing on all platforms via GitHub Actions

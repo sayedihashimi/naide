@@ -9,9 +9,12 @@ Repository structure must be:
 src/
   naide-desktop/
     (tauri + frontend project)
+  copilot-sidecar/
+    (node.js typescript sidecar)
 ```
 
 The Vite frontend should live in `src/naide-desktop` and Tauri config in `src/naide-desktop/src-tauri`.
+The Copilot sidecar lives in `src/copilot-sidecar` and is auto-started by Tauri.
 
 ## Create the Tauri + Vite project
 Use the official Tauri + Vite template flow (current tooling varies). If you need to initialize manually:
@@ -23,6 +26,20 @@ Use the official Tauri + Vite template flow (current tooling varies). If you nee
 The app must build with:
 - `tauri dev`
 - `tauri build`
+
+## TypeScript Best Practices (from PR #17)
+When working with React components and external libraries:
+
+1. **Interface Extensions**: Prefer extending React's built-in interfaces over using index signatures
+   - ✅ Good: `interface CodeProps extends React.HTMLAttributes<HTMLElement> { inline?: boolean; }`
+   - ❌ Avoid: `interface CodeProps { [key: string]: unknown; }`
+   
+2. **Type Compatibility**: Ensure custom component interfaces are compatible with library expectations
+   - Example: `react-markdown` expects `JSX.IntrinsicElements[Key] & ExtraProps`
+   - Extending `React.HTMLAttributes` provides full HTML attribute support while satisfying type constraints
+
+3. **Avoid Redundancy**: Don't redeclare properties already provided by parent interfaces
+   - `HTMLAttributes` already includes `className`, `children`, etc.
 
 ## Window defaults (required)
 Configure the main window:
@@ -81,9 +98,35 @@ Persisting to localStorage is optional but not required.
 - Buttons must have visible focus states.
 - Ensure keyboard navigation works.
 
+## CI/CD Setup (Implemented in PR #5)
+GitHub Actions workflow configured for continuous integration:
+
+### Build Matrix
+- Platforms: `ubuntu-latest`, `windows-latest`, `macos-latest`
+- Node.js: Version 18.x
+- Rust: Stable toolchain
+
+### Build Steps
+1. Install Node.js and Rust dependencies
+2. Install system dependencies (Linux: webkit2gtk, libayatana-appindicator3)
+3. Run linter: `npm run lint`
+4. Run tests: `npm run testonly`
+5. Build TypeScript and frontend: `npm run build`
+6. Build Tauri application: `npm run tauri build`
+
+### Configuration
+- Workflow triggers: push and pull_request on all branches
+- TypeScript config: Excludes `*.test.tsx` and `*.test.ts` files from build
+- ESLint config: Excludes test files from linting
+- Tauri bundle identifier: `com.naide.desktop` (changed from default `com.tauri.dev`)
+
 ## Build verification
 Ensure:
 - `tauri dev` starts the app
 - Screen 1 renders at `/`
 - Planning Mode renders at `/planning`
+- Generate App screen renders at `/generate`
 - Screen 1 Continue behavior works (modal on empty; navigation on non-empty)
+- All tests pass with `npm run testonly`
+- Linting passes with `npm run lint`
+- Build succeeds on all platforms (ubuntu, windows, macos)

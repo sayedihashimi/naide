@@ -2,6 +2,45 @@
 
 You are helping build **Naide** (**Not An IDE**): a desktop app (Windows/macOS/Linux) for *non‑pro developers* to create and maintain apps using AI.
 
+## Current Implementation Status
+
+The following features have been implemented:
+
+### Core Features (Completed)
+1. ✅ **Screen 1 — Intent Capture** (PR #2)
+   - No "Not An IDE" subtitle
+   - Expand/collapse and AI assist controls
+   - Starter prompt chips
+
+2. ✅ **Planning Mode Shell** (PR #2)
+   - Section-based guided Q&A layout
+   - "Plan out of date → Update plan" state
+   - File persistence to markdown files
+
+3. ✅ **Generate App Screen** (PR #7, #9, #15)
+   - 3-column layout with navigation, chat, and preview panels
+   - Mode selector: Planning/Building/Analyzing
+   - Interactive chat with markdown rendering
+   - Message persistence to `.naide/chatsessions/`
+
+4. ✅ **Copilot Integration** (PR #13)
+   - Node.js sidecar with @github/copilot-sdk
+   - Auto-start on Tauri launch
+   - HTTP API on localhost:3001
+
+5. ✅ **Markdown Support** (PR #15)
+   - Full markdown rendering in chat messages
+   - Code blocks, lists, tables, links, etc.
+   - XSS protection and dark theme styling
+
+6. ✅ **CI/CD** (PR #5)
+   - GitHub Actions for ubuntu, windows, macos
+   - Automated linting, testing, and builds
+
+7. ✅ **File Persistence System**
+   - Auto-save to Documents/naide/projects/{PROJECT_NAME}/
+   - Project loading and switching
+
 ## Prototype scope (THIS iteration)
 Implement only:
 1. **Screen 1 — Intent Capture** (no "Not An IDE" subtitle, with expand/collapse and AI assist controls)
@@ -11,24 +50,25 @@ Implement only:
 5. **Project Loading** - Load existing projects on startup and skip Screen 1
 6. **Project Switching** - Folder picker to open different projects
 7. Basic navigation + state handoff: Screen 1 → Planning Mode
-8. No Copilot SDK integration yet (UI-only prototype). No code generation.
+8. **Copilot SDK integration** via Node.js sidecar (Planning mode only)
+9. **Generate App screen** with chat interface and markdown support
 
 ## Non-goals (do NOT implement yet)
-- No real app generation (stub only)
+- No real app generation (Building/Analyzing modes are stubs)
 - No authentication, accounts, or cloud sync
 - No multi-window, no tray, no auto-updater
 
 ## Tech decisions (locked)
-- Desktop shell: **Tauri** (Rust core, plugins: fs, dialog)
-- Frontend: **React + Vite**
+- Desktop shell: **Tauri 2** (Rust core, plugins: fs, dialog)
+- Frontend: **React 19 + Vite**
 - Styling: **Tailwind CSS**
 - Theme: **Dark mode only**
 - Fonts: bundle **Inter** (UI) + **JetBrains Mono** (monospace)
 - Window: default **1200×800**, **resizable**
-- Repo layout: app lives under **src/naide-desktop**
+- Repo layout: app lives under **src/naide-desktop**, sidecar under **src/copilot-sidecar**
 - Build commands: `tauri dev` and `tauri build`
 - Testing: **Vitest** + **React Testing Library** (see `tech/testing.md`)
-- Vite setup: **rolldown-vite** for dev/build, **standard vite** for tests
+- CI/CD: **GitHub Actions** on ubuntu/windows/macos
 
 ## UX decisions (locked)
 - Screen 1 **Continue** button is **always enabled**

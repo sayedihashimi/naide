@@ -1,7 +1,33 @@
 Title: Initial Copilot SDK + Copilot CLI integration (Planning mode only; Building/Analyzing stubbed)
 
+**Status**: ✅ IMPLEMENTED in PR #13
+
 Summary
 Add initial integration to Naide using GitHub Copilot SDK (which uses GitHub Copilot CLI in server mode). The user will install and authenticate Copilot CLI outside of Naide before launching the app. If the user submits a request in Naide and Copilot CLI is missing or not logged in, show a basic UI message telling them to install/sign in and try again.
+
+## Implementation Summary
+
+The Copilot integration was implemented with the following architecture:
+
+1. **Node.js Sidecar**: Created at `src/copilot-sidecar/` with TypeScript
+   - Runs as HTTP server on `http://localhost:3001`
+   - Uses `@github/copilot-sdk` package
+   - Auto-started by Tauri on application launch
+   - Built with `npm run build` which compiles TypeScript to `dist/index.js`
+
+2. **Auto-Start Mechanism**: Tauri spawns the sidecar automatically
+   - Tauri's `lib.rs` starts the sidecar using Node.js
+   - Sidecar path: `src/copilot-sidecar/dist/index.js`
+   - Logs sidecar startup with PID to console
+   - Accessible at `http://localhost:3001`
+
+3. **Endpoints Implemented**: 
+   - `POST /api/copilot/chat` - Main chat endpoint for Copilot interactions
+   - Health check endpoint for connection verification
+
+---
+
+## Original Requirements
 
 For this initial integration:
 - Enable Copilot-backed behavior for Planning workflows (see details below).
