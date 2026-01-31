@@ -15,6 +15,7 @@ The Naide desktop app uses:
 
 Available test commands in `package.json`:
 - `npm test` - Run tests in watch mode
+- `npm run testonly` - Run tests once
 - `npm run test:ui` - Run tests with Vitest UI
 - `npm run test:coverage` - Run tests with coverage report
 
@@ -31,10 +32,9 @@ This dual setup allows us to benefit from rolldown-vite's performance in develop
 ### Test Files Location
 Tests are colocated with source files using the `.test.tsx` or `.test.ts` naming convention:
 - `src/components/Modal.test.tsx` - Modal component tests
-- `src/pages/Screen1.test.tsx` - Screen 1 page tests
-- `src/pages/PlanningMode.test.tsx` - Planning Mode tests
+- `src/components/MessageContent.test.tsx` - Message rendering tests
+- `src/pages/GenerateAppScreen.test.tsx` - Generate App screen tests
 - `src/utils/fileSystem.test.ts` - File system utility tests
-- `src/test/integration.test.tsx` - Integration tests
 
 ### Test Setup
 - `src/test/setup.ts` - Global test setup and Tauri API mocks
@@ -43,38 +43,28 @@ Tests are colocated with source files using the `.test.tsx` or `.test.ts` naming
 
 ## Test Coverage
 
-Tests cover the following requirements from the prototype specification:
+Tests cover the following requirements:
 
-### Screen 1 (Intent Capture)
-- ✓ Branding and UI rendering
-- ✓ 5 quick start chips with text insertion
-- ✓ Continue button (always enabled)
-- ✓ Modal on empty continue
-- ✓ Navigation to Planning Mode
-- ✓ Textarea controls (AI assist, expand/collapse)
-- ✓ Keyboard navigation and accessibility
-
-### Planning Mode
-- ✓ Section navigation (Overview, Features, Data, etc.)
-- ✓ Code section with file mappings
-- ✓ Plan dirty state management
-- ✓ Update plan and Generate App buttons
-- ✓ Project name in title bar
-- ✓ Textarea controls in Q&A sections
+### Generate App Screen (Single Chat Interface)
+- ✓ 3-column layout rendering (navigation, chat, preview)
+- ✓ Mode selector dropdown (Planning/Building/Analyzing)
+- ✓ Chat interface with message rendering
+- ✓ Message input with expand/collapse
+- ✓ Send button and keyboard shortcuts (Ctrl+Enter)
+- ✓ Welcome messages per mode
+- ✓ Stub responses for Building/Analyzing modes
+- ✓ Markdown rendering in chat messages
 
 ### Components
 - ✓ Modal accessibility (focus trap, escape key, backdrop click)
 - ✓ Modal dialog semantics (role, aria attributes)
+- ✓ Markdown content rendering
+- ✓ Code block syntax highlighting
 
 ### File Persistence
 - ✓ Config loading and saving
 - ✓ Project file operations (mocked in tests)
-
-### Integration Tests
-- ✓ End-to-end user flows
-- ✓ Navigation between screens
-- ✓ Chip insertion and continue workflow
-- ✓ Accessibility features (keyboard navigation)
+- ✓ Chat session persistence
 
 ## Tauri API Mocking
 
@@ -126,6 +116,10 @@ Tests should be run:
 - Before merging pull requests
 
 The test suite is designed to be fast and reliable for development workflows.
+
+## Current Status
+
+All tests pass successfully (49 tests). The application has been simplified to use a single chat-driven interface.
 
 ## Notes
 
