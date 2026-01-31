@@ -12,9 +12,12 @@ export interface ChatMessage {
 export interface ChatSession {
   id: string;
   projectName: string;
+  mode?: string;
   messages: ChatMessage[];
+  summary?: unknown;
   createdAt: string;
   updatedAt: string;
+  savedAt?: string;
 }
 
 // Get the .naide directory path within a project
@@ -188,5 +191,73 @@ export async function listChatSessions(projectName: string): Promise<string[]> {
   } catch (error) {
     console.error('[ChatPersistence] Error listing chat sessions:', error);
     return [];
+  }
+}
+
+// Generate a unique chat session ID using timestamp and random string
+function generateChatId(): string {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substr(2, 9);
+  return `chat-${timestamp}-${randomStr}`;
+}
+
+// Archive the current chat session by saving it with a unique ID
+// Returns the archived session ID, or null if there was nothing to archive
+export async function archiveChatSession(
+  projectName: string,
+  messages: ChatMessage[],
+  mode?: string,
+  summary?: unknown
+): Promise<string | null> {
+  try {
+    // Filter out welcome messages (they have IDs starting with 'welcome-')
+    const userMessages = messages.filter(
+      (m) => m.role === 'user' || !m.id.startsWith('welcome-')
+    );
+    
+    // Only archive if there are user messages
+    const hasUserMessages = messages.some((m) => m.role === 'user');
+    if (!hasUserMessages) {
+      console.log('[ChatPersistence] No user messages to archive, skipping');
+      return null;
+    }
+    
+    // Generate unique ID for the archived session
+    const chatId = generateChatId();
+    const filename = `${chatId}.json`;
+    
+    // Ensure chat sessions directory exists
+    const chatSessionsDir = await getChatSessionsDir(projectName);
+    const chatSessionsDirExists = await exists(chatSessionsDir);
+    
+    if (!chatSessionsDirExists) {
+      console.log('[ChatPersistence] Creating chat sessions directory:', chatSessionsDir);
+      await mkdir(chatSessionsDir, { recursive: true });
+    }
+    
+    // Create the archived session object
+    const now = new Date().toISOString();
+    const session: ChatSession = {
+      id: chatId,
+      projectName,
+      mode,
+      messages: userMessages,
+      summary,
+      createdAt: messages[0]?.timestamp || now,
+      updatedAt: now,
+      savedAt: now,
+    };
+    
+    const sessionPath = await join(chatSessionsDir, filename);
+    const content = JSON.stringify(session, null, 2);
+    
+    console.log('[ChatPersistence] Archiving chat session to:', sessionPath);
+    await writeTextFile(sessionPath, content);
+    console.log('[ChatPersistence] Chat session archived successfully with ID:', chatId);
+    
+    return chatId;
+  } catch (error) {
+    console.error('[ChatPersistence] Error archiving chat session:', error);
+    throw error;
   }
 }

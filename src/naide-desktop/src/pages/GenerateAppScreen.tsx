@@ -307,6 +307,41 @@ const GenerateAppScreen: React.FC = () => {
     }
   };
 
+  const handleNewChat = async () => {
+    // Check if there are any user messages to save
+    const hasUserMessages = messages.some((m) => m.role === 'user');
+    
+    if (hasUserMessages) {
+      try {
+        // Archive the current chat session
+        const { archiveChatSession } = await import('../utils/chatPersistence');
+        const archivedId = await archiveChatSession(
+          state.projectName,
+          messages,
+          copilotMode,
+          conversationSummary
+        );
+        
+        if (archivedId) {
+          console.log('[GenerateApp] Archived chat session:', archivedId);
+        }
+      } catch (error) {
+        console.error('[GenerateApp] Error archiving chat session:', error);
+        // Continue with new chat even if archiving fails
+      }
+    }
+    
+    // Reset state for new chat
+    setChatInitialized(false);
+    setMessages(getWelcomeMessages(copilotMode));
+    setConversationSummary(null);
+    
+    // Focus the textarea
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
   const handleOpenProjectFolder = async () => {
     try {
       // Get the current project path
@@ -479,8 +514,29 @@ const GenerateAppScreen: React.FC = () => {
           {/* Input row */}
           <div className="border-t border-zinc-800 p-6">
             <div className="max-w-3xl mx-auto">
-              {/* Mode selector */}
+              {/* Mode selector with New Chat button */}
               <div className="mb-3 flex items-center gap-2">
+                {/* New Chat button */}
+                <button
+                  onClick={handleNewChat}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-gray-100 transition-colors"
+                  title="New Chat"
+                  aria-label="Start new chat"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                </button>
                 <label htmlFor="mode-select" className="text-sm text-gray-400">
                   Mode:
                 </label>

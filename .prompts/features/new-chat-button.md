@@ -1,5 +1,5 @@
 # Feature: New Chat Button
-**Status**: 📋 PLANNED
+**Status**: ✅ IMPLEMENTED
 
 ## Summary
 Add a "New Chat" button (+ icon) to the Generate App screen that allows users to start a fresh chat conversation. When clicked, the current chat session should be saved to a file for later retrieval, and a new empty chat should be initialized.
