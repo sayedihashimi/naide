@@ -2,11 +2,37 @@ import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve, sep } from 'path';
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { CopilotClient } from '@github/copilot-sdk';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// =============================================================================
+// Types for Conversation Memory
+// =============================================================================
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+interface ConversationSummary {
+  decisions: string[];
+  constraints: string[];
+  acceptedDefaults: string[];
+  rejectedOptions: string[];
+  openQuestions: string[];
+  updatedAt: string;
+}
+
+interface ConversationContext {
+  summary: ConversationSummary | null;
+  recentMessages: ChatMessage[];
+  totalMessageCount: number;
+}
 
 const app = express();
 
@@ -96,14 +122,37 @@ function loadSystemPrompts(mode: string): string {
       console.warn(`[Sidecar] Mode system prompt not found at: ${modePath}`);
     }
     
-    // Add instruction to read files from the USER'S PROJECT
-    systemPrompt += `\nFILES IN USER'S PROJECT:\n`;
-    systemPrompt += `The user's project folder contains:\n`;
-    systemPrompt += `- README.naide.md (if exists) - project overview\n`;
-    systemPrompt += `- .prompts/plan/** - planning specs (intent.md, app-spec.md, data-spec.md, rules.md, tasks.json)\n`;
-    systemPrompt += `- .prompts/features/** - feature files (one per feature)\n`;
-    systemPrompt += `- .naide/learnings/** - learnings from past interactions\n`;
-    systemPrompt += `- Project source files - the actual app code\n`;
+    // Add conversation memory instructions
+    systemPrompt += `
+CONVERSATION MEMORY INSTRUCTIONS:
+You have access to conversation memory to maintain context across messages.
+
+MEMORY STRUCTURE:
+- Conversation Summary: Key decisions, constraints, accepted defaults, rejected options, and open questions
+- Recent Messages: The last 6-10 messages for conversational context
+- The user's message: The current request to respond to
+
+CRITICAL RULES:
+- Do NOT repeat decisions that have already been made
+- Do NOT ask questions that have already been answered
+- Honor all constraints and rejected options from the summary
+- Build on accepted defaults rather than re-proposing alternatives
+- Focus on unresolved items from the open questions list
+
+When the conversation has matured (4+ message exchanges), include a summary update in your response using this exact format:
+<!-- CONVERSATION_SUMMARY_START -->
+{
+  "decisions": ["New decisions from this exchange"],
+  "constraints": ["New constraints identified"],
+  "acceptedDefaults": ["Defaults user accepted"],
+  "rejectedOptions": ["Options user rejected"],
+  "openQuestions": ["Current unresolved questions - replace previous"]
+}
+<!-- CONVERSATION_SUMMARY_END -->
+
+Only include non-empty arrays. The openQuestions array should contain the CURRENT state of open questions (replacing previous), while other arrays are additive (new items only).
+
+`;
     
     return systemPrompt;
   } catch (error) {
@@ -123,7 +172,7 @@ async function loadLearnings(workspaceRoot: string): Promise<string> {
   try {
     const fs = await import('fs/promises');
     const files = await fs.readdir(learningsDir);
-    let learnings = '\n\n## LEARNINGS\n\n';
+    let learnings = '\n\n## LEARNINGS FROM PAST INTERACTIONS\n\n';
     
     for (const file of files) {
       if (file.endsWith('.md')) {
@@ -137,6 +186,124 @@ async function loadLearnings(workspaceRoot: string): Promise<string> {
     console.error('Error loading learnings:', error);
     return '';
   }
+}
+
+// Load spec files from .prompts/plan/
+function loadSpecFiles(workspaceRoot: string): string {
+  const planDir = join(workspaceRoot, '.prompts', 'plan');
+  
+  if (!existsSync(planDir)) {
+    return '';
+  }
+  
+  try {
+    const files = readdirSync(planDir);
+    let specs = '\n\n## PROJECT SPECIFICATIONS\n\n';
+    let hasContent = false;
+    
+    for (const file of files) {
+      const filePath = join(planDir, file);
+      if (file.endsWith('.md') || file.endsWith('.json')) {
+        const content = readFileSync(filePath, 'utf-8');
+        if (content.trim()) {
+          specs += `### ${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
+          hasContent = true;
+        }
+      }
+    }
+    
+    return hasContent ? specs : '';
+  } catch (error) {
+    console.error('Error loading spec files:', error);
+    return '';
+  }
+}
+
+// Load feature files from .prompts/features/
+function loadFeatureFiles(workspaceRoot: string): string {
+  const featuresDir = join(workspaceRoot, '.prompts', 'features');
+  
+  if (!existsSync(featuresDir)) {
+    return '';
+  }
+  
+  try {
+    const files = readdirSync(featuresDir);
+    let features = '\n\n## FEATURE SPECIFICATIONS\n\n';
+    let hasContent = false;
+    
+    for (const file of files) {
+      // Skip removed-features directory
+      if (file === 'removed-features') continue;
+      
+      const filePath = join(featuresDir, file);
+      if (file.endsWith('.md')) {
+        const content = readFileSync(filePath, 'utf-8');
+        if (content.trim()) {
+          features += `### ${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
+          hasContent = true;
+        }
+      }
+    }
+    
+    return hasContent ? features : '';
+  } catch (error) {
+    console.error('Error loading feature files:', error);
+    return '';
+  }
+}
+
+// Format conversation summary for the prompt
+function formatConversationSummary(summary: ConversationSummary | null): string {
+  if (!summary) {
+    return '';
+  }
+  
+  const sections: string[] = [];
+  
+  if (summary.decisions.length > 0) {
+    sections.push(`### Key Decisions Made\n${summary.decisions.map(d => `- ${d}`).join('\n')}`);
+  }
+  
+  if (summary.constraints.length > 0) {
+    sections.push(`### Active Constraints\n${summary.constraints.map(c => `- ${c}`).join('\n')}`);
+  }
+  
+  if (summary.acceptedDefaults.length > 0) {
+    sections.push(`### Accepted Defaults\n${summary.acceptedDefaults.map(d => `- ${d}`).join('\n')}`);
+  }
+  
+  if (summary.rejectedOptions.length > 0) {
+    sections.push(`### Rejected Options (Do Not Re-propose)\n${summary.rejectedOptions.map(r => `- ${r}`).join('\n')}`);
+  }
+  
+  if (summary.openQuestions.length > 0) {
+    sections.push(`### Open Questions (Focus Here)\n${summary.openQuestions.map(q => `- ${q}`).join('\n')}`);
+  }
+  
+  if (sections.length === 0) {
+    return '';
+  }
+  
+  return `\n\n## CONVERSATION SUMMARY (Mid-Term Memory)\n\n${sections.join('\n\n')}\n`;
+}
+
+// Format recent messages for the prompt
+function formatRecentMessages(messages: ChatMessage[]): string {
+  if (messages.length === 0) {
+    return '';
+  }
+  
+  const formattedMessages = messages.map(m => {
+    const role = m.role === 'user' ? 'User' : 'Assistant';
+    // Truncate very long messages to keep token count reasonable
+    const content = m.content.length > 1000 
+      ? m.content.substring(0, 1000) + '... [truncated]'
+      : m.content;
+    return `**${role}**: ${content}`;
+  });
+  
+  return `\n\n## RECENT CONVERSATION (Short-Term Memory)\n\n${formattedMessages.join('\n\n')}\n`;
 }
 
 // Write a learning entry
@@ -248,9 +415,12 @@ function safeFileRead(workspaceRoot: string, relativePath: string): string | nul
 
 // Main chat endpoint
 app.post('/api/copilot/chat', async (req, res) => {
-  const { mode, message, workspaceRoot, contextFiles } = req.body;
+  const { mode, message, workspaceRoot, contextFiles, conversationContext } = req.body;
   
   console.log(`[Sidecar] Chat request - mode: ${mode}, message: ${message?.substring(0, 50)}...`);
+  if (conversationContext) {
+    console.log(`[Sidecar] Conversation context: ${conversationContext.totalMessageCount} total messages, summary: ${conversationContext.summary ? 'yes' : 'no'}`);
+  }
   
   // For Building and Analyzing modes, return stub responses
   if (mode === 'Building') {
@@ -281,14 +451,45 @@ app.post('/api/copilot/chat', async (req, res) => {
     }
     
     try {
-      // Load system prompts from naide app repository
-      const systemPrompt = loadSystemPrompts(mode);
+      // =========================================================================
+      // PROMPT ASSEMBLY ORDER (as per conversation-memory.feature.md)
+      // 1) Base system prompt
+      // 2) Mode system prompt
+      // 3) Relevant learnings
+      // 4) Relevant spec + feature files
+      // 5) Conversation summary
+      // 6) Recent messages
+      // 7) Current user message (sent separately)
+      // =========================================================================
       
-      // Load learnings from user's project
-      const learnings = await loadLearnings(workspaceRoot || process.cwd());
+      const workspace = workspaceRoot || process.cwd();
       
-      // Combine system prompt with learnings
-      const fullSystemPrompt = systemPrompt + learnings;
+      // 1-2) Load system prompts from naide app repository (base + mode)
+      let fullSystemPrompt = loadSystemPrompts(mode);
+      
+      // 3) Load learnings from user's project
+      const learnings = await loadLearnings(workspace);
+      fullSystemPrompt += learnings;
+      
+      // 4) Load spec and feature files from user's project
+      const specs = loadSpecFiles(workspace);
+      const features = loadFeatureFiles(workspace);
+      fullSystemPrompt += specs;
+      fullSystemPrompt += features;
+      
+      // 5) Add conversation summary (mid-term memory)
+      if (conversationContext?.summary) {
+        const summaryPrompt = formatConversationSummary(conversationContext.summary);
+        fullSystemPrompt += summaryPrompt;
+      }
+      
+      // 6) Add recent messages (short-term memory)
+      if (conversationContext?.recentMessages && conversationContext.recentMessages.length > 0) {
+        const messagesPrompt = formatRecentMessages(conversationContext.recentMessages);
+        fullSystemPrompt += messagesPrompt;
+      }
+      
+      console.log(`[Sidecar] Full prompt assembled, total length: ${fullSystemPrompt.length} chars`);
       
       // Create a new session for each request to avoid conflicts
       console.log('[Sidecar] Creating new Copilot session for Planning mode');
@@ -299,7 +500,7 @@ app.post('/api/copilot/chat', async (req, res) => {
         }
       });
       
-      // Send user message and collect response
+      // 7) Send current user message and collect response
       const responseChunks: string[] = [];
       
       // Set up event listeners for the response BEFORE sending

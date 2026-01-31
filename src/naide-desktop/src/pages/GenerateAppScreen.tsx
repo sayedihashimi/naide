@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/useAppContext';
 import type { ChatMessage } from '../utils/chatPersistence';
+import {
+  type ConversationSummary,
+  buildConversationContext,
+  parseSummaryFromResponse,
+  cleanResponseForDisplay,
+  mergeSummary,
+} from '../utils/conversationMemory';
 import MessageContent from '../components/MessageContent';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
@@ -76,6 +83,8 @@ const GenerateAppScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [chatInitialized, setChatInitialized] = useState(false);
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('Planning');
+  // Conversation summary for mid-term memory (persisted in state, not disk)
+  const [conversationSummary, setConversationSummary] = useState<ConversationSummary | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -185,6 +194,17 @@ const GenerateAppScreen: React.FC = () => {
       // Get the project path to use as workspace root
       const projectPath = await getProjectPath(state.projectName);
       
+      // Build conversation context for memory (short-term + mid-term)
+      // Include all messages EXCEPT the one we just added (recentMessages are for context)
+      const contextMessages = [...messages]; // messages state hasn't updated yet, so this is correct
+      const conversationContext = buildConversationContext(contextMessages, conversationSummary);
+      
+      console.log('[GenerateApp] Sending with conversation context:', {
+        summaryExists: !!conversationContext.summary,
+        recentMessagesCount: conversationContext.recentMessages.length,
+        totalMessageCount: conversationContext.totalMessageCount,
+      });
+      
       const response = await fetch('http://localhost:3001/api/copilot/chat', {
         method: 'POST',
         headers: {
@@ -194,6 +214,7 @@ const GenerateAppScreen: React.FC = () => {
           mode: copilotMode,
           message: userInput,
           workspaceRoot: projectPath,
+          conversationContext,
         }),
       });
 
@@ -217,10 +238,23 @@ const GenerateAppScreen: React.FC = () => {
 
       const data = await response.json();
 
+      // Extract conversation summary update from the response (if present)
+      const rawReplyText = data.replyText || data.error || 'An error occurred';
+      const summaryUpdate = parseSummaryFromResponse(rawReplyText);
+      
+      // Update conversation summary if we got new information
+      if (summaryUpdate) {
+        console.log('[GenerateApp] Updating conversation summary from AI response');
+        setConversationSummary(prev => mergeSummary(prev, summaryUpdate));
+      }
+      
+      // Clean the response for display (remove summary markers)
+      const cleanedReplyText = cleanResponseForDisplay(rawReplyText);
+
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
-        content: data.replyText || data.error || 'An error occurred',
+        content: cleanedReplyText,
         timestamp: new Date().toISOString(),
       };
 
@@ -268,6 +302,8 @@ const GenerateAppScreen: React.FC = () => {
     // Reset chat with new welcome messages for the mode
     if (!chatInitialized) {
       setMessages(getWelcomeMessages(newMode));
+      // Clear conversation summary when switching modes in a fresh session
+      setConversationSummary(null);
     }
   };
 
@@ -301,6 +337,8 @@ const GenerateAppScreen: React.FC = () => {
           // Reset chat for new project
           setChatInitialized(false);
           setMessages(getWelcomeMessages(copilotMode));
+          // Clear conversation summary for new project
+          setConversationSummary(null);
         } else {
           console.log('[GenerateApp] Project not found, will create on first interaction');
         }

@@ -57,11 +57,27 @@ Dropdown with three options:
 
 ## Data Flow
 1. User types message in chat
-2. Frontend calls sidecar API at `/api/copilot/chat`
-3. Sidecar loads system prompts and learnings
-4. Sidecar calls Copilot SDK (or returns stub for Building/Analyzing)
-5. Response displayed in chat with markdown rendering
-6. Files updated as needed (Planning mode only)
+2. Frontend builds conversation context (summary + recent messages)
+3. Frontend calls sidecar API at `/api/copilot/chat`
+4. Sidecar assembles full prompt in required order:
+   - Base system prompt + mode system prompt
+   - Learnings from `.naide/learnings/`
+   - Spec files from `.prompts/plan/`
+   - Feature files from `.prompts/features/`
+   - Conversation summary (mid-term memory)
+   - Recent messages (short-term memory)
+   - Current user message
+5. Sidecar calls Copilot SDK (or returns stub for Building/Analyzing)
+6. Response displayed in chat with markdown rendering
+7. Conversation summary updated from response (if present)
+8. Files updated as needed (Planning mode only)
+
+## Conversation Memory
+- **Short-Term Memory**: Rolling buffer of last 6-10 messages in app state
+- **Mid-Term Memory**: Conversation summary updated incrementally
+- **Long-Term Memory**: Repo files (specs, features, learnings) are authoritative
+- Token usage stays bounded by limiting recent messages
+- Summary tracks: decisions, constraints, accepted defaults, rejected options, open questions
 
 ## Copilot Sidecar Integration
 - Auto-started by Tauri on application launch

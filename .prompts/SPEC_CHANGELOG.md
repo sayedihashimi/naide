@@ -2,6 +2,70 @@
 
 This document tracks updates made to specification files based on merged PRs.
 
+## 2026-01-31: Conversation Memory & Context Management
+
+### Overview
+Implemented proper conversation memory handling for Naide's chat experience. The AI can now remember prior messages, decisions, and constraints within a session through a three-layer memory model.
+
+### Changes Made
+
+#### New Utility: `conversationMemory.ts`
+Created `src/naide-desktop/src/utils/conversationMemory.ts` with:
+- `ConversationSummary` interface (decisions, constraints, defaults, rejections, questions)
+- `ConversationContext` interface (summary + recent messages + total count)
+- `getRecentMessages()` - extracts last 6-10 messages for short-term memory
+- `buildConversationContext()` - builds context object for API requests
+- `parseSummaryFromResponse()` - extracts summary updates from AI responses
+- `cleanResponseForDisplay()` - removes summary markers from displayed responses
+- `mergeSummary()` - merges summary updates incrementally
+
+#### Sidecar Updates
+Updated `src/copilot-sidecar/src/index.ts`:
+- Added conversation memory types
+- New `loadSpecFiles()` function to load `.prompts/plan/**` files
+- New `loadFeatureFiles()` function to load `.prompts/features/**` files
+- New `formatConversationSummary()` for mid-term memory prompt section
+- New `formatRecentMessages()` for short-term memory prompt section
+- Updated `/api/copilot/chat` endpoint to accept `conversationContext`
+- Implemented proper prompt assembly order:
+  1. Base system prompt
+  2. Mode system prompt
+  3. Learnings
+  4. Spec files
+  5. Feature files
+  6. Conversation summary
+  7. Recent messages
+  8. Current user message
+
+#### Frontend Updates
+Updated `src/naide-desktop/src/pages/GenerateAppScreen.tsx`:
+- Added `conversationSummary` state for mid-term memory
+- Build and send `conversationContext` with each Planning request
+- Extract summary updates from AI responses
+- Clean responses for display (remove summary markers)
+- Reset summary when switching projects or modes
+
+### Spec Files Updated
+- `.prompts/plan/data-spec.md`: Added conversation memory types and architecture
+- `.prompts/plan/app-spec.md`: Updated data flow and added memory section
+- `.prompts/features/conversation-memory.feature.md`: Marked as IMPLEMENTED
+
+### Memory Model Implementation
+1. **Short-Term Memory**: Last 6-10 messages stored in React state
+2. **Mid-Term Memory**: Conversation summary updated from AI responses
+3. **Long-Term Memory**: Repository files (specs, features, learnings)
+
+### Prompt Assembly Order (Required)
+1. Base system prompt
+2. Mode system prompt
+3. Relevant learnings
+4. Relevant spec + feature files
+5. Conversation summary
+6. Recent messages
+7. Current user message
+
+---
+
 ## 2026-01-31: Simplify to Single Chat Screen
 
 ### Overview
