@@ -3,7 +3,7 @@ import { AppProvider } from './context/AppContext';
 import { useAppContext } from './context/useAppContext';
 import GenerateAppScreen from './pages/GenerateAppScreen';
 import { useEffect, useState } from 'react';
-import { loadConfig, createAllProjectFiles } from './utils/fileSystem';
+import { loadConfig, initializeProject } from './utils/fileSystem';
 
 function AppRoutes() {
   const { checkForExistingProject, loadProject, setProjectName, state } = useAppContext();
@@ -32,9 +32,9 @@ function AppRoutes() {
             await loadProject(projectName);
             console.log('[App] Loaded last used project:', projectName);
           } else {
-            // Create project files if they don't exist
-            console.log('[App] Creating project files for:', projectName);
-            await createAllProjectFiles(projectName, '');
+            // Initialize project directory only (no files)
+            console.log('[App] Initializing project directory for:', projectName);
+            await initializeProject(projectName);
           }
         } else {
           console.log('[App] No last used project found');
@@ -43,9 +43,9 @@ function AppRoutes() {
           if (exists) {
             await loadProject(state.projectName);
           } else {
-            // Create default project files
-            console.log('[App] Creating default project files');
-            await createAllProjectFiles(state.projectName, '');
+            // Initialize default project directory only (no files)
+            console.log('[App] Initializing default project directory');
+            await initializeProject(state.projectName);
           }
         }
       } catch (error) {

@@ -7,10 +7,10 @@ REQUIRED CONTEXT
 - Read .prompts/plan/**, .prompts/features/**, .naide/learnings/**.
 
 PLANNING OUTPUTS
-- intent.md
-- app-spec.md
-- data-spec.md
-- rules.md
-- tasks.json
+- .prompts/plan/intent.md
+- .prompts/plan/app-spec.md
+- .prompts/plan/data-spec.md
+- .prompts/plan/rules.md
+- .prompts/plan/tasks.json
 
 DO NOT WRITE CODE

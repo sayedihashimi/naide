@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/useAppContext';
 import type { ChatMessage } from '../utils/chatPersistence';
 import MessageContent from '../components/MessageContent';
+import { open } from '@tauri-apps/plugin-dialog';
+import { getProjectPath } from '../utils/fileSystem';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -67,7 +69,7 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
 };
 
 const GenerateAppScreen: React.FC = () => {
-  const { state } = useAppContext();
+  const { state, setProjectName, loadProject } = useAppContext();
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -180,6 +182,9 @@ const GenerateAppScreen: React.FC = () => {
       }
 
       // For Planning mode, call the sidecar
+      // Get the project path to use as workspace root
+      const projectPath = await getProjectPath(state.projectName);
+      
       const response = await fetch('http://localhost:3001/api/copilot/chat', {
         method: 'POST',
         headers: {
@@ -188,7 +193,7 @@ const GenerateAppScreen: React.FC = () => {
         body: JSON.stringify({
           mode: copilotMode,
           message: userInput,
-          workspaceRoot: '', // Sidecar will use its own cwd
+          workspaceRoot: projectPath,
         }),
       });
 
@@ -266,11 +271,70 @@ const GenerateAppScreen: React.FC = () => {
     }
   };
 
+  const handleOpenProjectFolder = async () => {
+    try {
+      // Get the current project path
+      const projectPath = await getProjectPath(state.projectName);
+      
+      // Open folder selection dialog
+      const selectedPath = await open({
+        title: 'Select Project Folder',
+        directory: true,
+        multiple: false,
+        defaultPath: projectPath,
+      });
+      
+      if (selectedPath && typeof selectedPath === 'string') {
+        console.log('[GenerateApp] Selected project folder:', selectedPath);
+        
+        // Extract project name from the path (cross-platform)
+        const pathParts = selectedPath.split(/[/\\]/);
+        const newProjectName = pathParts[pathParts.length - 1];
+        
+        // Update project name and load the project
+        setProjectName(newProjectName);
+        
+        // Try to load the project
+        const loaded = await loadProject(newProjectName);
+        if (loaded) {
+          console.log('[GenerateApp] Successfully loaded project:', newProjectName);
+          // Reset chat for new project
+          setChatInitialized(false);
+          setMessages(getWelcomeMessages(copilotMode));
+        } else {
+          console.log('[GenerateApp] Project not found, will create on first interaction');
+        }
+      }
+    } catch (error) {
+      console.error('[GenerateApp] Error opening project folder:', error);
+    }
+  };
+
   return (
     <div className="h-screen bg-zinc-950 flex flex-col">
       {/* Header */}
-      <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4">
+      <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-100">Naide</h1>
+        <button
+          onClick={handleOpenProjectFolder}
+          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-gray-100 rounded-lg transition-colors flex items-center gap-2"
+          title="Open project folder"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+            />
+          </svg>
+          <span className="text-sm">{state.projectName}</span>
+        </button>
       </div>
 
       {/* Main content area - 3 columns */}
