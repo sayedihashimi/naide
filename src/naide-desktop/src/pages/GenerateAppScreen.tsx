@@ -69,7 +69,7 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
 };
 
 const GenerateAppScreen: React.FC = () => {
-  const { state } = useAppContext();
+  const { state, setProjectName, loadProject } = useAppContext();
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -284,10 +284,26 @@ const GenerateAppScreen: React.FC = () => {
         defaultPath: projectPath,
       });
       
-      if (selectedPath) {
+      if (selectedPath && typeof selectedPath === 'string') {
         console.log('[GenerateApp] Selected project folder:', selectedPath);
-        // TODO: Load the selected project
-        // For now, just log the selection
+        
+        // Extract project name from the path
+        const pathParts = selectedPath.split('/');
+        const newProjectName = pathParts[pathParts.length - 1];
+        
+        // Update project name and load the project
+        setProjectName(newProjectName);
+        
+        // Try to load the project
+        const loaded = await loadProject(newProjectName);
+        if (loaded) {
+          console.log('[GenerateApp] Successfully loaded project:', newProjectName);
+          // Reset chat for new project
+          setChatInitialized(false);
+          setMessages(getWelcomeMessages(copilotMode));
+        } else {
+          console.log('[GenerateApp] Project not found, will create on first interaction');
+        }
       }
     } catch (error) {
       console.error('[GenerateApp] Error opening project folder:', error);

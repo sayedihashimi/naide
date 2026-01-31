@@ -165,16 +165,14 @@ function writeLearning(workspaceRoot: string, category: string, content: string)
 
 // Safe file write - allow .prompts/** and project files, but block dangerous paths
 function safeFileWrite(workspaceRoot: string, relativePath: string, content: string): boolean {
-  // Block dangerous paths
+  // Block dangerous paths - using precise patterns
   const blockedPatterns = [
-    /^\.\./, // Parent directory traversal
+    /\.\./, // Any occurrence of '..' (path traversal)
     /node_modules/, // Dependencies
     /\.git/, // Git directory
-    /\.env/, // Environment files
-    /^package\.json$/, // Package manifest at root (dangerous to modify)
-    /^package-lock\.json$/, // Lock file at root
-    /\/package\.json$/, // Package manifest in subdirectories
-    /\/package-lock\.json$/, // Lock files in subdirectories
+    /(?:^|\/)\.env(?:$|\.|\/)/, // .env files and variants (.env.local, .env.production, etc.)
+    /(?:^|\/)package\.json$/, // package.json at any depth
+    /(?:^|\/)package-lock\.json$/, // package-lock.json at any depth
   ];
   
   if (blockedPatterns.some(pattern => pattern.test(relativePath))) {
@@ -211,10 +209,10 @@ function safeFileWrite(workspaceRoot: string, relativePath: string, content: str
 
 // Safe file read - allow reading within workspace but block dangerous paths
 function safeFileRead(workspaceRoot: string, relativePath: string): string | null {
-  // Block dangerous paths
+  // Block dangerous paths - using precise patterns
   const blockedPatterns = [
-    /^\.\./, // Parent directory traversal
-    /\.env/, // Environment files (may contain secrets)
+    /\.\./, // Any occurrence of '..' (path traversal)
+    /(?:^|\/)\.env(?:$|\.|\/)/, // .env files and variants (may contain secrets)
   ];
   
   if (blockedPatterns.some(pattern => pattern.test(relativePath))) {
