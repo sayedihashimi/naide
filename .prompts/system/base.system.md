@@ -21,7 +21,10 @@ REPO PROMPTS, SPECS, AND FEATURES ARE SOURCE OF TRUTH
 - Always check README.naide.md if it exists in the project
 - Specs are stored in .prompts/plan/ (intent.md, app-spec.md, data-spec.md, rules.md, tasks.json)
 - Features are stored in .prompts/features/ with one file per feature
-- Specs and feature files must never drift from user intent or implementation
+- **CRITICAL**: Specs and feature files must ALWAYS stay synchronized with actual implementation
+- When you make ANY code changes, you MUST update the corresponding spec files
+- When you create a new feature, you MUST create/update its feature file in .prompts/features/
+- When implementation deviates from specs, update the specs immediately
 
 FEATURE FILE CONTRACT
 - EVERY feature must have its own file under .prompts/features/.
