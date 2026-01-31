@@ -167,12 +167,12 @@ function writeLearning(workspaceRoot: string, category: string, content: string)
 function safeFileWrite(workspaceRoot: string, relativePath: string, content: string): boolean {
   // Block dangerous paths - using precise patterns
   const blockedPatterns = [
-    /\.\./, // Any occurrence of '..' (path traversal)
+    /(?:^|[/\\])\.\.(?:[/\\]|$)/, // Path traversal: '..' as a path component
     /node_modules/, // Dependencies
     /\.git/, // Git directory
-    /(?:^|\/)\.env(?:$|\.|\/)/, // .env files and variants (.env.local, .env.production, etc.)
-    /(?:^|\/)package\.json$/, // package.json at any depth
-    /(?:^|\/)package-lock\.json$/, // package-lock.json at any depth
+    /(?:^|[/\\])\.env(?:$|\.|[/\\])/, // .env files and variants (.env.local, .env.production, etc.)
+    /(?:^|[/\\])package\.json$/, // package.json at any depth
+    /(?:^|[/\\])package-lock\.json$/, // package-lock.json at any depth
   ];
   
   if (blockedPatterns.some(pattern => pattern.test(relativePath))) {
@@ -211,8 +211,8 @@ function safeFileWrite(workspaceRoot: string, relativePath: string, content: str
 function safeFileRead(workspaceRoot: string, relativePath: string): string | null {
   // Block dangerous paths - using precise patterns
   const blockedPatterns = [
-    /\.\./, // Any occurrence of '..' (path traversal)
-    /(?:^|\/)\.env(?:$|\.|\/)/, // .env files and variants (may contain secrets)
+    /(?:^|[/\\])\.\.(?:[/\\]|$)/, // Path traversal: '..' as a path component
+    /(?:^|[/\\])\.env(?:$|\.|[/\\])/, // .env files and variants (may contain secrets)
   ];
   
   if (blockedPatterns.some(pattern => pattern.test(relativePath))) {

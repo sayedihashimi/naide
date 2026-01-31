@@ -287,8 +287,8 @@ const GenerateAppScreen: React.FC = () => {
       if (selectedPath && typeof selectedPath === 'string') {
         console.log('[GenerateApp] Selected project folder:', selectedPath);
         
-        // Extract project name from the path
-        const pathParts = selectedPath.split('/');
+        // Extract project name from the path (cross-platform)
+        const pathParts = selectedPath.split(/[/\\]/);
         const newProjectName = pathParts[pathParts.length - 1];
         
         // Update project name and load the project
