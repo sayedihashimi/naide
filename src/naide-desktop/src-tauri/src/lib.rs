@@ -1,7 +1,6 @@
 use std::process::{Command, Child, Stdio};
 use std::sync::Mutex;
 use std::env;
-use std::path::PathBuf;
 use tauri::Manager;
 
 // Global state to track the sidecar process
