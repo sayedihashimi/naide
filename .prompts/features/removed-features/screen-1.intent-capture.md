@@ -1,3 +1,16 @@
+# REMOVED FEATURE (HISTORICAL ONLY)
+
+- Status: Removed
+- RemovedAt: 2026-01-31 03:49 (UTC)
+- Notes: This feature has been removed from Naide. This file is retained for historical reference only.
+
+## Replacement
+- The app now launches directly into the Generate App screen with chat-driven planning
+- Intent capture is now handled through the chat interface in Planning mode
+- Users can start describing what they want to build immediately in the chat
+
+---
+
 # UI — Screen 1: Intent Capture (Naide)
 
 Implement Screen 1 based on the approved mockup, updated to match the Planning Mode styling (dark UI, panels, typography).

@@ -11,23 +11,20 @@ This directory contains the testing infrastructure and integration tests for the
   - User interactions (OK button, backdrop click, Escape key)
   - Focus trap behavior
 
-### Page Tests
-- **`../pages/Screen1.test.tsx`** - Tests for Screen 1 (Intent Capture)
-  - Branding and UI rendering
-  - 5 quick start chips with text insertion
-  - Continue button behavior (always enabled)
-  - Modal display on empty continue
-  - Navigation to Planning Mode
-  - Textarea controls (AI assist, expand/collapse)
-  - User input handling
+- **`../components/MessageContent.test.tsx`** - Tests for message rendering
+  - Markdown rendering in messages
+  - Code block syntax highlighting
+  - Link handling
 
-- **`../pages/PlanningMode.test.tsx`** - Tests for Planning Mode
-  - Section navigation (Overview, Features, Data, etc.)
-  - Code section rendering
-  - Update plan and Generate App buttons
-  - Project name display
-  - Section switching behavior
-  - Plan dirty state management
+### Page Tests
+- **`../pages/GenerateAppScreen.test.tsx`** - Tests for Generate App Screen
+  - 3-column layout rendering
+  - Mode selector (Planning/Building/Analyzing)
+  - Chat interface
+  - Message sending and receiving
+  - Textarea controls (expand/collapse)
+  - Keyboard shortcuts (Ctrl+Enter)
+  - Markdown rendering in messages
 
 ### Utility Tests
 - **`../utils/fileSystem.test.ts`** - Tests for file system utilities
@@ -35,15 +32,6 @@ This directory contains the testing infrastructure and integration tests for the
   - Path resolution
   - Error handling
   - Tauri API mocking
-
-### Integration Tests
-- **`integration.test.tsx`** - End-to-end user flow tests
-  - Screen 1 to Planning Mode navigation
-  - Chip insertion workflow
-  - Modal interaction and recovery
-  - Multiple chip insertions
-  - Keyboard navigation and accessibility
-  - File persistence triggers
 
 ## Test Setup
 
@@ -62,31 +50,24 @@ This directory contains the testing infrastructure and integration tests for the
 
 ## Test Coverage
 
-The test suite covers all major requirements from `.prompts/`:
+The test suite covers:
 
-### Screen 1 Requirements (from `.prompts/ui/screen-1.intent-capture.md`)
-✓ Branding ("Naide" only, no subtitle)
-✓ 5 chips with starter prompts
-✓ Chip insertion behavior (empty vs. existing content)
-✓ Continue button (always enabled)
-✓ Modal on empty continue
-✓ Modal accessibility (focus trap, Escape key)
-✓ Navigation to Planning Mode
+### Generate App Screen (Single Chat Interface)
+✓ 3-column layout (navigation, chat, preview)
+✓ Mode selector dropdown (Planning/Building/Analyzing)
+✓ Chat message rendering
+✓ Markdown support in messages
+✓ Message input with expand/collapse
+✓ Send button and keyboard shortcuts
+✓ Welcome messages per mode
+✓ Stub responses for Building/Analyzing modes
 
-### Planning Mode Requirements (from `.prompts/ui/planning-mode.shell.md`)
-✓ Section navigation
-✓ Code section with file mappings
-✓ Plan dirty state tracking
-✓ Update plan functionality
-✓ Generate App button (stub)
-✓ Project name in title bar
-✓ Textarea controls in Q&A sections
-
-### Technical Requirements (from `.prompts/tech/desktop-setup.md`)
+### Technical Requirements
 ✓ Modal accessibility (focus trap, Escape key)
 ✓ Keyboard navigation
 ✓ State management
-✓ Routing (`/` and `/planning`)
+✓ Single route (`/`)
+✓ Chat persistence
 
 ## Mocked Dependencies
 
@@ -122,7 +103,7 @@ The following Tauri APIs are mocked for testing:
 npm test
 
 # Run tests once
-npm test -- --run
+npm run testonly
 
 # Run with UI
 npm run test:ui
@@ -133,7 +114,7 @@ npm run test:coverage
 
 ## Current Status
 
-**Note**: Tests are fully written but currently have compatibility issues with rolldown-vite. See `.prompts/tech/testing.md` for details and resolution options.
+All tests pass successfully. The application has been simplified to a single chat-driven interface.
 
 ## Writing New Tests
 

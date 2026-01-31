@@ -1,19 +1,16 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { useAppContext } from './context/useAppContext';
-import Screen1 from './pages/Screen1';
-import PlanningMode from './pages/PlanningMode';
 import GenerateAppScreen from './pages/GenerateAppScreen';
 import { useEffect, useState } from 'react';
-import { loadConfig } from './utils/fileSystem';
+import { loadConfig, createAllProjectFiles } from './utils/fileSystem';
 
 function AppRoutes() {
   const { checkForExistingProject, loadProject, setProjectName, state } = useAppContext();
   const [loading, setLoading] = useState(true);
-  const [hasExistingProject, setHasExistingProject] = useState(false);
 
   useEffect(() => {
-    const checkProject = async () => {
+    const initializeApp = async () => {
       try {
         // Load config to check for last used project
         console.log('[App] Loading config...');
@@ -32,27 +29,34 @@ function AppRoutes() {
           // Check if project exists and load it
           const exists = await checkForExistingProject();
           if (exists) {
-            const loaded = await loadProject(projectName);
-            setHasExistingProject(loaded);
+            await loadProject(projectName);
             console.log('[App] Loaded last used project:', projectName);
+          } else {
+            // Create project files if they don't exist
+            console.log('[App] Creating project files for:', projectName);
+            await createAllProjectFiles(projectName, '');
           }
         } else {
           console.log('[App] No last used project found');
           // Check for default project
           const exists = await checkForExistingProject();
           if (exists) {
-            const loaded = await loadProject(state.projectName);
-            setHasExistingProject(loaded);
+            await loadProject(state.projectName);
+          } else {
+            // Create default project files
+            console.log('[App] Creating default project files');
+            await createAllProjectFiles(state.projectName, '');
           }
         }
       } catch (error) {
-        console.error('[App] Error checking for existing project:', error);
+        console.error('[App] Error initializing app:', error);
       } finally {
         setLoading(false);
       }
     };
-    checkProject();
-  }, []);
+    initializeApp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   if (loading) {
     return (
@@ -64,12 +68,7 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route 
-        path="/" 
-        element={hasExistingProject ? <Navigate to="/planning" replace /> : <Screen1 />} 
-      />
-      <Route path="/planning" element={<PlanningMode />} />
-      <Route path="/generate" element={<GenerateAppScreen />} />
+      <Route path="/" element={<GenerateAppScreen />} />
     </Routes>
   );
 }

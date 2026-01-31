@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/useAppContext';
 import type { ChatMessage } from '../utils/chatPersistence';
 import MessageContent from '../components/MessageContent';
@@ -68,7 +67,6 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
 };
 
 const GenerateAppScreen: React.FC = () => {
-  const navigate = useNavigate();
   const { state } = useAppContext();
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -284,12 +282,6 @@ const GenerateAppScreen: React.FC = () => {
               Navigation
             </h2>
             <nav>
-              <button
-                onClick={() => navigate('/planning')}
-                className="w-full text-left px-3 py-2 rounded mb-1 transition-colors text-gray-400 hover:bg-zinc-800/50 hover:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Planning
-              </button>
               <button
                 className="w-full text-left px-3 py-2 rounded mb-1 transition-colors bg-zinc-800 text-gray-100 font-medium"
                 disabled

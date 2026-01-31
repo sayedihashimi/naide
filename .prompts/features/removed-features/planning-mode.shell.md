@@ -1,3 +1,17 @@
+# REMOVED FEATURE (HISTORICAL ONLY)
+
+- Status: Removed
+- RemovedAt: 2026-01-31 03:49 (UTC)
+- Notes: This feature has been removed from Naide. This file is retained for historical reference only.
+
+## Replacement
+- The separate Planning Mode UI with form-based Q&A has been removed
+- Planning is now fully chat-driven on the Generate App screen
+- Spec files are continuously updated through chat conversations
+- No more "Rebuild Plan" button or planDirty state management
+
+---
+
 # UI — Planning Mode Shell (Naide)
 
 Planning Mode is a **section-based guided Q&A** that persists after app creation (though app creation is out of scope for v1).

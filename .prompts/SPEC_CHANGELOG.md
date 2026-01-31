@@ -2,6 +2,89 @@
 
 This document tracks updates made to specification files based on merged PRs.
 
+## 2026-01-31: Simplify to Single Chat Screen
+
+### Overview
+Refactored Naide to use a single chat-driven interface instead of separate Intent Capture and Planning Mode screens. This is a structural simplification maintaining all project functionality through the Generate App screen.
+
+### Changes Made
+
+#### UI Simplification
+- **Removed Screen 1 (Intent Capture)**:
+  - Deleted `/pages/Screen1.tsx` and associated test file
+  - Archived specification to `.prompts/features/removed-features/screen-1.intent-capture.md`
+  
+- **Removed Planning Mode UI**:
+  - Deleted `/pages/PlanningMode.tsx` and associated test file
+  - Archived specification to `.prompts/features/removed-features/planning-mode.shell.md`
+
+- **Removed `.prompts/ui/` folder**: Now empty after moving specifications to removed-features
+
+#### Routing Changes
+- **Generate App Screen** is now the default and only route (`/`)
+- Removed `/planning` route
+- App launches directly into Generate App screen
+
+#### State Management
+- **Removed from AppContext**:
+  - `initialIntentText` field (no longer needed)
+  - `planDirty` boolean field
+  - `setInitialIntent()` method
+  - `setPlanDirty()` method
+  
+- **Preserved in AppContext**:
+  - Project creation and loading logic
+  - Section answers storage
+  - File system operations
+  - Project switching functionality
+
+#### Startup Behavior
+- Project load/create logic from Screen 1 moved to `App.tsx` initialization
+- App ensures project files exist on startup
+- Config loading preserved for last used project
+
+#### Planning Workflow (New Model)
+- Planning is now **chat-driven only** through Generate App screen
+- No separate Planning Mode screen
+- No "Rebuild Plan" button
+- No planDirty state management
+- Specs updated continuously through chat in Planning mode
+
+#### Feature Archival
+- Created `.prompts/features/removed-features/` folder
+- Moved removed feature files with "REMOVED FEATURE" header containing:
+  - Status: Removed
+  - RemovedAt: 2026-01-31 03:49 (UTC)
+  - Notes explaining replacement
+  - Context about the new chat-driven approach
+
+### Files Modified
+- `/src/naide-desktop/src/App.tsx`: Simplified routing, moved startup logic
+- `/src/naide-desktop/src/pages/GenerateAppScreen.tsx`: Removed Planning mode navigation
+- `/src/naide-desktop/src/context/AppContext.tsx`: Removed planDirty state
+- `.prompts/features/removed-features/screen-1.intent-capture.md`: Archived with header
+- `.prompts/features/removed-features/planning-mode.shell.md`: Archived with header
+
+### Files Deleted
+- `/src/naide-desktop/src/pages/Screen1.tsx`
+- `/src/naide-desktop/src/pages/Screen1.test.tsx`
+- `/src/naide-desktop/src/pages/PlanningMode.tsx`
+- `/src/naide-desktop/src/pages/PlanningMode.test.tsx`
+- `.prompts/ui/` directory (now empty)
+
+### Preserved Functionality
+- Project creation and loading
+- Project selection and switching
+- Spec file writing/updating
+- Feature file management
+- Learnings storage
+- Chat persistence
+- Mode selector (Planning/Building/Analyzing)
+- 3-column layout
+- File system operations
+
+---
+
 ## 2026-01-31: Updated specs based on PRs #2-#19
 
 ### Files Updated
