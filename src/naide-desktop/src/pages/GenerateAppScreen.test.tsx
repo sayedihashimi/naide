@@ -38,6 +38,15 @@ const renderGenerateAppScreen = () => {
 };
 
 describe('GenerateAppScreen', () => {
+  it('uses fixed viewport height to prevent app expansion', () => {
+    const { container } = renderGenerateAppScreen();
+    
+    // The root div should use h-screen (fixed height) not min-h-screen (can grow)
+    const rootDiv = container.firstChild as HTMLElement;
+    expect(rootDiv).toHaveClass('h-screen');
+    expect(rootDiv).not.toHaveClass('min-h-screen');
+  });
+
   it('renders the Generate App screen with 3-column layout', async () => {
     renderGenerateAppScreen();
 
