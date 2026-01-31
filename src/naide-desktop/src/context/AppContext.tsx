@@ -10,8 +10,6 @@ import {
 } from '../utils/fileSystem';
 
 interface AppState {
-  initialIntentText: string;
-  planDirty: boolean;
   sections: Record<string, Record<string, string>>;
   projectName: string;
   projectLoaded: boolean;
@@ -19,8 +17,6 @@ interface AppState {
 
 interface AppContextType {
   state: AppState;
-  setInitialIntent: (text: string) => void;
-  setPlanDirty: (dirty: boolean) => void;
   updateSectionAnswer: (section: string, questionId: string, value: string) => void;
   getSectionAnswer: (section: string, questionId: string) => string;
   setProjectName: (name: string) => void;
@@ -46,8 +42,6 @@ const sectionFileMapping: Record<string, string> = {
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AppState>({
-    initialIntentText: '',
-    planDirty: false,
     sections: {},
     projectName: 'MyApp',
     projectLoaded: false,
@@ -65,14 +59,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     init();
   }, [state.projectName]);
 
-  const setInitialIntent = useCallback((text: string) => {
-    setState(prev => ({ ...prev, initialIntentText: text }));
-  }, []);
-
-  const setPlanDirty = useCallback((dirty: boolean) => {
-    setState(prev => ({ ...prev, planDirty: dirty }));
-  }, []);
-
   const updateSectionAnswer = useCallback((section: string, questionId: string, value: string) => {
     setState(prev => ({
       ...prev,
@@ -83,7 +69,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           [questionId]: value,
         },
       },
-      planDirty: true,
     }));
   }, []);
 
@@ -154,7 +139,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         projectName,
         sections: projectData,
         projectLoaded: true,
-        planDirty: false,
       }));
       
       return true;
@@ -175,8 +159,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const value: AppContextType = {
     state,
-    setInitialIntent,
-    setPlanDirty,
     updateSectionAnswer,
     getSectionAnswer,
     setProjectName,
