@@ -267,7 +267,7 @@ const GenerateAppScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="h-screen bg-zinc-950 flex flex-col">
       {/* Header */}
       <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4">
         <h1 className="text-xl font-semibold text-gray-100">Naide</h1>
