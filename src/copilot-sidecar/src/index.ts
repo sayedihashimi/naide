@@ -171,8 +171,10 @@ function safeFileWrite(workspaceRoot: string, relativePath: string, content: str
     /node_modules/, // Dependencies
     /\.git/, // Git directory
     /\.env/, // Environment files
-    /package\.json/, // Package manifest (dangerous to modify)
-    /package-lock\.json/, // Lock files
+    /^package\.json$/, // Package manifest at root (dangerous to modify)
+    /^package-lock\.json$/, // Lock file at root
+    /\/package\.json$/, // Package manifest in subdirectories
+    /\/package-lock\.json$/, // Lock files in subdirectories
   ];
   
   if (blockedPatterns.some(pattern => pattern.test(relativePath))) {
