@@ -506,11 +506,31 @@ app.post('/api/copilot/chat', async (req, res) => {
       // Set up event listeners for the response BEFORE sending
       const responsePromise = new Promise<string>((resolve, reject) => {
         let timeoutHandle: NodeJS.Timeout;
+        const RESPONSE_TIMEOUT_MS = 180000; // 3 minute base timeout
+        const ACTIVITY_TIMEOUT_MS = 60000; // 60 second inactivity timeout (reset on each chunk)
+        
+        // Function to reset timeout on activity
+        const resetTimeout = () => {
+          clearTimeout(timeoutHandle);
+          timeoutHandle = setTimeout(() => {
+            // Clean up listeners on timeout
+            unsubscribeAssistant();
+            unsubscribeIdle();
+            unsubscribeError();
+            
+            // Destroy session after timeout
+            session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
+            
+            reject(new Error('Response timeout - no activity for 60 seconds'));
+          }, responseChunks.length > 0 ? ACTIVITY_TIMEOUT_MS : RESPONSE_TIMEOUT_MS);
+        };
         
         // Set up event listeners and get unsubscribe functions
         const unsubscribeAssistant = session.on('assistant.message', (event) => {
           if (event.data.content) {
             responseChunks.push(event.data.content);
+            // Reset timeout when we receive data - AI is still responding
+            resetTimeout();
           }
         });
         
@@ -540,18 +560,8 @@ app.post('/api/copilot/chat', async (req, res) => {
           reject(new Error(event.data.message || 'Copilot session error'));
         });
         
-        // Set timeout
-        timeoutHandle = setTimeout(() => {
-          // Clean up listeners on timeout
-          unsubscribeAssistant();
-          unsubscribeIdle();
-          unsubscribeError();
-          
-          // Destroy session after timeout
-          session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
-          
-          reject(new Error('Response timeout'));
-        }, 60000); // 60 second timeout
+        // Set initial timeout
+        resetTimeout();
       });
       
       // Send the message AFTER setting up listeners
