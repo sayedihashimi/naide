@@ -8,11 +8,8 @@ interface MessageContentProps {
   role: 'user' | 'assistant';
 }
 
-interface CodeProps {
+interface CodeProps extends React.HTMLAttributes<HTMLElement> {
   inline?: boolean;
-  className?: string;
-  children?: React.ReactNode;
-  [key: string]: unknown;
 }
 
 // Helper function to validate href for security
