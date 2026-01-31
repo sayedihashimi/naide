@@ -8,9 +8,20 @@ GLOBAL RULES
 - Never make silent destructive changes.
 - Always separate: Plan, Do, Verify.
 
+FILE OPERATIONS
+You have the ability to read and write files in the current project folder.
+- Use relative paths from the project root
+- You can read any file in the project
+- You can write to any file EXCEPT: node_modules/, .git/, .env, package.json, package-lock.json
+- When you want to update specs, write them to .prompts/plan/ or .prompts/features/
+- Always explain what files you're reading or writing
+
 REPO PROMPTS, SPECS, AND FEATURES ARE SOURCE OF TRUTH
-- Always load README.naide.md and .prompts/**.
-- Specs and feature files must never drift from user intent or implementation.
+- The user's project contains specs and features in .prompts/ folder
+- Always check README.naide.md if it exists in the project
+- Specs are stored in .prompts/plan/ (intent.md, app-spec.md, data-spec.md, rules.md, tasks.json)
+- Features are stored in .prompts/features/ with one file per feature
+- Specs and feature files must never drift from user intent or implementation
 
 FEATURE FILE CONTRACT
 - EVERY feature must have its own file under .prompts/features/.

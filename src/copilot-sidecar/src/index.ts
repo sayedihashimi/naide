@@ -69,9 +69,12 @@ async function initializeCopilot(): Promise<{ success: boolean; error?: string }
   }
 }
 
-// Load system prompts from the repository
-function loadSystemPrompts(mode: string, workspaceRoot: string): string {
-  const promptsDir = join(workspaceRoot, '.prompts', 'system');
+// Load system prompts from the naide app repository (not user's project)
+function loadSystemPrompts(mode: string): string {
+  // System prompts are in the naide app repository, not the user's project
+  // Go up from src/copilot-sidecar/dist to the root, then to .prompts/system
+  const naideRoot = join(__dirname, '..', '..', '..', '..');
+  const promptsDir = join(naideRoot, '.prompts', 'system');
   
   try {
     const basePath = join(promptsDir, 'base.system.md');
@@ -81,19 +84,26 @@ function loadSystemPrompts(mode: string, workspaceRoot: string): string {
     
     if (existsSync(basePath)) {
       systemPrompt += readFileSync(basePath, 'utf-8') + '\n\n';
+      console.log(`[Sidecar] Loaded base system prompt from: ${basePath}`);
+    } else {
+      console.warn(`[Sidecar] Base system prompt not found at: ${basePath}`);
     }
     
     if (existsSync(modePath)) {
       systemPrompt += readFileSync(modePath, 'utf-8') + '\n\n';
+      console.log(`[Sidecar] Loaded ${mode} system prompt from: ${modePath}`);
+    } else {
+      console.warn(`[Sidecar] Mode system prompt not found at: ${modePath}`);
     }
     
-    // Add instruction to read other relevant files
-    systemPrompt += `\nREQUIRED READING:\n`;
-    systemPrompt += `- README.naide.md\n`;
-    systemPrompt += `- .prompts/**\n`;
-    systemPrompt += `- .prompts/plan/** (if exists)\n`;
-    systemPrompt += `- .prompts/features/**\n`;
-    systemPrompt += `- .naide/learnings/** (if exists)\n`;
+    // Add instruction to read files from the USER'S PROJECT
+    systemPrompt += `\nFILES IN USER'S PROJECT:\n`;
+    systemPrompt += `The user's project folder contains:\n`;
+    systemPrompt += `- README.naide.md (if exists) - project overview\n`;
+    systemPrompt += `- .prompts/plan/** - planning specs (intent.md, app-spec.md, data-spec.md, rules.md, tasks.json)\n`;
+    systemPrompt += `- .prompts/features/** - feature files (one per feature)\n`;
+    systemPrompt += `- .naide/learnings/** - learnings from past interactions\n`;
+    systemPrompt += `- Project source files - the actual app code\n`;
     
     return systemPrompt;
   } catch (error) {
@@ -153,25 +163,31 @@ function writeLearning(workspaceRoot: string, category: string, content: string)
   writeFileSync(filepath, existingContent + newEntry, 'utf-8');
 }
 
-// Safe file write - only allow .prompts/plan/** and .prompts/features/**
+// Safe file write - allow .prompts/** and project files, but block dangerous paths
 function safeFileWrite(workspaceRoot: string, relativePath: string, content: string): boolean {
-  const allowedDirs = [
-    join(workspaceRoot, '.prompts', 'plan'),
-    join(workspaceRoot, '.prompts', 'features')
+  // Block dangerous paths
+  const blockedPatterns = [
+    /^\.\./, // Parent directory traversal
+    /node_modules/, // Dependencies
+    /\.git/, // Git directory
+    /\.env/, // Environment files
+    /package\.json/, // Package manifest (dangerous to modify)
+    /package-lock\.json/, // Lock files
   ];
+  
+  if (blockedPatterns.some(pattern => pattern.test(relativePath))) {
+    console.error(`Blocked write to dangerous path: ${relativePath}`);
+    return false;
+  }
   
   // Resolve and normalize the full path to prevent path traversal
   const fullPath = join(workspaceRoot, relativePath);
   const resolvedPath = resolve(fullPath);
+  const resolvedWorkspace = resolve(workspaceRoot);
   
-  // Check if the resolved path starts with any of the allowed directories
-  const isAllowed = allowedDirs.some(dir => {
-    const resolvedDir = resolve(dir);
-    return resolvedPath.startsWith(resolvedDir + sep);
-  });
-  
-  if (!isAllowed) {
-    console.error(`Blocked write to disallowed path: ${relativePath}`);
+  // Ensure the path is within workspace
+  if (!resolvedPath.startsWith(resolvedWorkspace + sep) && resolvedPath !== resolvedWorkspace) {
+    console.error(`Blocked write outside workspace: ${relativePath}`);
     return false;
   }
   
@@ -183,10 +199,50 @@ function safeFileWrite(workspaceRoot: string, relativePath: string, content: str
     }
     
     writeFileSync(fullPath, content, 'utf-8');
+    console.log(`[Sidecar] Successfully wrote file: ${relativePath}`);
     return true;
   } catch (error) {
     console.error(`Error writing file ${relativePath}:`, error);
     return false;
+  }
+}
+
+// Safe file read - allow reading within workspace but block dangerous paths
+function safeFileRead(workspaceRoot: string, relativePath: string): string | null {
+  // Block dangerous paths
+  const blockedPatterns = [
+    /^\.\./, // Parent directory traversal
+    /\.env/, // Environment files (may contain secrets)
+  ];
+  
+  if (blockedPatterns.some(pattern => pattern.test(relativePath))) {
+    console.error(`Blocked read from dangerous path: ${relativePath}`);
+    return null;
+  }
+  
+  // Resolve and normalize the full path to prevent path traversal
+  const fullPath = join(workspaceRoot, relativePath);
+  const resolvedPath = resolve(fullPath);
+  const resolvedWorkspace = resolve(workspaceRoot);
+  
+  // Ensure the path is within workspace
+  if (!resolvedPath.startsWith(resolvedWorkspace + sep) && resolvedPath !== resolvedWorkspace) {
+    console.error(`Blocked read outside workspace: ${relativePath}`);
+    return null;
+  }
+  
+  try {
+    if (!existsSync(fullPath)) {
+      console.log(`[Sidecar] File not found: ${relativePath}`);
+      return null;
+    }
+    
+    const content = readFileSync(fullPath, 'utf-8');
+    console.log(`[Sidecar] Successfully read file: ${relativePath}`);
+    return content;
+  } catch (error) {
+    console.error(`Error reading file ${relativePath}:`, error);
+    return null;
   }
 }
 
@@ -225,8 +281,10 @@ app.post('/api/copilot/chat', async (req, res) => {
     }
     
     try {
-      // Load system prompts and learnings
-      const systemPrompt = loadSystemPrompts(mode, workspaceRoot || process.cwd());
+      // Load system prompts from naide app repository
+      const systemPrompt = loadSystemPrompts(mode);
+      
+      // Load learnings from user's project
       const learnings = await loadLearnings(workspaceRoot || process.cwd());
       
       // Combine system prompt with learnings
