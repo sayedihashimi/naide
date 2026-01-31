@@ -72,8 +72,8 @@ async function initializeCopilot(): Promise<{ success: boolean; error?: string }
 // Load system prompts from the naide app repository (not user's project)
 function loadSystemPrompts(mode: string): string {
   // System prompts are in the naide app repository, not the user's project
-  // Go up from src/copilot-sidecar/dist to the root, then to .prompts/system
-  const naideRoot = join(__dirname, '..', '..', '..', '..');
+  // When compiled, __dirname is copilot-sidecar/dist, so go up to naide root
+  const naideRoot = join(__dirname, '..', '..', '..');
   const promptsDir = join(naideRoot, '.prompts', 'system');
   
   try {
