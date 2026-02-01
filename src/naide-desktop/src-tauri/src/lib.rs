@@ -7,7 +7,7 @@ use tauri::Manager;
 use chrono::Utc;
 
 mod settings;
-use settings::{LastProject, GlobalSettings, read_settings, write_settings, add_recent_project, get_recent_projects as get_recent_projects_from_settings};
+use settings::{LastProject, read_settings, write_settings, add_recent_project, get_recent_projects as get_recent_projects_from_settings};
 
 // Global state to track the sidecar process
 struct SidecarState {
