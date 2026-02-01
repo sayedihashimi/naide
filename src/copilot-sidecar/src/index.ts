@@ -310,7 +310,14 @@ function formatRecentMessages(messages: ChatMessage[]): string {
   return `\n\n## RECENT CONVERSATION (Short-Term Memory)\n\n${formattedMessages.join('\n\n')}\n`;
 }
 
-// Add footer to markdown content
+/**
+ * Adds the naide footer to markdown content.
+ * The footer is added with two newlines before it.
+ * If the content already ends with the footer, it won't be added again (idempotent).
+ * 
+ * @param content - The markdown content to add footer to
+ * @returns The content with the footer appended
+ */
 function addMarkdownFooter(content: string): string {
   // If content already has the footer, don't add it again
   if (content.endsWith('<!-- created by naide -->')) {
