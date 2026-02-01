@@ -11,7 +11,7 @@ import {
 import MessageContent from '../components/MessageContent';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
-import { getRecentProjects, type LastProject } from '../utils/globalSettings';
+import { getRecentProjects, saveLastProject, type LastProject } from '../utils/globalSettings';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -500,6 +500,10 @@ const GenerateAppScreen: React.FC = () => {
       if (selectedPath && typeof selectedPath === 'string') {
         console.log('[GenerateApp] Selected project folder:', selectedPath);
         
+        // Save the selected path to settings (this also adds to recent projects)
+        await saveLastProject(selectedPath);
+        console.log('[GenerateApp] Saved project to settings');
+        
         // Extract project name from the path (cross-platform)
         const pathParts = selectedPath.split(/[/\\]/);
         const newProjectName = pathParts[pathParts.length - 1];
@@ -536,6 +540,10 @@ const GenerateAppScreen: React.FC = () => {
   const handleSelectRecentProject = async (projectPath: string) => {
     try {
       console.log('[GenerateApp] Selected recent project:', projectPath);
+      
+      // Save the selected path to settings (this updates last accessed time)
+      await saveLastProject(projectPath);
+      console.log('[GenerateApp] Updated project in settings');
       
       // Extract project name from the path (cross-platform)
       const pathParts = projectPath.split(/[/\\]/);
