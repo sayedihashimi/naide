@@ -66,7 +66,12 @@ console.log = (...args: any[]) => {
   try {
     originalLog(...args);
   } catch (error) {
-    // Continue to file logging even if console fails
+    // If console.log fails, try to report to stderr to avoid infinite loop
+    try {
+      originalError('[Logger] Console.log failed:', error);
+    } catch {
+      // Last resort: silently fail
+    }
   }
   writeToFile('INFO', ...args);
 };
@@ -75,7 +80,7 @@ console.error = (...args: any[]) => {
   try {
     originalError(...args);
   } catch (error) {
-    // Continue to file logging even if console fails
+    // If console.error fails, silently continue to avoid infinite loop
   }
   writeToFile('ERROR', ...args);
 };
@@ -84,7 +89,12 @@ console.warn = (...args: any[]) => {
   try {
     originalWarn(...args);
   } catch (error) {
-    // Continue to file logging even if console fails
+    // If console.warn fails, try to report to stderr to avoid infinite loop
+    try {
+      originalError('[Logger] Console.warn failed:', error);
+    } catch {
+      // Last resort: silently fail
+    }
   }
   writeToFile('WARN', ...args);
 };
