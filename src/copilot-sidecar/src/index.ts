@@ -581,7 +581,7 @@ app.post('/api/copilot/stream', async (req, res) => {
         timeoutHandle = setTimeout(() => {
           cleanupListeners();
           session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
-          sendEvent('error', { message: 'Response timeout - no activity for 2 minutes' });
+          sendEvent('error', { message: 'Response timeout - no activity detected' });
           res.end();
         }, responseBuffer.length > 0 ? ACTIVITY_TIMEOUT_MS : RESPONSE_TIMEOUT_MS);
       };

@@ -355,10 +355,19 @@ const GenerateAppScreen: React.FC = () => {
         }
       } catch (streamError) {
         console.error('[GenerateApp] Error in streaming:', streamError);
+        
+        // Provide specific error message based on error type
+        let errorMessage = 'An error occurred while streaming the response.';
+        if (streamError instanceof TypeError && streamError.message.includes('fetch')) {
+          errorMessage = 'Unable to connect to the Copilot service. Please make sure the sidecar is running.';
+        } else if (streamError instanceof Error && streamError.message.includes('body')) {
+          errorMessage = 'Failed to read the streaming response. Please try again.';
+        }
+        
         setMessages(prev => 
           prev.map(m => 
             m.id === assistantMessageId 
-              ? { ...m, content: 'Unable to connect to the Copilot streaming service. Please make sure the sidecar is running.' }
+              ? { ...m, content: errorMessage }
               : m
           )
         );
