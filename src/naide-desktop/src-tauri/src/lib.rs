@@ -217,6 +217,10 @@ pub fn run() {
           .build(),
       )?;
       
+      // Test that logging works
+      log::info!("Naide application starting");
+      log::info!("Logging configured successfully");
+      
       // Start the copilot sidecar
       // Get the current executable directory and construct path to sidecar
       let sidecar_relative_path = if cfg!(target_os = "windows") {
@@ -248,6 +252,7 @@ pub fn run() {
         });
       
       if let Some(path) = sidecar_path {
+        log::info!("Starting copilot sidecar from: {:?}", path);
         println!("[Tauri] Starting copilot sidecar from: {:?}", path);
         
         match Command::new("node")
@@ -256,6 +261,7 @@ pub fn run() {
           .stderr(Stdio::piped())
           .spawn() {
             Ok(child) => {
+              log::info!("Copilot sidecar started with PID: {:?}", child.id());
               println!("[Tauri] Copilot sidecar started with PID: {:?}", child.id());
               println!("[Tauri] Sidecar should be accessible at http://localhost:3001");
               
@@ -265,12 +271,14 @@ pub fn run() {
               }));
             }
             Err(e) => {
+              log::error!("Failed to start copilot sidecar: {}", e);
               eprintln!("[Tauri] Failed to start copilot sidecar: {}", e);
               eprintln!("[Tauri] Make sure Node.js is installed and in PATH");
               eprintln!("[Tauri] App will continue, but copilot features will not work");
             }
           }
       } else {
+        log::warn!("Sidecar not found at expected path: {}", sidecar_relative_path);
         eprintln!("[Tauri] Sidecar not found at expected path: {}", sidecar_relative_path);
         eprintln!("[Tauri] Make sure to build the sidecar with: cd src/copilot-sidecar && npm run build");
         eprintln!("[Tauri] App will continue, but copilot features will not work");
