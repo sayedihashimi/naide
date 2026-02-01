@@ -3,7 +3,8 @@ import { AppProvider } from './context/AppContext';
 import { useAppContext } from './context/useAppContext';
 import GenerateAppScreen from './pages/GenerateAppScreen';
 import { useEffect, useState } from 'react';
-import { loadConfig, initializeProject } from './utils/fileSystem';
+import { initializeProject } from './utils/fileSystem';
+import { loadLastProject } from './utils/globalSettings';
 
 function AppRoutes() {
   const { checkForExistingProject, loadProject, setProjectName, state } = useAppContext();
@@ -12,14 +13,14 @@ function AppRoutes() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Load config to check for last used project
-        console.log('[App] Loading config...');
-        const config = await loadConfig();
-        console.log('[App] Config loaded:', config);
+        // Load last used project from global settings
+        console.log('[App] Loading last project from global settings...');
+        const lastProjectPath = await loadLastProject();
+        console.log('[App] Last project path:', lastProjectPath);
         
-        if (config.lastUsedProject) {
-          // Extract project name from path
-          const parts = config.lastUsedProject.split('/');
+        if (lastProjectPath) {
+          // Extract project name from path (handle both / and \ separators)
+          const parts = lastProjectPath.split(/[\\/]/);
           const projectName = parts[parts.length - 1];
           console.log('[App] Last used project:', projectName);
           
@@ -32,12 +33,13 @@ function AppRoutes() {
             await loadProject(projectName);
             console.log('[App] Loaded last used project:', projectName);
           } else {
-            // Initialize project directory only (no files)
+            // Path was valid but project structure may be incomplete
+            // Initialize project directory
             console.log('[App] Initializing project directory for:', projectName);
             await initializeProject(projectName);
           }
         } else {
-          console.log('[App] No last used project found');
+          console.log('[App] No valid last project found');
           // Check for default project
           const exists = await checkForExistingProject();
           if (exists) {

@@ -8,6 +8,7 @@ import {
   getProjectPath,
   updateLastUsedProject
 } from '../utils/fileSystem';
+import { saveLastProject } from '../utils/globalSettings';
 
 interface AppState {
   sections: Record<string, Record<string, string>>;
@@ -119,6 +120,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const projectPath = await getProjectPath(state.projectName);
       await updateLastUsedProject(projectPath);
       console.log('[AppContext] Updated last used project in config');
+      
+      // Also save to global settings (OS-specific location)
+      await saveLastProject(projectPath);
+      console.log('[AppContext] Saved last used project to global settings');
     } catch (error) {
       console.error('[AppContext] Error saving project:', error);
       throw error;

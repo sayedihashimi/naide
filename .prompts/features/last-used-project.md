@@ -46,21 +46,21 @@ When a project folder is opened (via folder picker or any other method):
 
 **Windows**:
 ```
-%AppData%\Naide\settings.json
+%AppData%\com.naide.desktop\naide-settings.json
 ```
-Example: `C:\Users\<username>\AppData\Roaming\Naide\settings.json`
+Example: `C:\Users\<username>\AppData\Roaming\com.naide.desktop\naide-settings.json`
 
 **macOS**:
 ```
-~/Library/Application Support/Naide/settings.json
+~/Library/Application Support/com.naide.desktop/naide-settings.json
 ```
-Example: `/Users/<username>/Library/Application Support/Naide/settings.json`
+Example: `/Users/<username>/Library/Application Support/com.naide.desktop/naide-settings.json`
 
 **Linux**:
 ```
-~/.config/Naide/settings.json
+~/.config/com.naide.desktop/naide-settings.json
 ```
-Example: `/home/<username>/.config/Naide/settings.json`
+Example: `/home/<username>/.config/com.naide.desktop/naide-settings.json`
 
 ---
 
@@ -103,7 +103,7 @@ let app_data_dir = app.path_resolver()
     .app_data_dir()
     .expect("Failed to get app data dir");
 
-let settings_path = app_data_dir.join("settings.json");
+let settings_path = app_data_dir.join("naide-settings.json");
 
 // Ensure directory exists
 std::fs::create_dir_all(&app_data_dir)?;
@@ -214,7 +214,7 @@ async function handleProjectSelected(path: string) {
 ### Corrupted Settings File
 - **JSON parse error**
 - Log error
-- Back up corrupted file (settings.json.backup)
+- Back up corrupted file (naide-settings.json.backup)
 - Create fresh settings file
 - Continue to project picker
 
@@ -239,7 +239,7 @@ async function handleProjectSelected(path: string) {
 - [ ] After selecting project, settings file is created
 - [ ] Second launch loads project automatically
 - [ ] Delete project folder, launch → project picker shown
-- [ ] Corrupted settings.json → recover gracefully
+- [ ] Corrupted naide-settings.json → recover gracefully
 - [ ] Works on Windows, macOS, Linux
 
 ---
