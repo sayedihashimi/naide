@@ -190,7 +190,7 @@ pub fn run() {
       
       // Create log directory if it doesn't exist
       if let Err(e) = fs::create_dir_all(&log_dir) {
-        eprintln!("[Tauri] Failed to create log directory: {}", e);
+        eprintln!("[Tauri] Failed to create log directory at {:?}: {}", log_dir, e);
       } else {
         println!("[Tauri] Log directory: {:?}", log_dir);
       }

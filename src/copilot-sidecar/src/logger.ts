@@ -63,16 +63,28 @@ const originalError = console.error;
 const originalWarn = console.warn;
 
 console.log = (...args: any[]) => {
-  originalLog(...args);
+  try {
+    originalLog(...args);
+  } catch (error) {
+    // Continue to file logging even if console fails
+  }
   writeToFile('INFO', ...args);
 };
 
 console.error = (...args: any[]) => {
-  originalError(...args);
+  try {
+    originalError(...args);
+  } catch (error) {
+    // Continue to file logging even if console fails
+  }
   writeToFile('ERROR', ...args);
 };
 
 console.warn = (...args: any[]) => {
-  originalWarn(...args);
+  try {
+    originalWarn(...args);
+  } catch (error) {
+    // Continue to file logging even if console fails
+  }
   writeToFile('WARN', ...args);
 };
