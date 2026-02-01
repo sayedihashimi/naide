@@ -73,3 +73,33 @@ export async function getSettingsFilePath(): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Get the list of recent projects.
+ * @returns Array of recent projects, sorted by most recent first
+ */
+export async function getRecentProjects(): Promise<LastProject[]> {
+  try {
+    const projects = await invoke<LastProject[]>('get_recent_projects');
+    console.log('[GlobalSettings] Loaded recent projects:', projects);
+    return projects;
+  } catch (error) {
+    console.error('[GlobalSettings] Error getting recent projects:', error);
+    return [];
+  }
+}
+
+/**
+ * Add a project to the recent projects list.
+ * The path must exist and be a directory.
+ * @param path - Absolute path to the project directory
+ */
+export async function addRecentProject(path: string): Promise<void> {
+  try {
+    await invoke('add_recent_project_cmd', { path });
+    console.log('[GlobalSettings] Added to recent projects:', path);
+  } catch (error) {
+    console.error('[GlobalSettings] Error adding to recent projects:', error);
+    // Non-fatal: log but don't throw to allow app to continue
+  }
+}
