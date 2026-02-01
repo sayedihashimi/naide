@@ -17,6 +17,9 @@ const FOOTER_MARKER = '<!-- created by naide -->';
 // File write tool names from Copilot SDK's built-in tools
 // These are the tools the AI uses to create/modify files
 const FILE_WRITE_TOOLS = ['create', 'edit', 'write_file', 'write'];
+// Streaming timeout constants
+const RESPONSE_TIMEOUT_MS = 180000; // 3 minutes - initial timeout before any response
+const ACTIVITY_TIMEOUT_MS = 120000; // 2 minutes - timeout once streaming starts
 
 // =============================================================================
 // Types for Conversation Memory
@@ -567,8 +570,6 @@ app.post('/api/copilot/stream', async (req, res) => {
       };
       
       // Set up timeout handling
-      const RESPONSE_TIMEOUT_MS = 180000; // 3 minutes
-      const ACTIVITY_TIMEOUT_MS = 120000; // 2 minutes
       let timeoutHandle: NodeJS.Timeout;
       
       const resetTimeout = (reason?: string) => {
