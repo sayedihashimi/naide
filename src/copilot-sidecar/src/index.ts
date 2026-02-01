@@ -12,6 +12,12 @@ const __dirname = dirname(__filename);
 // Initialize file logger before any other logging
 initializeLogger();
 
+// Constants
+const FOOTER_MARKER = '<!-- created by naide -->';
+// File write tool names from Copilot SDK's built-in tools
+// These are the tools the AI uses to create/modify files
+const FILE_WRITE_TOOLS = ['create', 'edit', 'write_file', 'write'];
+
 // =============================================================================
 // Types for Conversation Memory
 // =============================================================================
@@ -320,10 +326,10 @@ function formatRecentMessages(messages: ChatMessage[]): string {
  */
 function addMarkdownFooter(content: string): string {
   // If content already has the footer, don't add it again
-  if (content.endsWith('<!-- created by naide -->')) {
+  if (content.endsWith(FOOTER_MARKER)) {
     return content;
   }
-  return content + '\n\n<!-- created by naide -->';
+  return content + '\n\n' + FOOTER_MARKER;
 }
 
 // Write a learning entry
@@ -527,14 +533,13 @@ app.post('/api/copilot/chat', async (req, res) => {
         },
         hooks: {
           // Hook to add footer to markdown files after they're written by the AI
-          onPostToolUse: async (input: any) => {
+          onPostToolUse: async (input) => {
             // Check if this was a file write operation
-            const fileWriteTools = ['create', 'edit', 'write_file', 'write'];
-            const toolName = input.toolName?.toLowerCase() || '';
+            const toolName = (input.toolName as string | undefined)?.toLowerCase() || '';
             
-            if (fileWriteTools.some(t => toolName.includes(t))) {
+            if (FILE_WRITE_TOOLS.some(t => toolName.includes(t))) {
               // Check if a file path was provided and it's a markdown file
-              const args = input.toolArgs || {};
+              const args = (input.toolArgs as Record<string, any>) || {};
               const filePath = args.path || args.file || args.filename;
               
               if (filePath && typeof filePath === 'string' && filePath.endsWith('.md')) {
@@ -547,7 +552,7 @@ app.post('/api/copilot/chat', async (req, res) => {
                     let content = readFileSync(fullPath, 'utf-8');
                     
                     // Add footer if not already present
-                    if (!content.endsWith('<!-- created by naide -->')) {
+                    if (!content.endsWith(FOOTER_MARKER)) {
                       content = addMarkdownFooter(content);
                       writeFileSync(fullPath, content, 'utf-8');
                       console.log(`[Sidecar] Footer added to ${filePath}`);

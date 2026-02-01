@@ -1,6 +1,9 @@
 import { exists, readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
 import { join, documentDir } from '@tauri-apps/api/path';
 
+// Constants
+const FOOTER_MARKER = '<!-- created by naide -->';
+
 export interface ProjectConfig {
   name: string;
   path: string;
@@ -249,10 +252,10 @@ export async function readSectionFromFile(
  */
 export function addMarkdownFooter(content: string): string {
   // If content already has the footer, don't add it again
-  if (content.endsWith('<!-- created by naide -->')) {
+  if (content.endsWith(FOOTER_MARKER)) {
     return content;
   }
-  return content + '\n\n<!-- created by naide -->';
+  return content + '\n\n' + FOOTER_MARKER;
 }
 
 export function formatSectionAsMarkdown(
