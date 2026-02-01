@@ -576,6 +576,8 @@ app.post('/api/copilot/stream', async (req, res) => {
         if (reason) {
           console.log(`[Sidecar] Activity detected: ${reason} - resetting timeout`);
         }
+        // Use longer timeout initially (before any response), shorter timeout once streaming starts
+        // This allows Copilot more time to begin responding, but ensures timely cleanup if streaming stalls
         timeoutHandle = setTimeout(() => {
           cleanupListeners();
           session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));

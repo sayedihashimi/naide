@@ -304,8 +304,10 @@ const GenerateAppScreen: React.FC = () => {
                     
                   case 'done':
                     console.log('[GenerateApp] Stream done');
-                    // Use the full buffered response for summary extraction
-                    const fullResponse = eventData.data?.fullResponse || accumulatedContent;
+                    // Use the full buffered response for summary extraction (prefer server's buffer)
+                    const fullResponse = eventData.data?.fullResponse !== undefined 
+                      ? eventData.data.fullResponse 
+                      : accumulatedContent;
                     
                     // Extract conversation summary update from the response (if present)
                     const summaryUpdate = parseSummaryFromResponse(fullResponse);
@@ -585,6 +587,7 @@ const GenerateAppScreen: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {/* Loading indicator - only shown before assistant placeholder is added */}
               {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                 <div className="flex gap-3">
                   <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
