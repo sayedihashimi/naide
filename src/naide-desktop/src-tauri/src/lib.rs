@@ -4,100 +4,14 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
-use serde::{Deserialize, Serialize};
 use chrono::Utc;
+
+mod settings;
+use settings::{LastProject, read_settings, write_settings, add_recent_project, get_recent_projects as get_recent_projects_from_settings};
 
 // Global state to track the sidecar process
 struct SidecarState {
     process: Option<Child>,
-}
-
-// Settings structures
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LastProject {
-    pub path: String,
-    #[serde(rename = "lastAccessed")]
-    pub last_accessed: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GlobalSettings {
-    pub version: u32,
-    #[serde(rename = "lastUsedProject")]
-    pub last_used_project: Option<LastProject>,
-}
-
-impl Default for GlobalSettings {
-    fn default() -> Self {
-        GlobalSettings {
-            version: 1,
-            last_used_project: None,
-        }
-    }
-}
-
-// Get the settings directory path (OS-specific)
-fn get_settings_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))
-}
-
-// Get the settings file path
-fn get_settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let settings_dir = get_settings_dir(app)?;
-    Ok(settings_dir.join("naide-settings.json"))
-}
-
-// Read settings from file
-fn read_settings(app: &tauri::AppHandle) -> Result<GlobalSettings, String> {
-    let settings_path = get_settings_path(app)?;
-    
-    if !settings_path.exists() {
-        return Ok(GlobalSettings::default());
-    }
-    
-    let content = fs::read_to_string(&settings_path)
-        .map_err(|e| format!("Failed to read settings file: {}", e))?;
-    
-    serde_json::from_str(&content)
-        .map_err(|e| {
-            // If settings are corrupted, backup and return default
-            let backup_path = settings_path.with_extension("json.backup");
-            let _ = fs::copy(&settings_path, backup_path);
-            format!("Failed to parse settings (backed up corrupted file): {}", e)
-        })
-}
-
-// Write settings to file
-fn write_settings(app: &tauri::AppHandle, settings: &GlobalSettings) -> Result<(), String> {
-    let settings_dir = get_settings_dir(app)?;
-    let settings_path = get_settings_path(app)?;
-    
-    println!("[Settings] Creating directory: {:?}", settings_dir);
-    // Ensure directory exists
-    fs::create_dir_all(&settings_dir)
-        .map_err(|e| {
-            println!("[Settings] ERROR creating directory: {}", e);
-            format!("Failed to create settings directory: {}", e)
-        })?;
-    println!("[Settings] Directory created or already exists");
-    
-    let content = serde_json::to_string_pretty(settings)
-        .map_err(|e| {
-            println!("[Settings] ERROR serializing: {}", e);
-            format!("Failed to serialize settings: {}", e)
-        })?;
-    
-    println!("[Settings] Writing to file: {:?}", settings_path);
-    fs::write(&settings_path, content)
-        .map_err(|e| {
-            println!("[Settings] ERROR writing file: {}", e);
-            format!("Failed to write settings file: {}", e)
-        })?;
-    
-    println!("[Settings] File written successfully");
-    Ok(())
 }
 
 // Tauri command: Save the last used project path
@@ -116,11 +30,8 @@ async fn save_last_project(app: tauri::AppHandle, path: String) -> Result<(), St
         return Err(format!("Path is not a directory: {}", path));
     }
     
-    // Get settings directory path for logging
-    let settings_dir = get_settings_dir(&app)?;
-    println!("[Settings] Settings directory: {:?}", settings_dir);
-    
-    let settings_path = get_settings_path(&app)?;
+    // Get settings file path for logging
+    let settings_path = settings::get_settings_path(&app)?;
     println!("[Settings] Settings file path: {:?}", settings_path);
     
     // Get current timestamp in ISO 8601 format
@@ -129,8 +40,11 @@ async fn save_last_project(app: tauri::AppHandle, path: String) -> Result<(), St
     let mut settings = read_settings(&app).unwrap_or_default();
     settings.last_used_project = Some(LastProject {
         path: path.clone(),
-        last_accessed: now,
+        last_accessed: now.clone(),
     });
+    
+    // Also add to recent projects
+    add_recent_project(&mut settings, path.clone(), now);
     
     println!("[Settings] About to write settings...");
     write_settings(&app, &settings)?;
@@ -173,8 +87,42 @@ async fn clear_last_project(app: tauri::AppHandle) -> Result<(), String> {
 // Tauri command: Get the settings file path (for debugging)
 #[tauri::command]
 async fn get_settings_file_path(app: tauri::AppHandle) -> Result<String, String> {
-    let path = get_settings_path(&app)?;
+    let path = settings::get_settings_path(&app)?;
     Ok(path.to_string_lossy().to_string())
+}
+
+// Tauri command: Get recent projects list
+#[tauri::command]
+async fn get_recent_projects(app: tauri::AppHandle) -> Result<Vec<LastProject>, String> {
+    let settings = read_settings(&app)?;
+    Ok(get_recent_projects_from_settings(&settings))
+}
+
+// Tauri command: Add a project to recent projects
+#[tauri::command]
+async fn add_recent_project_cmd(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    println!("[Settings] add_recent_project called with path: {}", path);
+    
+    // Validate path exists and is a directory
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.exists() {
+        println!("[Settings] ERROR: Path does not exist: {}", path);
+        return Err(format!("Path does not exist: {}", path));
+    }
+    if !path_buf.is_dir() {
+        println!("[Settings] ERROR: Path is not a directory: {}", path);
+        return Err(format!("Path is not a directory: {}", path));
+    }
+    
+    // Get current timestamp in ISO 8601 format
+    let now = chrono::Utc::now().to_rfc3339();
+    
+    let mut settings = read_settings(&app).unwrap_or_default();
+    add_recent_project(&mut settings, path.clone(), now);
+    write_settings(&app, &settings)?;
+    
+    println!("[Settings] Added to recent projects: {}", path);
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -290,7 +238,9 @@ pub fn run() {
       save_last_project,
       load_last_project,
       clear_last_project,
-      get_settings_file_path
+      get_settings_file_path,
+      get_recent_projects,
+      add_recent_project_cmd
     ])
     .on_window_event(|_window, event| {
       // Clean up sidecar on app exit

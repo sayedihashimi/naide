@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
-import { saveLastProject, loadLastProject, clearLastProject, getSettingsFilePath } from './globalSettings'
+import { saveLastProject, loadLastProject, clearLastProject, getSettingsFilePath, getRecentProjects, addRecentProject } from './globalSettings'
 
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
@@ -101,6 +101,53 @@ describe('globalSettings utilities', () => {
       const result = await getSettingsFilePath()
       
       expect(result).toBeNull()
+      expect(consoleError).toHaveBeenCalled()
+      consoleError.mockRestore()
+    })
+  })
+
+  describe('getRecentProjects', () => {
+    it('should return list of recent projects', async () => {
+      const mockProjects = [
+        { path: '/path/to/project1', lastAccessed: '2026-02-01T12:00:00Z' },
+        { path: '/path/to/project2', lastAccessed: '2026-02-01T11:00:00Z' }
+      ]
+      vi.mocked(invoke).mockResolvedValue(mockProjects)
+      
+      const result = await getRecentProjects()
+      
+      expect(invoke).toHaveBeenCalledWith('get_recent_projects')
+      expect(result).toEqual(mockProjects)
+    })
+
+    it('should return empty array on error', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(invoke).mockRejectedValue(new Error('Fetch failed'))
+      
+      const result = await getRecentProjects()
+      
+      expect(result).toEqual([])
+      expect(consoleError).toHaveBeenCalled()
+      consoleError.mockRestore()
+    })
+  })
+
+  describe('addRecentProject', () => {
+    it('should invoke add_recent_project_cmd command with path', async () => {
+      vi.mocked(invoke).mockResolvedValue(undefined)
+      
+      await addRecentProject('/path/to/project')
+      
+      expect(invoke).toHaveBeenCalledWith('add_recent_project_cmd', { path: '/path/to/project' })
+    })
+
+    it('should handle errors gracefully', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(invoke).mockRejectedValue(new Error('Add failed'))
+      
+      // Should not throw
+      await expect(addRecentProject('/path/to/project')).resolves.not.toThrow()
+      
       expect(consoleError).toHaveBeenCalled()
       consoleError.mockRestore()
     })
