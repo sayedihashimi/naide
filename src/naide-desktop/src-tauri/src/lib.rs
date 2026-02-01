@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 use serde::{Deserialize, Serialize};
+use chrono::Utc;
 
 // Global state to track the sidecar process
 struct SidecarState {
@@ -182,13 +183,39 @@ pub fn run() {
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
+      // Configure file logging for both debug and production
+      // Get log directory: %temp%/com.naide.desktop/logs
+      let temp_dir = env::temp_dir();
+      let log_dir = temp_dir.join("com.naide.desktop").join("logs");
+      
+      // Create log directory if it doesn't exist
+      if let Err(e) = fs::create_dir_all(&log_dir) {
+        eprintln!("[Tauri] Failed to create log directory: {}", e);
+      } else {
+        println!("[Tauri] Log directory: {:?}", log_dir);
       }
+      
+      // Generate timestamped log filename: naide-2026-02-01T03-30-28.log
+      let timestamp = Utc::now().format("%Y-%m-%dT%H-%M-%S").to_string();
+      let log_filename = format!("naide-{}.log", timestamp);
+      
+      println!("[Tauri] Log file: {:?}/{}", log_dir.display(), log_filename);
+      
+      // Configure tauri-plugin-log with custom folder target
+      app.handle().plugin(
+        tauri_plugin_log::Builder::default()
+          .level(log::LevelFilter::Info)
+          .targets([
+            tauri_plugin_log::Target::new(
+              tauri_plugin_log::TargetKind::Folder {
+                path: log_dir,
+                file_name: Some(log_filename),
+              }
+            ),
+            tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+          ])
+          .build(),
+      )?;
       
       // Start the copilot sidecar
       // Get the current executable directory and construct path to sidecar

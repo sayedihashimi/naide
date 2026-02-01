@@ -4,9 +4,13 @@ import { fileURLToPath } from 'url';
 import { dirname, join, resolve, sep } from 'path';
 import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { CopilotClient } from '@github/copilot-sdk';
+import { initializeLogger } from './logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Initialize file logger before any other logging
+initializeLogger();
 
 // =============================================================================
 // Types for Conversation Memory
