@@ -524,6 +524,45 @@ app.post('/api/copilot/chat', async (req, res) => {
         model: 'gpt-4o',
         systemMessage: {
           content: fullSystemPrompt
+        },
+        hooks: {
+          // Hook to add footer to markdown files after they're written by the AI
+          onPostToolUse: async (input: any) => {
+            // Check if this was a file write operation
+            const fileWriteTools = ['create', 'edit', 'write_file', 'write'];
+            const toolName = input.toolName?.toLowerCase() || '';
+            
+            if (fileWriteTools.some(t => toolName.includes(t))) {
+              // Check if a file path was provided and it's a markdown file
+              const args = input.toolArgs || {};
+              const filePath = args.path || args.file || args.filename;
+              
+              if (filePath && typeof filePath === 'string' && filePath.endsWith('.md')) {
+                console.log(`[Sidecar] Post-tool hook: Adding footer to ${filePath}`);
+                
+                // Read the file that was just written
+                const fullPath = join(workspace, filePath);
+                if (existsSync(fullPath)) {
+                  try {
+                    let content = readFileSync(fullPath, 'utf-8');
+                    
+                    // Add footer if not already present
+                    if (!content.endsWith('<!-- created by naide -->')) {
+                      content = addMarkdownFooter(content);
+                      writeFileSync(fullPath, content, 'utf-8');
+                      console.log(`[Sidecar] Footer added to ${filePath}`);
+                    } else {
+                      console.log(`[Sidecar] Footer already present in ${filePath}`);
+                    }
+                  } catch (error) {
+                    console.error(`[Sidecar] Error adding footer to ${filePath}:`, error);
+                  }
+                }
+              }
+            }
+            
+            return {};
+          }
         }
       });
       
