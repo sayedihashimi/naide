@@ -130,4 +130,75 @@ Enhance the project switcher UI to show a dropdown list of recent projects when 
 - Categorize or tag projects
 - Search/filter recent projects
 
+## Implementation Notes
+
+### Completed Changes
+
+**Backend (Rust):**
+- Updated `src-tauri/src/settings.rs`:
+  - Added `recent_projects: Vec<LastProject>` field to `GlobalSettings` struct
+  - Implemented `add_recent_project()` function to manage the recent projects list:
+    - Removes duplicates (case-insensitive on Windows)
+    - Adds new project at the beginning (most recent first)
+    - Limits list to 10 most recent projects
+  - Implemented `get_recent_projects()` function to retrieve the list
+  - Added comprehensive unit tests for the new functionality
+
+- Updated `src-tauri/src/lib.rs`:
+  - Refactored to use the `settings` module instead of duplicate code
+  - Modified `save_last_project` command to also add projects to recent list
+  - Added `get_recent_projects` Tauri command
+  - Added `add_recent_project_cmd` Tauri command
+  - Registered new commands in the invoke handler
+
+**Frontend (TypeScript/React):**
+- Updated `src/utils/globalSettings.ts`:
+  - Added `getRecentProjects()` function
+  - Added `addRecentProject()` function
+  - Added corresponding unit tests
+
+- Updated `src/pages/GenerateAppScreen.tsx`:
+  - Added state management for dropdown visibility and recent projects list
+  - Added `useEffect` hook to load recent projects on component mount
+  - Added `useEffect` hook for click-outside handler to close dropdown
+  - Implemented `handleToggleDropdown()` to show/hide dropdown
+  - Implemented `handleSelectRecentProject()` to switch to a selected project
+  - Updated `handleOpenProjectFolder()` to reload recent projects after opening
+  - Split project button into two buttons:
+    - **Left button**: Shows current project name with dropdown arrow, opens dropdown
+    - **Right button**: Icon-only "Open folder" button, opens directory browser
+  - Implemented dropdown component:
+    - Positioned absolutely below project button
+    - Shows list of recent projects with name and path
+    - Displays "No recent projects" when list is empty
+    - Dark theme styling consistent with app (zinc colors)
+    - Auto-closes when clicking outside
+    - Updates list after project selection
+
+### Key Design Decisions
+
+1. **Case-insensitive path comparison on Windows**: The backend removes duplicate projects using case-insensitive comparison on Windows to handle different case variations of the same path.
+
+2. **Automatic list management**: When a project is opened via `save_last_project`, it's automatically added to the recent projects list, so no manual tracking is needed.
+
+3. **Non-fatal errors**: Both backend and frontend handle errors gracefully, logging them but not throwing, to prevent disrupting the user experience.
+
+4. **State synchronization**: The recent projects list is reloaded after any project operation (open folder, select from dropdown) to ensure the UI stays in sync with the backend.
+
+5. **Backward compatibility**: The `last_used_project` field is retained in settings for backward compatibility, even though recent projects now provides similar functionality.
+
+### Testing Recommendations
+
+- [x] Backend unit tests pass for recent projects logic
+- [x] Frontend unit tests added for new API functions
+- [ ] Manual testing required (requires full Tauri environment):
+  - Open multiple projects and verify they appear in dropdown
+  - Verify projects are sorted by most recent first
+  - Test switching between projects via dropdown
+  - Test opening new project via "Open folder" button
+  - Verify dropdown closes when clicking outside
+  - Confirm settings persist across app restarts
+  - Test limit of 10 projects
+
 created by naide
+

@@ -11,6 +11,7 @@ import {
 import MessageContent from '../components/MessageContent';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
+import { getRecentProjects, saveLastProject, type LastProject } from '../utils/globalSettings';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -85,8 +86,12 @@ const GenerateAppScreen: React.FC = () => {
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('Planning');
   // Conversation summary for mid-term memory (persisted in state, not disk)
   const [conversationSummary, setConversationSummary] = useState<ConversationSummary | null>(null);
+  // Recent projects dropdown state
+  const [showRecentProjects, setShowRecentProjects] = useState(false);
+  const [recentProjects, setRecentProjects] = useState<LastProject[]>([]);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Load chat session on mount
   useEffect(() => {
@@ -128,6 +133,31 @@ const GenerateAppScreen: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [messages, state.projectName, chatInitialized]);
+
+  // Load recent projects on mount
+  useEffect(() => {
+    const loadRecentProjects = async () => {
+      const projects = await getRecentProjects();
+      setRecentProjects(projects);
+    };
+    loadRecentProjects();
+  }, []);
+
+  // Click outside handler to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowRecentProjects(false);
+      }
+    };
+
+    if (showRecentProjects) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showRecentProjects]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -470,6 +500,10 @@ const GenerateAppScreen: React.FC = () => {
       if (selectedPath && typeof selectedPath === 'string') {
         console.log('[GenerateApp] Selected project folder:', selectedPath);
         
+        // Save the selected path to settings (this also adds to recent projects)
+        await saveLastProject(selectedPath);
+        console.log('[GenerateApp] Saved project to settings');
+        
         // Extract project name from the path (cross-platform)
         const pathParts = selectedPath.split(/[/\\]/);
         const newProjectName = pathParts[pathParts.length - 1];
@@ -486,6 +520,10 @@ const GenerateAppScreen: React.FC = () => {
           setMessages(getWelcomeMessages(copilotMode));
           // Clear conversation summary for new project
           setConversationSummary(null);
+          
+          // Reload recent projects to include the newly opened project
+          const projects = await getRecentProjects();
+          setRecentProjects(projects);
         } else {
           console.log('[GenerateApp] Project not found, will create on first interaction');
         }
@@ -495,31 +533,136 @@ const GenerateAppScreen: React.FC = () => {
     }
   };
 
+  const handleToggleDropdown = () => {
+    setShowRecentProjects(!showRecentProjects);
+  };
+
+  const handleSelectRecentProject = async (projectPath: string) => {
+    try {
+      console.log('[GenerateApp] Selected recent project:', projectPath);
+      
+      // Save the selected path to settings (this updates last accessed time)
+      await saveLastProject(projectPath);
+      console.log('[GenerateApp] Updated project in settings');
+      
+      // Extract project name from the path (cross-platform)
+      const pathParts = projectPath.split(/[/\\]/);
+      const newProjectName = pathParts[pathParts.length - 1];
+      
+      // Update project name and load the project
+      setProjectName(newProjectName);
+      
+      // Try to load the project
+      const loaded = await loadProject(newProjectName);
+      if (loaded) {
+        console.log('[GenerateApp] Successfully loaded project:', newProjectName);
+        // Reset chat for new project
+        setChatInitialized(false);
+        setMessages(getWelcomeMessages(copilotMode));
+        // Clear conversation summary for new project
+        setConversationSummary(null);
+        
+        // Reload recent projects to update last accessed time
+        const projects = await getRecentProjects();
+        setRecentProjects(projects);
+      }
+      
+      // Close dropdown
+      setShowRecentProjects(false);
+    } catch (error) {
+      console.error('[GenerateApp] Error selecting recent project:', error);
+    }
+  };
+
   return (
     <div className="h-screen bg-zinc-950 flex flex-col">
       {/* Header */}
       <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-100">Naide</h1>
-        <button
-          onClick={handleOpenProjectFolder}
-          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-gray-100 rounded-lg transition-colors flex items-center gap-2"
-          title="Open project folder"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div className="flex items-center gap-2 relative" ref={dropdownRef}>
+          {/* Current project button with dropdown */}
+          <button
+            onClick={handleToggleDropdown}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-gray-100 rounded-lg transition-colors flex items-center gap-2"
+            title="Recent projects"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-            />
-          </svg>
-          <span className="text-sm">{state.projectName}</span>
-        </button>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+              />
+            </svg>
+            <span className="text-sm">{state.projectName}</span>
+            <svg
+              className={`w-4 h-4 transition-transform ${showRecentProjects ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+
+          {/* Open project folder button */}
+          <button
+            onClick={handleOpenProjectFolder}
+            className="p-2 bg-zinc-800 hover:bg-zinc-700 text-gray-100 rounded-lg transition-colors"
+            title="Open a different project folder"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"
+              />
+            </svg>
+          </button>
+
+          {/* Recent projects dropdown */}
+          {showRecentProjects && (
+            <div className="absolute top-full right-0 mt-2 w-80 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+              {recentProjects.length > 0 ? (
+                <div className="py-2">
+                  {recentProjects.map((project, index) => {
+                    const projectName = project.path.split(/[/\\]/).pop() || project.path;
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => handleSelectRecentProject(project.path)}
+                        className="w-full px-4 py-2 text-left hover:bg-zinc-700 transition-colors text-gray-100 flex flex-col"
+                      >
+                        <span className="text-sm font-medium">{projectName}</span>
+                        <span className="text-xs text-gray-400 truncate">{project.path}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="px-4 py-6 text-center text-gray-400 text-sm">
+                  No recent projects
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main content area - 3 columns */}
