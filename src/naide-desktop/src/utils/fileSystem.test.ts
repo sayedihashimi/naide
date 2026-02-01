@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { exists, readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs'
 import { documentDir, join } from '@tauri-apps/api/path'
-import { loadConfig, saveConfig, getConfigPath, getConfigFilePath } from './fileSystem'
+import { loadConfig, saveConfig, getConfigPath, getConfigFilePath, addMarkdownFooter, formatSectionAsMarkdown } from './fileSystem'
 
 // Mock Tauri APIs
 vi.mock('@tauri-apps/plugin-fs', () => ({
@@ -96,6 +96,58 @@ describe('fileSystem utilities', () => {
         expect.any(String),
         JSON.stringify(mockConfig, null, 2)
       )
+    })
+  })
+
+  describe('addMarkdownFooter', () => {
+    it('should add footer to markdown content', () => {
+      const content = '# Title\n\nSome content'
+      const result = addMarkdownFooter(content)
+      
+      expect(result).toBe('# Title\n\nSome content\n\n<!-- created by naide -->')
+    })
+
+    it('should add footer to empty content', () => {
+      const content = ''
+      const result = addMarkdownFooter(content)
+      
+      expect(result).toBe('\n\n<!-- created by naide -->')
+    })
+  })
+
+  describe('formatSectionAsMarkdown', () => {
+    it('should format section as markdown with footer', () => {
+      const questions = [
+        { id: 'question-1', question: 'What is this?', type: 'text' },
+        { id: 'question-2', question: 'Why is this?', type: 'text' }
+      ]
+      const answers = {
+        'question-1': 'This is a test',
+        'question-2': 'Because we need it'
+      }
+      
+      const result = formatSectionAsMarkdown('Test Section', questions, answers)
+      
+      expect(result).toContain('# Test Section')
+      expect(result).toContain('## What is this?')
+      expect(result).toContain('This is a test')
+      expect(result).toContain('## Why is this?')
+      expect(result).toContain('Because we need it')
+      expect(result.endsWith('<!-- created by naide -->')).toBe(true)
+    })
+
+    it('should handle empty answers with footer', () => {
+      const questions = [
+        { id: 'question-1', question: 'What is this?', type: 'text' }
+      ]
+      const answers = {}
+      
+      const result = formatSectionAsMarkdown('Test Section', questions, answers)
+      
+      expect(result).toContain('# Test Section')
+      expect(result).toContain('## What is this?')
+      expect(result).toContain('_No answer provided_')
+      expect(result.endsWith('<!-- created by naide -->')).toBe(true)
     })
   })
 })

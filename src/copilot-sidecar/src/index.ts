@@ -310,6 +310,15 @@ function formatRecentMessages(messages: ChatMessage[]): string {
   return `\n\n## RECENT CONVERSATION (Short-Term Memory)\n\n${formattedMessages.join('\n\n')}\n`;
 }
 
+// Add footer to markdown content
+function addMarkdownFooter(content: string): string {
+  // If content already has the footer, don't add it again
+  if (content.endsWith('<!-- created by naide -->')) {
+    return content;
+  }
+  return content + '\n\n<!-- created by naide -->';
+}
+
 // Write a learning entry
 // Note: This function is defined for future use when automatic learnings capture is implemented
 function writeLearning(workspaceRoot: string, category: string, content: string): void {
@@ -331,7 +340,8 @@ function writeLearning(workspaceRoot: string, category: string, content: string)
   const timestamp = new Date().toISOString();
   const newEntry = `\n## [${timestamp}]\n${content}\n`;
   
-  writeFileSync(filepath, existingContent + newEntry, 'utf-8');
+  const finalContent = addMarkdownFooter(existingContent + newEntry);
+  writeFileSync(filepath, finalContent, 'utf-8');
 }
 
 // Safe file write - allow .prompts/** and project files, but block dangerous paths
@@ -369,7 +379,13 @@ function safeFileWrite(workspaceRoot: string, relativePath: string, content: str
       mkdirSync(dir, { recursive: true });
     }
     
-    writeFileSync(fullPath, content, 'utf-8');
+    // Add footer to markdown files
+    let finalContent = content;
+    if (relativePath.endsWith('.md')) {
+      finalContent = addMarkdownFooter(content);
+    }
+    
+    writeFileSync(fullPath, finalContent, 'utf-8');
     console.log(`[Sidecar] Successfully wrote file: ${relativePath}`);
     return true;
   } catch (error) {
