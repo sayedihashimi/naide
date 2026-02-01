@@ -446,6 +446,277 @@ function safeFileRead(workspaceRoot: string, relativePath: string): string | nul
   }
 }
 
+// Streaming chat endpoint using Server-Sent Events (SSE)
+app.post('/api/copilot/stream', async (req, res) => {
+  const { mode, message, workspaceRoot, contextFiles, conversationContext } = req.body;
+  
+  console.log(`[Sidecar] Streaming chat request - mode: ${mode}, message: ${message?.substring(0, 50)}...`);
+  if (conversationContext) {
+    console.log(`[Sidecar] Conversation context: ${conversationContext.totalMessageCount} total messages, summary: ${conversationContext.summary ? 'yes' : 'no'}`);
+  }
+  
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering if behind proxy
+  
+  // Helper to send SSE event
+  const sendEvent = (type: string, data: any) => {
+    res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
+  };
+  
+  // For Building and Analyzing modes, return stub responses
+  if (mode === 'Building') {
+    sendEvent('delta', { content: 'Building coming soon' });
+    sendEvent('done', {});
+    res.end();
+    return;
+  }
+  
+  if (mode === 'Analyzing') {
+    sendEvent('delta', { content: 'Analyzing coming soon' });
+    sendEvent('done', {});
+    res.end();
+    return;
+  }
+  
+  // For Planning mode, use Copilot SDK with streaming
+  if (mode === 'Planning') {
+    // Check if Copilot is initialized
+    if (!copilotReady || !copilotClient) {
+      const initResult = await initializeCopilot();
+      if (!initResult.success) {
+        sendEvent('error', { message: initResult.error });
+        res.end();
+        return;
+      }
+    }
+    
+    try {
+      const workspace = workspaceRoot || process.cwd();
+      
+      // Load system prompts (same as non-streaming endpoint)
+      let fullSystemPrompt = loadSystemPrompts(mode);
+      const learnings = await loadLearnings(workspace);
+      fullSystemPrompt += learnings;
+      const specs = loadSpecFiles(workspace);
+      const features = loadFeatureFiles(workspace);
+      fullSystemPrompt += specs;
+      fullSystemPrompt += features;
+      
+      if (conversationContext?.summary) {
+        const summaryPrompt = formatConversationSummary(conversationContext.summary);
+        fullSystemPrompt += summaryPrompt;
+      }
+      
+      if (conversationContext?.recentMessages && conversationContext.recentMessages.length > 0) {
+        const messagesPrompt = formatRecentMessages(conversationContext.recentMessages);
+        fullSystemPrompt += messagesPrompt;
+      }
+      
+      console.log(`[Sidecar] Full prompt assembled for streaming, total length: ${fullSystemPrompt.length} chars`);
+      
+      // Create a new session for streaming
+      console.log('[Sidecar] Creating new Copilot session for streaming Planning mode');
+      const session = await copilotClient!.createSession({
+        model: 'gpt-4o',
+        systemMessage: {
+          content: fullSystemPrompt
+        },
+        hooks: {
+          // Hook to add footer to markdown files after they're written by the AI
+          onPostToolUse: async (input) => {
+            const toolName = (input.toolName as string | undefined)?.toLowerCase() || '';
+            
+            if (FILE_WRITE_TOOLS.some(t => toolName.includes(t))) {
+              const args = (input.toolArgs as Record<string, any>) || {};
+              const filePath = args.path || args.file || args.filename;
+              
+              if (filePath && typeof filePath === 'string' && filePath.endsWith('.md')) {
+                console.log(`[Sidecar] Post-tool hook: Adding footer to ${filePath}`);
+                const fullPath = join(workspace, filePath);
+                if (existsSync(fullPath)) {
+                  try {
+                    let content = readFileSync(fullPath, 'utf-8');
+                    if (!content.endsWith(FOOTER_MARKER)) {
+                      content = addMarkdownFooter(content);
+                      writeFileSync(fullPath, content, 'utf-8');
+                      console.log(`[Sidecar] Footer added to ${filePath}`);
+                    }
+                  } catch (error) {
+                    console.error(`[Sidecar] Error adding footer to ${filePath}:`, error);
+                  }
+                }
+              }
+            }
+            return {};
+          }
+        }
+      });
+      
+      // Buffer for safety - we still collect the full response for file operations
+      const responseBuffer: string[] = [];
+      
+      // Track all unsubscribe functions for cleanup
+      const unsubscribeFns: Array<() => void> = [];
+      
+      // Function to clean up all listeners
+      const cleanupListeners = () => {
+        unsubscribeFns.forEach(fn => fn());
+      };
+      
+      // Set up timeout handling
+      const RESPONSE_TIMEOUT_MS = 180000; // 3 minutes
+      const ACTIVITY_TIMEOUT_MS = 120000; // 2 minutes
+      let timeoutHandle: NodeJS.Timeout;
+      
+      const resetTimeout = (reason?: string) => {
+        clearTimeout(timeoutHandle);
+        if (reason) {
+          console.log(`[Sidecar] Activity detected: ${reason} - resetting timeout`);
+        }
+        timeoutHandle = setTimeout(() => {
+          cleanupListeners();
+          session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
+          sendEvent('error', { message: 'Response timeout - no activity for 2 minutes' });
+          res.end();
+        }, responseBuffer.length > 0 ? ACTIVITY_TIMEOUT_MS : RESPONSE_TIMEOUT_MS);
+      };
+      
+      // Event listeners - stream to client in real-time
+      
+      // Assistant message - full content chunks
+      unsubscribeFns.push(session.on('assistant.message', (event) => {
+        if (event.data.content) {
+          responseBuffer.push(event.data.content);
+          sendEvent('delta', { content: event.data.content });
+          resetTimeout('assistant.message received');
+        }
+      }));
+      
+      // Streaming message deltas - partial content as it's generated
+      unsubscribeFns.push(session.on('assistant.message_delta', (event) => {
+        if (event.data.deltaContent) {
+          responseBuffer.push(event.data.deltaContent);
+          sendEvent('delta', { content: event.data.deltaContent });
+        }
+        resetTimeout('streaming content');
+      }));
+      
+      // Assistant turn tracking
+      unsubscribeFns.push(session.on('assistant.turn_start', () => {
+        sendEvent('turn_start', {});
+        resetTimeout('assistant turn started');
+      }));
+      
+      unsubscribeFns.push(session.on('assistant.turn_end', () => {
+        sendEvent('turn_end', {});
+        resetTimeout('assistant turn ended');
+      }));
+      
+      // Reasoning events
+      unsubscribeFns.push(session.on('assistant.reasoning', () => {
+        resetTimeout('assistant reasoning');
+      }));
+      
+      unsubscribeFns.push(session.on('assistant.reasoning_delta', () => {
+        resetTimeout('streaming reasoning');
+      }));
+      
+      // Tool execution events - notify user about tool usage
+      unsubscribeFns.push(session.on('tool.execution_start', (event) => {
+        console.log(`[Sidecar] Tool started: ${event.data.toolName}`);
+        sendEvent('tool_start', { toolName: event.data.toolName });
+        resetTimeout(`tool started: ${event.data.toolName}`);
+      }));
+      
+      unsubscribeFns.push(session.on('tool.execution_progress', (event) => {
+        console.log(`[Sidecar] Tool progress: ${event.data.progressMessage}`);
+        sendEvent('tool_progress', { message: event.data.progressMessage });
+        resetTimeout(`tool progress: ${event.data.progressMessage}`);
+      }));
+      
+      unsubscribeFns.push(session.on('tool.execution_partial_result', () => {
+        resetTimeout('tool partial result');
+      }));
+      
+      unsubscribeFns.push(session.on('tool.execution_complete', (event) => {
+        console.log(`[Sidecar] Tool completed: ${event.data.toolCallId}, success: ${event.data.success}`);
+        sendEvent('tool_complete', { 
+          toolCallId: event.data.toolCallId,
+          success: event.data.success 
+        });
+        resetTimeout('tool completed');
+      }));
+      
+      // Subagent events
+      unsubscribeFns.push(session.on('subagent.started', (event) => {
+        console.log(`[Sidecar] Subagent started: ${event.data.agentDisplayName}`);
+        sendEvent('subagent_start', { agentName: event.data.agentDisplayName });
+        resetTimeout(`subagent started: ${event.data.agentDisplayName}`);
+      }));
+      
+      unsubscribeFns.push(session.on('subagent.completed', () => {
+        sendEvent('subagent_complete', {});
+        resetTimeout('subagent completed');
+      }));
+      
+      // Session becomes idle - completion signal
+      unsubscribeFns.push(session.on('session.idle', () => {
+        console.log('[Sidecar] Session idle - streaming complete');
+        clearTimeout(timeoutHandle);
+        cleanupListeners();
+        
+        // Send the complete buffered response for any post-processing
+        sendEvent('done', { fullResponse: responseBuffer.join('') });
+        res.end();
+        
+        // Destroy session after use
+        session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
+      }));
+      
+      // Session error
+      unsubscribeFns.push(session.on('session.error', (event) => {
+        console.error('[Sidecar] Session error:', event.data.message);
+        clearTimeout(timeoutHandle);
+        cleanupListeners();
+        
+        sendEvent('error', { message: event.data.message || 'Copilot session error' });
+        res.end();
+        
+        // Destroy session after error
+        session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
+      }));
+      
+      // Handle client disconnect
+      req.on('close', () => {
+        console.log('[Sidecar] Client disconnected from stream');
+        clearTimeout(timeoutHandle);
+        cleanupListeners();
+        session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
+      });
+      
+      // Set initial timeout
+      resetTimeout();
+      
+      // Send the message to start streaming
+      await session.send({ prompt: message });
+      
+    } catch (error: unknown) {
+      console.error('[Sidecar] Error in streaming:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      sendEvent('error', { message: `Failed to communicate with Copilot: ${errorMessage}` });
+      res.end();
+    }
+    return;
+  }
+  
+  // Unknown mode
+  sendEvent('error', { message: `Unknown mode: ${mode}` });
+  res.end();
+});
+
 // Main chat endpoint
 app.post('/api/copilot/chat', async (req, res) => {
   const { mode, message, workspaceRoot, contextFiles, conversationContext } = req.body;
