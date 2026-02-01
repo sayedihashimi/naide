@@ -113,6 +113,17 @@ describe('fileSystem utilities', () => {
       
       expect(result).toBe('\n\n<!-- created by naide -->')
     })
+
+    it('should not add duplicate footer (idempotent)', () => {
+      const content = '# Title\n\nSome content'
+      const result1 = addMarkdownFooter(content)
+      const result2 = addMarkdownFooter(result1)
+      
+      expect(result1).toBe(result2)
+      // Count occurrences of the footer
+      const footerCount = (result2.match(/<!-- created by naide -->/g) || []).length
+      expect(footerCount).toBe(1)
+    })
   })
 
   describe('formatSectionAsMarkdown', () => {

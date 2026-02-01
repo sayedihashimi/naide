@@ -241,6 +241,10 @@ export async function readSectionFromFile(
 // Format section content as markdown
 // Add footer to markdown content
 export function addMarkdownFooter(content: string): string {
+  // If content already has the footer, don't add it again
+  if (content.endsWith('<!-- created by naide -->')) {
+    return content;
+  }
   return content + '\n\n<!-- created by naide -->';
 }
 
