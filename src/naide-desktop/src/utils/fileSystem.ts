@@ -1,6 +1,9 @@
 import { exists, readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
 import { join, documentDir } from '@tauri-apps/api/path';
 
+// Constants
+const FOOTER_MARKER = '<!-- created by naide -->';
+
 export interface ProjectConfig {
   name: string;
   path: string;
@@ -160,11 +163,11 @@ export async function createAllProjectFiles(projectName: string, initialIntent?:
     
     // Define all files
     const files = [
-      { name: 'Intent.md', content: initialIntent ? `# Overview\n\n## What do you want to build?\n\n${initialIntent}\n\n` : '# Overview\n\n' },
-      { name: 'AppSpec.md', content: '# Features\n\n' },
-      { name: 'DataSpec.md', content: '# Data\n\n' },
-      { name: 'Rules.md', content: '# Access & Rules\n\n' },
-      { name: 'Assumptions.md', content: '# Assumptions\n\n' },
+      { name: 'Intent.md', content: addMarkdownFooter(initialIntent ? `# Overview\n\n## What do you want to build?\n\n${initialIntent}\n\n` : '# Overview\n\n') },
+      { name: 'AppSpec.md', content: addMarkdownFooter('# Features\n\n') },
+      { name: 'DataSpec.md', content: addMarkdownFooter('# Data\n\n') },
+      { name: 'Rules.md', content: addMarkdownFooter('# Access & Rules\n\n') },
+      { name: 'Assumptions.md', content: addMarkdownFooter('# Assumptions\n\n') },
       { name: 'Tasks.json', content: '{}' }
     ];
     
@@ -239,6 +242,22 @@ export async function readSectionFromFile(
 }
 
 // Format section content as markdown
+/**
+ * Adds the naide footer to markdown content.
+ * The footer is added with two newlines before it.
+ * If the content already ends with the footer, it won't be added again (idempotent).
+ * 
+ * @param content - The markdown content to add footer to
+ * @returns The content with the footer appended
+ */
+export function addMarkdownFooter(content: string): string {
+  // If content already has the footer, don't add it again
+  if (content.endsWith(FOOTER_MARKER)) {
+    return content;
+  }
+  return content + '\n\n' + FOOTER_MARKER;
+}
+
 export function formatSectionAsMarkdown(
   sectionName: string,
   questions: Array<{ id: string; question: string; type: string }>,
@@ -256,7 +275,7 @@ export function formatSectionAsMarkdown(
     }
   });
   
-  return markdown;
+  return addMarkdownFooter(markdown);
 }
 
 // Parse markdown file to extract question/answer pairs

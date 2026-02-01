@@ -15,6 +15,7 @@ You have the ability to read and write files in the current project folder.
 - You can write to any file EXCEPT: node_modules/, .git/, .env, package.json, package-lock.json
 - When you want to update specs, write them to .prompts/plan/ or .prompts/features/
 - Always explain what files you're reading or writing
+- DO NOT add any footer or signature to markdown files - this is handled automatically by the system
 
 REPO PROMPTS, SPECS, AND FEATURES ARE SOURCE OF TRUTH
 - The user's project contains specs and features in .prompts/ folder

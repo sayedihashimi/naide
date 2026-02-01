@@ -6,7 +6,8 @@ import {
   loadProjectData, 
   checkProjectExists,
   getProjectPath,
-  updateLastUsedProject
+  updateLastUsedProject,
+  addMarkdownFooter
 } from '../utils/fileSystem';
 import { saveLastProject } from '../utils/globalSettings';
 
@@ -111,7 +112,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               markdown += `_No answer provided_\n\n`;
             }
           }
-          await saveSectionToFile(state.projectName, filename, markdown);
+          // Add footer to markdown files
+          const markdownWithFooter = addMarkdownFooter(markdown);
+          await saveSectionToFile(state.projectName, filename, markdownWithFooter);
         }
       }
       console.log('[AppContext] saveProject completed successfully');

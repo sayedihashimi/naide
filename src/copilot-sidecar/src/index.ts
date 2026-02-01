@@ -12,6 +12,12 @@ const __dirname = dirname(__filename);
 // Initialize file logger before any other logging
 initializeLogger();
 
+// Constants
+const FOOTER_MARKER = '<!-- created by naide -->';
+// File write tool names from Copilot SDK's built-in tools
+// These are the tools the AI uses to create/modify files
+const FILE_WRITE_TOOLS = ['create', 'edit', 'write_file', 'write'];
+
 // =============================================================================
 // Types for Conversation Memory
 // =============================================================================
@@ -310,6 +316,22 @@ function formatRecentMessages(messages: ChatMessage[]): string {
   return `\n\n## RECENT CONVERSATION (Short-Term Memory)\n\n${formattedMessages.join('\n\n')}\n`;
 }
 
+/**
+ * Adds the naide footer to markdown content.
+ * The footer is added with two newlines before it.
+ * If the content already ends with the footer, it won't be added again (idempotent).
+ * 
+ * @param content - The markdown content to add footer to
+ * @returns The content with the footer appended
+ */
+function addMarkdownFooter(content: string): string {
+  // If content already has the footer, don't add it again
+  if (content.endsWith(FOOTER_MARKER)) {
+    return content;
+  }
+  return content + '\n\n' + FOOTER_MARKER;
+}
+
 // Write a learning entry
 // Note: This function is defined for future use when automatic learnings capture is implemented
 function writeLearning(workspaceRoot: string, category: string, content: string): void {
@@ -331,7 +353,8 @@ function writeLearning(workspaceRoot: string, category: string, content: string)
   const timestamp = new Date().toISOString();
   const newEntry = `\n## [${timestamp}]\n${content}\n`;
   
-  writeFileSync(filepath, existingContent + newEntry, 'utf-8');
+  const finalContent = addMarkdownFooter(existingContent + newEntry);
+  writeFileSync(filepath, finalContent, 'utf-8');
 }
 
 // Safe file write - allow .prompts/** and project files, but block dangerous paths
@@ -369,7 +392,13 @@ function safeFileWrite(workspaceRoot: string, relativePath: string, content: str
       mkdirSync(dir, { recursive: true });
     }
     
-    writeFileSync(fullPath, content, 'utf-8');
+    // Add footer to markdown files
+    let finalContent = content;
+    if (relativePath.endsWith('.md')) {
+      finalContent = addMarkdownFooter(content);
+    }
+    
+    writeFileSync(fullPath, finalContent, 'utf-8');
     console.log(`[Sidecar] Successfully wrote file: ${relativePath}`);
     return true;
   } catch (error) {
@@ -501,6 +530,44 @@ app.post('/api/copilot/chat', async (req, res) => {
         model: 'gpt-4o',
         systemMessage: {
           content: fullSystemPrompt
+        },
+        hooks: {
+          // Hook to add footer to markdown files after they're written by the AI
+          onPostToolUse: async (input) => {
+            // Check if this was a file write operation
+            const toolName = (input.toolName as string | undefined)?.toLowerCase() || '';
+            
+            if (FILE_WRITE_TOOLS.some(t => toolName.includes(t))) {
+              // Check if a file path was provided and it's a markdown file
+              const args = (input.toolArgs as Record<string, any>) || {};
+              const filePath = args.path || args.file || args.filename;
+              
+              if (filePath && typeof filePath === 'string' && filePath.endsWith('.md')) {
+                console.log(`[Sidecar] Post-tool hook: Adding footer to ${filePath}`);
+                
+                // Read the file that was just written
+                const fullPath = join(workspace, filePath);
+                if (existsSync(fullPath)) {
+                  try {
+                    let content = readFileSync(fullPath, 'utf-8');
+                    
+                    // Add footer if not already present
+                    if (!content.endsWith(FOOTER_MARKER)) {
+                      content = addMarkdownFooter(content);
+                      writeFileSync(fullPath, content, 'utf-8');
+                      console.log(`[Sidecar] Footer added to ${filePath}`);
+                    } else {
+                      console.log(`[Sidecar] Footer already present in ${filePath}`);
+                    }
+                  } catch (error) {
+                    console.error(`[Sidecar] Error adding footer to ${filePath}:`, error);
+                  }
+                }
+              }
+            }
+            
+            return {};
+          }
         }
       });
       
