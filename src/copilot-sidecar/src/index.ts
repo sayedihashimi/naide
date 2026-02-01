@@ -507,58 +507,123 @@ app.post('/api/copilot/chat', async (req, res) => {
       const responsePromise = new Promise<string>((resolve, reject) => {
         let timeoutHandle: NodeJS.Timeout;
         const RESPONSE_TIMEOUT_MS = 180000; // 3 minute base timeout
-        const ACTIVITY_TIMEOUT_MS = 60000; // 60 second inactivity timeout (reset on each chunk)
+        const ACTIVITY_TIMEOUT_MS = 120000; // 2 minute inactivity timeout (reset on any activity)
+        
+        // Track all unsubscribe functions for cleanup
+        const unsubscribeFns: Array<() => void> = [];
+        
+        // Function to clean up all listeners
+        const cleanupListeners = () => {
+          unsubscribeFns.forEach(fn => fn());
+        };
         
         // Function to reset timeout on activity
-        const resetTimeout = () => {
+        const resetTimeout = (reason?: string) => {
           clearTimeout(timeoutHandle);
+          if (reason) {
+            console.log(`[Sidecar] Activity detected: ${reason} - resetting timeout`);
+          }
           timeoutHandle = setTimeout(() => {
             // Clean up listeners on timeout
-            unsubscribeAssistant();
-            unsubscribeIdle();
-            unsubscribeError();
+            cleanupListeners();
             
             // Destroy session after timeout
             session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
             
-            reject(new Error('Response timeout - no activity for 60 seconds'));
+            reject(new Error('Response timeout - no activity for 2 minutes'));
           }, responseChunks.length > 0 ? ACTIVITY_TIMEOUT_MS : RESPONSE_TIMEOUT_MS);
         };
         
-        // Set up event listeners and get unsubscribe functions
-        const unsubscribeAssistant = session.on('assistant.message', (event) => {
+        // =========================================================================
+        // Event listeners for all activity types
+        // The SDK emits various events during processing - we listen to all of them
+        // to properly detect activity and prevent premature timeouts
+        // =========================================================================
+        
+        // Assistant message - the final response content
+        unsubscribeFns.push(session.on('assistant.message', (event) => {
           if (event.data.content) {
             responseChunks.push(event.data.content);
-            // Reset timeout when we receive data - AI is still responding
-            resetTimeout();
+            resetTimeout('assistant.message received');
           }
-        });
+        }));
         
-        const unsubscribeIdle = session.on('session.idle', () => {
+        // Streaming message deltas - partial content as it's generated
+        unsubscribeFns.push(session.on('assistant.message_delta', (event) => {
+          resetTimeout('streaming content');
+        }));
+        
+        // Assistant turn tracking
+        unsubscribeFns.push(session.on('assistant.turn_start', () => {
+          resetTimeout('assistant turn started');
+        }));
+        
+        unsubscribeFns.push(session.on('assistant.turn_end', () => {
+          resetTimeout('assistant turn ended');
+        }));
+        
+        // Reasoning events (for models that support it)
+        unsubscribeFns.push(session.on('assistant.reasoning', () => {
+          resetTimeout('assistant reasoning');
+        }));
+        
+        unsubscribeFns.push(session.on('assistant.reasoning_delta', () => {
+          resetTimeout('streaming reasoning');
+        }));
+        
+        // Tool execution events - CRITICAL for long-running tool calls
+        unsubscribeFns.push(session.on('tool.execution_start', (event) => {
+          console.log(`[Sidecar] Tool started: ${event.data.toolName}`);
+          resetTimeout(`tool started: ${event.data.toolName}`);
+        }));
+        
+        unsubscribeFns.push(session.on('tool.execution_progress', (event) => {
+          console.log(`[Sidecar] Tool progress: ${event.data.progressMessage}`);
+          resetTimeout(`tool progress: ${event.data.progressMessage}`);
+        }));
+        
+        unsubscribeFns.push(session.on('tool.execution_partial_result', () => {
+          resetTimeout('tool partial result');
+        }));
+        
+        unsubscribeFns.push(session.on('tool.execution_complete', (event) => {
+          console.log(`[Sidecar] Tool completed: ${event.data.toolCallId}, success: ${event.data.success}`);
+          resetTimeout('tool completed');
+        }));
+        
+        // Subagent events (for complex multi-agent workflows)
+        unsubscribeFns.push(session.on('subagent.started', (event) => {
+          console.log(`[Sidecar] Subagent started: ${event.data.agentDisplayName}`);
+          resetTimeout(`subagent started: ${event.data.agentDisplayName}`);
+        }));
+        
+        unsubscribeFns.push(session.on('subagent.completed', () => {
+          resetTimeout('subagent completed');
+        }));
+        
+        // Session becomes idle - this is our completion signal
+        unsubscribeFns.push(session.on('session.idle', () => {
+          console.log('[Sidecar] Session idle - request complete');
           clearTimeout(timeoutHandle);
-          // Clean up listeners
-          unsubscribeAssistant();
-          unsubscribeIdle();
-          unsubscribeError();
+          cleanupListeners();
           
           // Destroy session after use
           session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
           
           resolve(responseChunks.join(''));
-        });
+        }));
         
-        const unsubscribeError = session.on('session.error', (event) => {
+        // Session error
+        unsubscribeFns.push(session.on('session.error', (event) => {
+          console.error('[Sidecar] Session error:', event.data.message);
           clearTimeout(timeoutHandle);
-          // Clean up listeners
-          unsubscribeAssistant();
-          unsubscribeIdle();
-          unsubscribeError();
+          cleanupListeners();
           
           // Destroy session after error
           session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));
           
           reject(new Error(event.data.message || 'Copilot session error'));
-        });
+        }));
         
         // Set initial timeout
         resetTimeout();
