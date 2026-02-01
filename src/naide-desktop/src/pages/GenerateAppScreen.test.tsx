@@ -5,6 +5,29 @@ import userEvent from '@testing-library/user-event';
 import GenerateAppScreen from './GenerateAppScreen';
 import { AppProvider } from '../context/AppContext';
 
+// Helper to create a mock streaming response
+const createStreamingResponse = (content: string) => {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      // Send delta event
+      const deltaEvent = `data: ${JSON.stringify({ type: 'delta', data: { content } })}\n\n`;
+      controller.enqueue(encoder.encode(deltaEvent));
+      
+      // Send done event
+      const doneEvent = `data: ${JSON.stringify({ type: 'done', data: { fullResponse: content } })}\n\n`;
+      controller.enqueue(encoder.encode(doneEvent));
+      
+      controller.close();
+    }
+  });
+  
+  return {
+    ok: true,
+    body: stream,
+  };
+};
+
 // Mock fetch
 global.fetch = vi.fn();
 
@@ -206,11 +229,8 @@ describe('GenerateAppScreen', () => {
 
     await screen.findByLabelText(/Mode:/i);
 
-    // Mock fetch to return a Planning mode response
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ replyText: 'Planning mode response' }),
-    });
+    // Mock fetch to return a Planning mode streaming response
+    (global.fetch as any).mockResolvedValueOnce(createStreamingResponse('Planning mode response'));
 
     // Send a message to initialize the chat
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
@@ -299,11 +319,8 @@ describe('GenerateAppScreen', () => {
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
     const sendButton = screen.getByRole('button', { name: 'Send' });
 
-    // Mock fetch to return a Planning mode response
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ replyText: 'Planning mode response' }),
-    });
+    // Mock fetch to return a Planning mode streaming response
+    (global.fetch as any).mockResolvedValueOnce(createStreamingResponse('Planning mode response'));
 
     // Type a message
     await user.type(messageInput, 'Test message');
@@ -324,11 +341,8 @@ describe('GenerateAppScreen', () => {
     
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
 
-    // Mock fetch to return a Planning mode response
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ replyText: 'Planning mode response' }),
-    });
+    // Mock fetch to return a Planning mode streaming response
+    (global.fetch as any).mockResolvedValueOnce(createStreamingResponse('Planning mode response'));
 
     // Type a message
     await user.type(messageInput, 'Test message');
@@ -417,13 +431,9 @@ describe('GenerateAppScreen', () => {
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
     const sendButton = screen.getByRole('button', { name: 'Send' });
 
-    // Mock fetch to return a markdown response
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ 
-        replyText: 'Here is some **bold** text and *italic* text.\n\n- Item 1\n- Item 2\n\nAnd a `code` snippet.' 
-      }),
-    });
+    // Mock fetch to return a markdown streaming response
+    const markdownContent = 'Here is some **bold** text and *italic* text.\n\n- Item 1\n- Item 2\n\nAnd a `code` snippet.';
+    (global.fetch as any).mockResolvedValueOnce(createStreamingResponse(markdownContent));
 
     // Type a message
     await user.type(messageInput, 'Test markdown');

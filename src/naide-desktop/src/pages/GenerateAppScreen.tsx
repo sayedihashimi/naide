@@ -190,7 +190,7 @@ const GenerateAppScreen: React.FC = () => {
         return;
       }
 
-      // For Planning mode, call the sidecar
+      // For Planning mode, call the sidecar with streaming
       // Get the project path to use as workspace root
       const projectPath = await getProjectPath(state.projectName);
       
@@ -199,71 +199,183 @@ const GenerateAppScreen: React.FC = () => {
       const contextMessages = [...messages]; // messages state hasn't updated yet, so this is correct
       const conversationContext = buildConversationContext(contextMessages, conversationSummary);
       
-      console.log('[GenerateApp] Sending with conversation context:', {
+      console.log('[GenerateApp] Sending with conversation context (streaming):', {
         summaryExists: !!conversationContext.summary,
         recentMessagesCount: conversationContext.recentMessages.length,
         totalMessageCount: conversationContext.totalMessageCount,
       });
       
-      const response = await fetch('http://localhost:3001/api/copilot/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mode: copilotMode,
-          message: userInput,
-          workspaceRoot: projectPath,
-          conversationContext,
-        }),
-      });
+      // Create assistant message placeholder for streaming
+      const assistantMessageId = `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const assistantMessage: ChatMessage = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date().toISOString(),
+      };
+      
+      // Add the empty assistant message to the UI
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      try {
+        const response = await fetch('http://localhost:3001/api/copilot/stream', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mode: copilotMode,
+            message: userInput,
+            workspaceRoot: projectPath,
+            conversationContext,
+          }),
+        });
 
-      if (!response.ok) {
-        // Handle non-OK responses
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        const assistantMessage: ChatMessage = {
-          id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          role: 'assistant',
-          content: errorData.replyText || errorData.error || 'An error occurred',
-          timestamp: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
+        if (!response.ok) {
+          // Handle non-OK responses
+          const errorText = await response.text().catch(() => 'Unknown error');
+          setMessages(prev => 
+            prev.map(m => 
+              m.id === assistantMessageId 
+                ? { ...m, content: `Error: ${errorText}` }
+                : m
+            )
+          );
+          setIsLoading(false);
+          
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+          }
+          return;
+        }
+
+        // Process Server-Sent Events stream
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let accumulatedContent = '';
+        
+        if (!reader) {
+          throw new Error('Response body is not readable');
+        }
+
+        while (true) {
+          const { value, done } = await reader.read();
+          
+          if (done) {
+            console.log('[GenerateApp] Stream complete');
+            break;
+          }
+
+          // Decode the chunk and add to buffer
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Process complete lines (SSE format)
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const eventData = JSON.parse(line.slice(6));
+                
+                switch (eventData.type) {
+                  case 'delta':
+                    // Accumulate content and update the message
+                    if (eventData.data?.content) {
+                      accumulatedContent += eventData.data.content;
+                      setMessages(prev => 
+                        prev.map(m => 
+                          m.id === assistantMessageId 
+                            ? { ...m, content: accumulatedContent }
+                            : m
+                        )
+                      );
+                    }
+                    break;
+                    
+                  case 'tool_start':
+                    console.log('[GenerateApp] Tool started:', eventData.data?.toolName);
+                    break;
+                    
+                  case 'tool_complete':
+                    console.log('[GenerateApp] Tool completed:', eventData.data?.toolCallId);
+                    break;
+                    
+                  case 'done':
+                    console.log('[GenerateApp] Stream done');
+                    // Use the full buffered response for summary extraction (prefer server's buffer)
+                    const fullResponse = eventData.data?.fullResponse !== undefined 
+                      ? eventData.data.fullResponse 
+                      : accumulatedContent;
+                    
+                    // Extract conversation summary update from the response (if present)
+                    const summaryUpdate = parseSummaryFromResponse(fullResponse);
+                    if (summaryUpdate) {
+                      console.log('[GenerateApp] Updating conversation summary from AI response');
+                      setConversationSummary(prev => mergeSummary(prev, summaryUpdate));
+                    }
+                    
+                    // Clean the response for display (remove summary markers)
+                    const cleanedReplyText = cleanResponseForDisplay(accumulatedContent);
+                    
+                    // Update the message with cleaned content
+                    setMessages(prev => 
+                      prev.map(m => 
+                        m.id === assistantMessageId 
+                          ? { ...m, content: cleanedReplyText }
+                          : m
+                      )
+                    );
+                    break;
+                    
+                  case 'error':
+                    console.error('[GenerateApp] Stream error:', eventData.data?.message);
+                    setMessages(prev => 
+                      prev.map(m => 
+                        m.id === assistantMessageId 
+                          ? { ...m, content: `Error: ${eventData.data?.message || 'Unknown error'}` }
+                          : m
+                      )
+                    );
+                    break;
+                }
+              } catch (parseError) {
+                console.error('[GenerateApp] Error parsing SSE event:', parseError, line);
+              }
+            }
+          }
+        }
+        
+        setIsLoading(false);
+        
+        // Focus back on textarea
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        }
+      } catch (streamError) {
+        console.error('[GenerateApp] Error in streaming:', streamError);
+        
+        // Provide specific error message based on error type
+        let errorMessage = 'An error occurred while streaming the response.';
+        if (streamError instanceof TypeError && streamError.message.includes('fetch')) {
+          errorMessage = 'Unable to connect to the Copilot service. Please make sure the sidecar is running.';
+        } else if (streamError instanceof Error && streamError.message.includes('body')) {
+          errorMessage = 'Failed to read the streaming response. Please try again.';
+        }
+        
+        setMessages(prev => 
+          prev.map(m => 
+            m.id === assistantMessageId 
+              ? { ...m, content: errorMessage }
+              : m
+          )
+        );
         setIsLoading(false);
         
         if (textareaRef.current) {
           textareaRef.current.focus();
         }
-        return;
-      }
-
-      const data = await response.json();
-
-      // Extract conversation summary update from the response (if present)
-      const rawReplyText = data.replyText || data.error || 'An error occurred';
-      const summaryUpdate = parseSummaryFromResponse(rawReplyText);
-      
-      // Update conversation summary if we got new information
-      if (summaryUpdate) {
-        console.log('[GenerateApp] Updating conversation summary from AI response');
-        setConversationSummary(prev => mergeSummary(prev, summaryUpdate));
-      }
-      
-      // Clean the response for display (remove summary markers)
-      const cleanedReplyText = cleanResponseForDisplay(rawReplyText);
-
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        role: 'assistant',
-        content: cleanedReplyText,
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-      setIsLoading(false);
-      
-      // Focus back on textarea
-      if (textareaRef.current) {
-        textareaRef.current.focus();
       }
     } catch (error) {
       console.error('[GenerateApp] Error calling sidecar:', error);
@@ -484,7 +596,8 @@ const GenerateAppScreen: React.FC = () => {
                   </div>
                 </div>
               ))}
-              {isLoading && (
+              {/* Loading indicator - only shown before assistant placeholder is added */}
+              {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                 <div className="flex gap-3">
                   <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                     <svg
@@ -503,7 +616,7 @@ const GenerateAppScreen: React.FC = () => {
                   </div>
                   <div className="flex-1">
                     <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-                      <p className="text-gray-400">Thinking...</p>
+                      <p className="text-gray-400">Starting...</p>
                     </div>
                   </div>
                 </div>
