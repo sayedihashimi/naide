@@ -7,7 +7,7 @@ import { initializeProject } from './utils/fileSystem';
 import { loadLastProject } from './utils/globalSettings';
 
 function AppRoutes() {
-  const { checkForExistingProject, loadProject, setProjectName, setProjectPath, state } = useAppContext();
+  const { checkForExistingProject, loadProject, setProjectName, setProjectPath } = useAppContext();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

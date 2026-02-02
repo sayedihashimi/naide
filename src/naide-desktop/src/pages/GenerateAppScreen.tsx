@@ -574,31 +574,6 @@ const GenerateAppScreen: React.FC = () => {
       console.error('[GenerateApp] Error selecting recent project:', error);
     }
   };
-      
-      // Update project name and load the project
-      setProjectName(newProjectName);
-      
-      // Try to load the project
-      const loaded = await loadProject(newProjectName);
-      if (loaded) {
-        console.log('[GenerateApp] Successfully loaded project:', newProjectName);
-        // Reset chat for new project
-        setChatInitialized(false);
-        setMessages(getWelcomeMessages(copilotMode));
-        // Clear conversation summary for new project
-        setConversationSummary(null);
-        
-        // Reload recent projects to update last accessed time
-        const projects = await getRecentProjects();
-        setRecentProjects(projects);
-      }
-      
-      // Close dropdown
-      setShowRecentProjects(false);
-    } catch (error) {
-      console.error('[GenerateApp] Error selecting recent project:', error);
-    }
-  };
 
   return (
     <div className="h-screen bg-zinc-950 flex flex-col">
