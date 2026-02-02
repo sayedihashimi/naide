@@ -1,3 +1,10 @@
+---
+Status: shipped
+Area: infra
+Created: 2026-02-01
+LastUpdated: 2026-02-01
+---
+
 # File Logging Feature
 
 ## Status: ✅ IMPLEMENTED

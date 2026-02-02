@@ -1,3 +1,10 @@
+---
+Status: planned
+Area: ui, planning
+Created: 2026-02-01
+LastUpdated: 2026-02-01
+---
+
 # Feature: Simplify Naide to a single chat-driven screen (Generate App only)
 
 ## Summary

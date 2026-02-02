@@ -1,8 +1,15 @@
-Title: Initial Copilot SDK + Copilot CLI integration (Planning mode only; Building/Analyzing stubbed)
+---
+Status: shipped
+Area: copilot, infra
+Created: 2026-02-01
+LastUpdated: 2026-02-01
+---
+
+# Title: Initial Copilot SDK + Copilot CLI integration (Planning mode only; Building/Analyzing stubbed)
 
 **Status**: ✅ IMPLEMENTED in PR #13
 
-Summary
+## Summary
 Add initial integration to Naide using GitHub Copilot SDK (which uses GitHub Copilot CLI in server mode). The user will install and authenticate Copilot CLI outside of Naide before launching the app. If the user submits a request in Naide and Copilot CLI is missing or not logged in, show a basic UI message telling them to install/sign in and try again.
 
 ## Implementation Summary

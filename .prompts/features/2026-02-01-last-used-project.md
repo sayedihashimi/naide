@@ -1,3 +1,10 @@
+---
+Status: planned
+Area: ui, infra
+Created: 2026-02-01
+LastUpdated: 2026-02-01
+---
+
 # Feature: Last Used Project Persistence
 **Status**: 🟡 PLANNED
 
