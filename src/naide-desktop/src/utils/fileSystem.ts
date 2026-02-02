@@ -122,14 +122,19 @@ export async function getProjectsBasePath(): Promise<string> {
 }
 
 // Get specific project path
-export async function getProjectPath(projectName: string): Promise<string> {
+export async function getProjectPath(projectName: string, actualPath?: string): Promise<string> {
+  // If actualPath is provided, use it directly (user opened an existing project)
+  if (actualPath) {
+    return actualPath;
+  }
+  // Otherwise, generate path in Documents (for new projects or legacy behavior)
   const basePath = await getProjectsBasePath();
   return await join(basePath, projectName);
 }
 
 // Initialize a new project (create directories)
-export async function initializeProject(projectName: string): Promise<void> {
-  const projectPath = await getProjectPath(projectName);
+export async function initializeProject(projectName: string, actualPath?: string): Promise<void> {
+  const projectPath = await getProjectPath(projectName, actualPath);
   
   try {
     console.log(`[FileSystem] Initializing project at: ${projectPath}`);
@@ -138,11 +143,18 @@ export async function initializeProject(projectName: string): Promise<void> {
     
     if (!projectExists) {
       // Create project directory (recursively)
-      const basePath = await getProjectsBasePath();
-      console.log(`[FileSystem] Creating base path: ${basePath}`);
-      await mkdir(basePath, { recursive: true });
-      console.log(`[FileSystem] Creating project path: ${projectPath}`);
-      await mkdir(projectPath);
+      if (actualPath) {
+        // For user-opened projects, just ensure the path exists
+        console.log(`[FileSystem] Creating project path: ${projectPath}`);
+        await mkdir(projectPath, { recursive: true });
+      } else {
+        // For generated projects, create base path first
+        const basePath = await getProjectsBasePath();
+        console.log(`[FileSystem] Creating base path: ${basePath}`);
+        await mkdir(basePath, { recursive: true });
+        console.log(`[FileSystem] Creating project path: ${projectPath}`);
+        await mkdir(projectPath);
+      }
       console.log(`[FileSystem] Project initialized successfully`);
     }
   } catch (error) {
@@ -152,14 +164,14 @@ export async function initializeProject(projectName: string): Promise<void> {
 }
 
 // Create all project files (can be empty)
-export async function createAllProjectFiles(projectName: string, initialIntent?: string): Promise<void> {
+export async function createAllProjectFiles(projectName: string, initialIntent?: string, actualPath?: string): Promise<void> {
   try {
     console.log(`[FileSystem] Creating all project files for: ${projectName}`);
     
     // Ensure project folder exists
-    await initializeProject(projectName);
+    await initializeProject(projectName, actualPath);
     
-    const projectPath = await getProjectPath(projectName);
+    const projectPath = await getProjectPath(projectName, actualPath);
     
     // Define all files
     const files = [
@@ -205,10 +217,11 @@ export async function createAllProjectFiles(projectName: string, initialIntent?:
 export async function saveSectionToFile(
   projectName: string,
   filename: string,
-  content: string
+  content: string,
+  actualPath?: string
 ): Promise<void> {
   try {
-    const projectPath = await getProjectPath(projectName);
+    const projectPath = await getProjectPath(projectName, actualPath);
     const filePath = await join(projectPath, filename);
     console.log(`[FileSystem] Saving ${filename} to: ${filePath}`);
     console.log(`[FileSystem] Content length: ${content.length} characters`);
@@ -223,10 +236,11 @@ export async function saveSectionToFile(
 // Read section content from file
 export async function readSectionFromFile(
   projectName: string,
-  filename: string
+  filename: string,
+  actualPath?: string
 ): Promise<string> {
   try {
-    const projectPath = await getProjectPath(projectName);
+    const projectPath = await getProjectPath(projectName, actualPath);
     const filePath = await join(projectPath, filename);
     
     const fileExists = await exists(filePath);
@@ -308,9 +322,9 @@ export function parseMarkdownFile(content: string): Record<string, string> {
 }
 
 // Check if a project exists
-export async function checkProjectExists(projectName: string): Promise<boolean> {
+export async function checkProjectExists(projectName: string, actualPath?: string): Promise<boolean> {
   try {
-    const projectPath = await getProjectPath(projectName);
+    const projectPath = await getProjectPath(projectName, actualPath);
     return await exists(projectPath);
   } catch (error) {
     console.error('Error checking project existence:', error);
@@ -319,7 +333,7 @@ export async function checkProjectExists(projectName: string): Promise<boolean> 
 }
 
 // Load all project data from files
-export async function loadProjectData(projectName: string): Promise<Record<string, Record<string, string>>> {
+export async function loadProjectData(projectName: string, actualPath?: string): Promise<Record<string, Record<string, string>>> {
   const allSections: Record<string, Record<string, string>> = {};
   
   const fileMapping: Record<string, string> = {
@@ -335,7 +349,7 @@ export async function loadProjectData(projectName: string): Promise<Record<strin
     for (const [section, filename] of Object.entries(fileMapping)) {
       if (filename.endsWith('.json')) {
         // Load JSON file
-        const content = await readSectionFromFile(projectName, filename);
+        const content = await readSectionFromFile(projectName, filename, actualPath);
         if (content) {
           try {
             allSections[section] = JSON.parse(content);
@@ -348,7 +362,7 @@ export async function loadProjectData(projectName: string): Promise<Record<strin
         }
       } else {
         // Load and parse markdown file
-        const content = await readSectionFromFile(projectName, filename);
+        const content = await readSectionFromFile(projectName, filename, actualPath);
         if (content) {
           allSections[section] = parseMarkdownFile(content);
         } else {

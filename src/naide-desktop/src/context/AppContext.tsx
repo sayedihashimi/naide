@@ -14,6 +14,7 @@ import { saveLastProject } from '../utils/globalSettings';
 interface AppState {
   sections: Record<string, Record<string, string>>;
   projectName: string;
+  projectPath: string | null; // Actual opened project directory path
   projectLoaded: boolean;
 }
 
@@ -22,8 +23,9 @@ interface AppContextType {
   updateSectionAnswer: (section: string, questionId: string, value: string) => void;
   getSectionAnswer: (section: string, questionId: string) => string;
   setProjectName: (name: string) => void;
+  setProjectPath: (path: string | null) => void;
   saveProject: () => Promise<void>;
-  loadProject: (projectName: string) => Promise<boolean>;
+  loadProject: (projectPath: string) => Promise<boolean>;
   checkForExistingProject: () => Promise<boolean>;
 }
 
@@ -46,20 +48,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [state, setState] = useState<AppState>({
     sections: {},
     projectName: 'MyApp',
+    projectPath: null, // Will be set when user opens a project
     projectLoaded: false,
   });
 
-  // Initialize project on mount
+  // Initialize project on mount (only if projectPath is set)
   useEffect(() => {
     const init = async () => {
       try {
-        await initializeProject(state.projectName);
+        if (state.projectPath) {
+          await initializeProject(state.projectName, state.projectPath);
+        }
       } catch (error) {
         console.error('Failed to initialize project:', error);
       }
     };
     init();
-  }, [state.projectName]);
+  }, [state.projectName, state.projectPath]);
 
   const updateSectionAnswer = useCallback((section: string, questionId: string, value: string) => {
     setState(prev => ({
@@ -82,10 +87,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setState(prev => ({ ...prev, projectName: name }));
   }, []);
 
+  const setProjectPath = useCallback((path: string | null) => {
+    setState(prev => ({ ...prev, projectPath: path }));
+  }, []);
+
   const saveProject = useCallback(async () => {
     try {
       console.log('[AppContext] Starting saveProject for:', state.projectName);
+      console.log('[AppContext] Project path:', state.projectPath);
       console.log('[AppContext] Sections to save:', Object.keys(state.sections));
+      
+      // Use projectPath if available, otherwise fall back to generated path
+      const projectPath = state.projectPath || await getProjectPath(state.projectName);
       
       // We'll need to pass section questions from the component
       // For now, save the raw data and format it simply
@@ -96,7 +109,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (filename.endsWith('.json')) {
           // For JSON files (like Tasks.json), save as JSON
           const content = JSON.stringify(sectionData, null, 2);
-          await saveSectionToFile(state.projectName, filename, content);
+          await saveSectionToFile(state.projectName, filename, content, projectPath);
         } else {
           // For markdown files, format with question IDs as headings
           let markdown = `# ${section}\n\n`;
@@ -114,13 +127,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
           // Add footer to markdown files
           const markdownWithFooter = addMarkdownFooter(markdown);
-          await saveSectionToFile(state.projectName, filename, markdownWithFooter);
+          await saveSectionToFile(state.projectName, filename, markdownWithFooter, projectPath);
         }
       }
       console.log('[AppContext] saveProject completed successfully');
       
       // Update config with last used project
-      const projectPath = await getProjectPath(state.projectName);
       await updateLastUsedProject(projectPath);
       console.log('[AppContext] Updated last used project in config');
       
@@ -131,20 +143,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error('[AppContext] Error saving project:', error);
       throw error;
     }
-  }, [state.projectName, state.sections]);
+  }, [state.projectName, state.projectPath, state.sections]);
 
-  const loadProject = useCallback(async (projectName: string): Promise<boolean> => {
+  const loadProject = useCallback(async (projectPath: string): Promise<boolean> => {
     try {
-      const projectExists = await checkProjectExists(projectName);
+      // Extract project name from path
+      const pathParts = projectPath.split(/[/\\]/);
+      const projectName = pathParts[pathParts.length - 1];
+      
+      const projectExists = await checkProjectExists(projectName, projectPath);
       if (!projectExists) {
-        console.log(`Project ${projectName} does not exist`);
+        console.log(`Project ${projectName} at ${projectPath} does not exist`);
         return false;
       }
 
-      const projectData = await loadProjectData(projectName);
+      const projectData = await loadProjectData(projectName, projectPath);
       setState(prev => ({
         ...prev,
         projectName,
+        projectPath,
         sections: projectData,
         projectLoaded: true,
       }));
@@ -158,18 +175,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const checkForExistingProject = useCallback(async (): Promise<boolean> => {
     try {
-      return await checkProjectExists(state.projectName);
+      const projectPath = state.projectPath || await getProjectPath(state.projectName);
+      return await checkProjectExists(state.projectName, projectPath);
     } catch (error) {
       console.error('Error checking for existing project:', error);
       return false;
     }
-  }, [state.projectName]);
+  }, [state.projectName, state.projectPath]);
 
   const value: AppContextType = {
     state,
     updateSectionAnswer,
     getSectionAnswer,
     setProjectName,
+    setProjectPath,
     saveProject,
     loadProject,
     checkForExistingProject,

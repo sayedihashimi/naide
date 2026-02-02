@@ -21,20 +21,20 @@ export interface ChatSession {
 }
 
 // Get the .naide directory path within a project
-async function getProjectNaideDir(projectName: string): Promise<string> {
-  const projectPath = await getProjectPath(projectName);
+async function getProjectNaideDir(projectName: string, actualPath?: string): Promise<string> {
+  const projectPath = await getProjectPath(projectName, actualPath);
   return await join(projectPath, '.naide');
 }
 
 // Get the chat sessions directory path
-async function getChatSessionsDir(projectName: string): Promise<string> {
-  const naideDir = await getProjectNaideDir(projectName);
+async function getChatSessionsDir(projectName: string, actualPath?: string): Promise<string> {
+  const naideDir = await getProjectNaideDir(projectName, actualPath);
   return await join(naideDir, 'chatsessions');
 }
 
 // Get the project config file path (in .naide folder)
-async function getProjectConfigPath(projectName: string): Promise<string> {
-  const naideDir = await getProjectNaideDir(projectName);
+async function getProjectConfigPath(projectName: string, actualPath?: string): Promise<string> {
+  const naideDir = await getProjectNaideDir(projectName, actualPath);
   return await join(naideDir, 'project-config.json');
 }
 
@@ -44,9 +44,9 @@ function getDefaultChatSessionFilename(): string {
 }
 
 // Load project config (tracks last used chat session)
-async function loadProjectConfig(projectName: string): Promise<{ lastChatSession: string | null }> {
+async function loadProjectConfig(projectName: string, actualPath?: string): Promise<{ lastChatSession: string | null }> {
   try {
-    const configPath = await getProjectConfigPath(projectName);
+    const configPath = await getProjectConfigPath(projectName, actualPath);
     const configExists = await exists(configPath);
     
     if (!configExists) {
@@ -65,9 +65,9 @@ async function loadProjectConfig(projectName: string): Promise<{ lastChatSession
 }
 
 // Save project config
-async function saveProjectConfig(projectName: string, config: { lastChatSession: string | null }): Promise<void> {
+async function saveProjectConfig(projectName: string, config: { lastChatSession: string | null }, actualPath?: string): Promise<void> {
   try {
-    const naideDir = await getProjectNaideDir(projectName);
+    const naideDir = await getProjectNaideDir(projectName, actualPath);
     const naideDirExists = await exists(naideDir);
     
     if (!naideDirExists) {
@@ -75,7 +75,7 @@ async function saveProjectConfig(projectName: string, config: { lastChatSession:
       await mkdir(naideDir, { recursive: true });
     }
     
-    const configPath = await getProjectConfigPath(projectName);
+    const configPath = await getProjectConfigPath(projectName, actualPath);
     const content = JSON.stringify(config, null, 2);
     console.log('[ChatPersistence] Saving project config to:', configPath);
     await writeTextFile(configPath, content);
@@ -87,17 +87,17 @@ async function saveProjectConfig(projectName: string, config: { lastChatSession:
 }
 
 // Load chat session
-export async function loadChatSession(projectName: string, sessionFilename?: string): Promise<ChatMessage[]> {
+export async function loadChatSession(projectName: string, sessionFilename?: string, actualPath?: string): Promise<ChatMessage[]> {
   try {
     // Determine which session to load
     let filename = sessionFilename;
     if (!filename) {
       // Check project config for last used session
-      const config = await loadProjectConfig(projectName);
+      const config = await loadProjectConfig(projectName, actualPath);
       filename = config.lastChatSession || getDefaultChatSessionFilename();
     }
     
-    const chatSessionsDir = await getChatSessionsDir(projectName);
+    const chatSessionsDir = await getChatSessionsDir(projectName, actualPath);
     const sessionPath = await join(chatSessionsDir, filename);
     
     const sessionExists = await exists(sessionPath);
@@ -120,13 +120,14 @@ export async function loadChatSession(projectName: string, sessionFilename?: str
 export async function saveChatSession(
   projectName: string,
   messages: ChatMessage[],
-  sessionFilename?: string
+  sessionFilename?: string,
+  actualPath?: string
 ): Promise<void> {
   try {
     const filename = sessionFilename || getDefaultChatSessionFilename();
     
     // Ensure chat sessions directory exists
-    const chatSessionsDir = await getChatSessionsDir(projectName);
+    const chatSessionsDir = await getChatSessionsDir(projectName, actualPath);
     const chatSessionsDirExists = await exists(chatSessionsDir);
     
     if (!chatSessionsDirExists) {
@@ -165,7 +166,7 @@ export async function saveChatSession(
     console.log('[ChatPersistence] Chat session saved successfully');
     
     // Update project config with last used session
-    await saveProjectConfig(projectName, { lastChatSession: filename });
+    await saveProjectConfig(projectName, { lastChatSession: filename }, actualPath);
   } catch (error) {
     console.error('[ChatPersistence] Error saving chat session:', error);
     throw error;
@@ -173,9 +174,9 @@ export async function saveChatSession(
 }
 
 // List all chat sessions for a project
-export async function listChatSessions(projectName: string): Promise<string[]> {
+export async function listChatSessions(projectName: string, actualPath?: string): Promise<string[]> {
   try {
-    const chatSessionsDir = await getChatSessionsDir(projectName);
+    const chatSessionsDir = await getChatSessionsDir(projectName, actualPath);
     const dirExists = await exists(chatSessionsDir);
     
     if (!dirExists) {
@@ -207,7 +208,8 @@ export async function archiveChatSession(
   projectName: string,
   messages: ChatMessage[],
   mode?: string,
-  summary?: unknown
+  summary?: unknown,
+  actualPath?: string
 ): Promise<string | null> {
   try {
     // Filter out welcome messages (they have IDs starting with 'welcome-')
@@ -227,7 +229,7 @@ export async function archiveChatSession(
     const filename = `${chatId}.json`;
     
     // Ensure chat sessions directory exists
-    const chatSessionsDir = await getChatSessionsDir(projectName);
+    const chatSessionsDir = await getChatSessionsDir(projectName, actualPath);
     const chatSessionsDirExists = await exists(chatSessionsDir);
     
     if (!chatSessionsDirExists) {
