@@ -14,6 +14,19 @@ struct SidecarState {
     process: Option<Child>,
 }
 
+// Tauri command: Log from frontend to backend log file
+#[tauri::command]
+async fn log_to_file(level: String, message: String) -> Result<(), String> {
+    match level.as_str() {
+        "info" => log::info!("{}", message),
+        "error" => log::error!("{}", message),
+        "warn" => log::warn!("{}", message),
+        "debug" => log::debug!("{}", message),
+        _ => log::info!("{}", message),
+    }
+    Ok(())
+}
+
 // Tauri command: Save the last used project path
 #[tauri::command]
 async fn save_last_project(app: tauri::AppHandle, path: String) -> Result<(), String> {
@@ -241,7 +254,8 @@ pub fn run() {
       clear_last_project,
       get_settings_file_path,
       get_recent_projects,
-      add_recent_project_cmd
+      add_recent_project_cmd,
+      log_to_file
     ])
     .on_window_event(|_window, event| {
       // Clean up sidecar on app exit
