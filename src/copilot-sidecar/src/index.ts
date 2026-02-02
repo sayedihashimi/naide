@@ -174,9 +174,9 @@ Only include non-empty arrays. The openQuestions array should contain the CURREN
   }
 }
 
-// Load learnings from .naide/learnings/
+// Load learnings from .prompts/learnings/
 async function loadLearnings(workspaceRoot: string): Promise<string> {
-  const learningsDir = join(workspaceRoot, '.naide', 'learnings');
+  const learningsDir = join(workspaceRoot, '.prompts', 'learnings');
   
   if (!existsSync(learningsDir)) {
     return '';
@@ -338,7 +338,7 @@ function addMarkdownFooter(content: string): string {
 // Write a learning entry
 // Note: This function is defined for future use when automatic learnings capture is implemented
 function writeLearning(workspaceRoot: string, category: string, content: string): void {
-  const learningsDir = join(workspaceRoot, '.naide', 'learnings');
+  const learningsDir = join(workspaceRoot, '.prompts', 'learnings');
   
   // Create directory if it doesn't exist
   if (!existsSync(learningsDir)) {

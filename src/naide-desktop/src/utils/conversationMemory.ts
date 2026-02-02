@@ -4,7 +4,7 @@
  * Implements the three-layer memory model:
  * 1. Short-Term: Rolling buffer of recent messages (6-10 messages)
  * 2. Mid-Term: Conversation summary (decisions, constraints, open questions)
- * 3. Long-Term: Repo files (.prompts/**, .naide/learnings/**)
+ * 3. Long-Term: Repo files (.prompts/**)
  * 
  * This module handles short-term and mid-term memory.
  * Long-term memory is handled via file system operations.
