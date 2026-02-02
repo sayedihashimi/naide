@@ -25,6 +25,7 @@ interface AppContextType {
   setProjectName: (name: string) => void;
   setProjectPath: (path: string | null) => void;
   saveProject: () => Promise<void>;
+  /** Load a project from the specified directory path */
   loadProject: (projectPath: string) => Promise<boolean>;
   checkForExistingProject: () => Promise<boolean>;
 }

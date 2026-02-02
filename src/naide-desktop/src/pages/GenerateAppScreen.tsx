@@ -566,6 +566,7 @@ const GenerateAppScreen: React.FC = () => {
         setConversationSummary(null);
       } else {
         console.log('[GenerateApp] Project not found at path:', projectPath);
+        console.log('[GenerateApp] A new project structure will be created on first interaction');
       }
       
       // Close dropdown
