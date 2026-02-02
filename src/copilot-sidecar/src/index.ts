@@ -522,8 +522,10 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       // Create a new session for streaming
       console.log('[Sidecar] Creating new Copilot session for streaming Planning mode');
+      console.log(`[Sidecar] Workspace directory: ${workspace}`);
       const session = await copilotClient!.createSession({
         model: 'gpt-4o',
+        workingDirectory: workspace,
         systemMessage: {
           content: fullSystemPrompt
         },
@@ -800,8 +802,10 @@ app.post('/api/copilot/chat', async (req, res) => {
       
       // Create a new session for each request to avoid conflicts
       console.log('[Sidecar] Creating new Copilot session for Planning mode');
+      console.log(`[Sidecar] Workspace directory: ${workspace}`);
       const session = await copilotClient!.createSession({
         model: 'gpt-4o',
+        workingDirectory: workspace,
         systemMessage: {
           content: fullSystemPrompt
         },
