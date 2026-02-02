@@ -163,7 +163,7 @@ Update specs to reflect streaming behavior:
 ---
 
 ## Related Files
-- .prompts/features/add-copilot-integration.md
-- .prompts/features/conversation-memory.md
+- .prompts/features/2026-02-01-add-copilot-integration.md
+- .prompts/features/2026-02-01-conversation-memory.md
 - .prompts/system/base.system.md
 - .prompts/system/planning.system.md
