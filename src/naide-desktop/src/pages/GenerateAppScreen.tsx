@@ -12,6 +12,7 @@ import MessageContent from '../components/MessageContent';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, type LastProject } from '../utils/globalSettings';
+import { logInfo, logError } from '../utils/logger';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -97,24 +98,21 @@ const GenerateAppScreen: React.FC = () => {
   useEffect(() => {
     const loadChat = async () => {
       try {
-        console.log('[GenerateApp] Loading chat session for:', { 
-          projectName: state.projectName, 
-          projectPath: state.projectPath 
-        });
+        logInfo(`[GenerateApp] Loading chat session for: projectName=${state.projectName}, projectPath=${state.projectPath}`);
         const { loadChatSession } = await import('../utils/chatPersistence');
         const loadedMessages = await loadChatSession(state.projectName, undefined, state.projectPath || undefined);
         if (loadedMessages.length > 0) {
-          console.log('[GenerateApp] Loaded', loadedMessages.length, 'messages from chat session');
+          logInfo(`[GenerateApp] Loaded ${loadedMessages.length} messages from chat session`);
           setMessages(loadedMessages);
           setChatInitialized(true);
         } else {
-          console.log('[GenerateApp] No existing chat session found, initializing with welcome messages');
+          logInfo('[GenerateApp] No existing chat session found, initializing with welcome messages');
           // Initialize with welcome messages based on mode
           setMessages(getWelcomeMessages(copilotMode));
           // Don't set chatInitialized yet - wait for user interaction
         }
       } catch (error) {
-        console.error('[GenerateApp] Error loading chat:', error);
+        logError(`[GenerateApp] Error loading chat: ${error}`);
         // Fallback to welcome messages
         setMessages(getWelcomeMessages(copilotMode));
       }
@@ -128,15 +126,12 @@ const GenerateAppScreen: React.FC = () => {
     if (messages.length > 0 && chatInitialized) {
       const saveChat = async () => {
         try {
-          console.log('[GenerateApp] Saving chat session with', messages.length, 'messages for:', {
-            projectName: state.projectName,
-            projectPath: state.projectPath
-          });
+          logInfo(`[GenerateApp] Saving chat session with ${messages.length} messages for: projectName=${state.projectName}, projectPath=${state.projectPath}`);
           const { saveChatSession } = await import('../utils/chatPersistence');
           await saveChatSession(state.projectName, messages, undefined, state.projectPath || undefined);
-          console.log('[GenerateApp] Chat session saved successfully');
+          logInfo('[GenerateApp] Chat session saved successfully');
         } catch (error) {
-          console.error('[GenerateApp] Error saving chat:', error);
+          logError(`[GenerateApp] Error saving chat: ${error}`);
         }
       };
       // Debounce save to avoid excessive writes
