@@ -97,6 +97,12 @@ When you create or update a feature file under `.prompts/features/**`, it MUST i
 
 Feature files must be detailed enough that Copilot could implement them without re-asking basic questions.
 
+**CRITICAL FILE NAMING:**
+- ALL feature files MUST be named: `YYYY-MM-DD-description.md` (using current date)
+- ALL bug files MUST be named: `YYYY-MM-DD-description.md` (using current date)
+- Use ISO 8601 date format (e.g., `2026-02-02`)
+- Examples: `.prompts/features/2026-02-02-new-feature.md`, `.prompts/features/bugs/2026-02-02-fix-issue.md`
+
 ---
 
 ## PLAN SUMMARY (REQUIRED WHEN FILES CHANGE)

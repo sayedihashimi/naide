@@ -19,3 +19,26 @@ A bug fix file (`fix-naide-folder-location.md`) was initially created directly i
 **Quick reference:**
 - ✅ Correct: `.prompts/features/bugs/2026-02-02-fix-something.md`
 - ❌ Incorrect: `.prompts/features/2026-02-02-fix-something.md`
+
+---
+
+## Date Prefix Enforcement (2026-02-02)
+
+**What happened:**
+The AI was sometimes creating feature and bug files without the required date prefix (e.g., `feature-name.md` instead of `2026-02-02-feature-name.md`), even though the naming convention was documented in bug handling conventions.
+
+**Why it mattered:**
+- Date prefixes provide chronological ordering and context
+- They prevent filename collisions
+- They make it easy to identify when features/bugs were created
+- This convention is critical for project organization and is documented in `.prompts/features/2026-02-02-bug-handling-conventions.md`
+- Without explicit enforcement in system prompts, the AI may miss this requirement
+
+**What to do next time:**
+- **ALWAYS** prefix feature and bug filenames with current date: `YYYY-MM-DD-description.md`
+- Check system prompts (`base.system.md` and `planning.system.md`) to ensure naming conventions are explicit
+- When creating files in `.prompts/features/**` or `.prompts/features/bugs/**`, verify the filename follows the pattern
+- Use ISO 8601 date format (e.g., `2026-02-02`)
+
+**Key principle:**
+If a naming convention is critical but not enforced, add it explicitly to system prompts where file creation is instructed.
