@@ -1,3 +1,10 @@
+---
+Status: planned
+Area: ui
+Created: 2026-02-01
+LastUpdated: 2026-02-01
+---
+
 # Feature: Replace left nav with Planning / Building / Analyzing tabs (remove mode dropdown)
 
 ## Summary

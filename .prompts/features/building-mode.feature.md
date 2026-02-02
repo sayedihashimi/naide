@@ -1,3 +1,10 @@
+---
+Status: in-progress
+Area: copilot, planning
+Created: 2026-02-01
+LastUpdated: 2026-02-01
+---
+
 # Feature: Building Mode Implementation
 **Status**: 🔵 IN PROGRESS
 

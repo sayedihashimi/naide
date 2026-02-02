@@ -1,3 +1,10 @@
+---
+Status: planned
+Area: chat, copilot
+Created: 2026-02-01
+LastUpdated: 2026-02-01
+---
+
 # Feature: Stream Copilot Responses in Chat
 
 ## Summary
