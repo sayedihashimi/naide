@@ -12,6 +12,7 @@ import MessageContent from '../components/MessageContent';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, type LastProject } from '../utils/globalSettings';
+import { logInfo, logError } from '../utils/logger';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -77,7 +78,7 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
 };
 
 const GenerateAppScreen: React.FC = () => {
-  const { state, setProjectName, loadProject } = useAppContext();
+  const { state, setProjectName, setProjectPath, loadProject } = useAppContext();
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -97,42 +98,47 @@ const GenerateAppScreen: React.FC = () => {
   useEffect(() => {
     const loadChat = async () => {
       try {
+        logInfo(`[GenerateApp] Loading chat session for: projectName=${state.projectName}, projectPath=${state.projectPath}`);
         const { loadChatSession } = await import('../utils/chatPersistence');
-        const loadedMessages = await loadChatSession(state.projectName);
+        const loadedMessages = await loadChatSession(state.projectName, undefined, state.projectPath || undefined);
         if (loadedMessages.length > 0) {
+          logInfo(`[GenerateApp] Loaded ${loadedMessages.length} messages from chat session`);
           setMessages(loadedMessages);
           setChatInitialized(true);
         } else {
+          logInfo('[GenerateApp] No existing chat session found, initializing with welcome messages');
           // Initialize with welcome messages based on mode
           setMessages(getWelcomeMessages(copilotMode));
           // Don't set chatInitialized yet - wait for user interaction
         }
       } catch (error) {
-        console.error('[GenerateApp] Error loading chat:', error);
+        logError(`[GenerateApp] Error loading chat: ${error}`);
         // Fallback to welcome messages
         setMessages(getWelcomeMessages(copilotMode));
       }
     };
     loadChat();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.projectName]); // copilotMode intentionally excluded - mode changes are handled by handleModeChange
+  }, [state.projectName, state.projectPath]); // copilotMode intentionally excluded - mode changes are handled by handleModeChange
 
   // Save chat when messages change (but only after initialization with user messages)
   useEffect(() => {
     if (messages.length > 0 && chatInitialized) {
       const saveChat = async () => {
         try {
+          logInfo(`[GenerateApp] Saving chat session with ${messages.length} messages for: projectName=${state.projectName}, projectPath=${state.projectPath}`);
           const { saveChatSession } = await import('../utils/chatPersistence');
-          await saveChatSession(state.projectName, messages);
+          await saveChatSession(state.projectName, messages, undefined, state.projectPath || undefined);
+          logInfo('[GenerateApp] Chat session saved successfully');
         } catch (error) {
-          console.error('[GenerateApp] Error saving chat:', error);
+          logError(`[GenerateApp] Error saving chat: ${error}`);
         }
       };
       // Debounce save to avoid excessive writes
       const timer = setTimeout(saveChat, 500);
       return () => clearTimeout(timer);
     }
-  }, [messages, state.projectName, chatInitialized]);
+  }, [messages, state.projectName, state.projectPath, chatInitialized]);
 
   // Load recent projects on mount
   useEffect(() => {
@@ -222,7 +228,7 @@ const GenerateAppScreen: React.FC = () => {
 
       // For Planning mode, call the sidecar with streaming
       // Get the project path to use as workspace root
-      const projectPath = await getProjectPath(state.projectName);
+      const projectPath = state.projectPath || await getProjectPath(state.projectName);
       
       // Build conversation context for memory (short-term + mid-term)
       // Include all messages EXCEPT the one we just added (recentMessages are for context)
@@ -461,7 +467,8 @@ const GenerateAppScreen: React.FC = () => {
           state.projectName,
           messages,
           copilotMode,
-          conversationSummary
+          conversationSummary,
+          state.projectPath || undefined
         );
         
         if (archivedId) {
@@ -487,7 +494,7 @@ const GenerateAppScreen: React.FC = () => {
   const handleOpenProjectFolder = async () => {
     try {
       // Get the current project path
-      const projectPath = await getProjectPath(state.projectName);
+      const projectPath = state.projectPath || await getProjectPath(state.projectName);
       
       // Open folder selection dialog
       const selectedPath = await open({
@@ -508,11 +515,12 @@ const GenerateAppScreen: React.FC = () => {
         const pathParts = selectedPath.split(/[/\\]/);
         const newProjectName = pathParts[pathParts.length - 1];
         
-        // Update project name and load the project
+        // Update project name and path
         setProjectName(newProjectName);
+        setProjectPath(selectedPath);
         
         // Try to load the project
-        const loaded = await loadProject(newProjectName);
+        const loaded = await loadProject(selectedPath);
         if (loaded) {
           console.log('[GenerateApp] Successfully loaded project:', newProjectName);
           // Reset chat for new project
@@ -549,11 +557,12 @@ const GenerateAppScreen: React.FC = () => {
       const pathParts = projectPath.split(/[/\\]/);
       const newProjectName = pathParts[pathParts.length - 1];
       
-      // Update project name and load the project
+      // Update project name and path
       setProjectName(newProjectName);
+      setProjectPath(projectPath);
       
       // Try to load the project
-      const loaded = await loadProject(newProjectName);
+      const loaded = await loadProject(projectPath);
       if (loaded) {
         console.log('[GenerateApp] Successfully loaded project:', newProjectName);
         // Reset chat for new project
@@ -561,10 +570,9 @@ const GenerateAppScreen: React.FC = () => {
         setMessages(getWelcomeMessages(copilotMode));
         // Clear conversation summary for new project
         setConversationSummary(null);
-        
-        // Reload recent projects to update last accessed time
-        const projects = await getRecentProjects();
-        setRecentProjects(projects);
+      } else {
+        console.log('[GenerateApp] Project not found at path:', projectPath);
+        console.log('[GenerateApp] A new project structure will be created on first interaction');
       }
       
       // Close dropdown

@@ -5,53 +5,48 @@ import GenerateAppScreen from './pages/GenerateAppScreen';
 import { useEffect, useState } from 'react';
 import { initializeProject } from './utils/fileSystem';
 import { loadLastProject } from './utils/globalSettings';
+import { logInfo, logError } from './utils/logger';
 
 function AppRoutes() {
-  const { checkForExistingProject, loadProject, setProjectName, state } = useAppContext();
+  const { checkForExistingProject, loadProject, setProjectName, setProjectPath } = useAppContext();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
         // Load last used project from global settings
-        console.log('[App] Loading last project from global settings...');
+        logInfo('[App] Loading last project from global settings...');
         const lastProjectPath = await loadLastProject();
-        console.log('[App] Last project path:', lastProjectPath);
+        logInfo(`[App] Last project path: ${lastProjectPath}`);
         
         if (lastProjectPath) {
           // Extract project name from path (handle both / and \ separators)
           const parts = lastProjectPath.split(/[\\/]/);
           const projectName = parts[parts.length - 1];
-          console.log('[App] Last used project:', projectName);
+          logInfo(`[App] Last used project: ${projectName}`);
           
-          // Set project name
+          // Set project name and path
           setProjectName(projectName);
+          setProjectPath(lastProjectPath);
           
           // Check if project exists and load it
           const exists = await checkForExistingProject();
           if (exists) {
-            await loadProject(projectName);
-            console.log('[App] Loaded last used project:', projectName);
+            await loadProject(lastProjectPath);
+            logInfo(`[App] Loaded last used project: ${projectName}`);
           } else {
             // Path was valid but project structure may be incomplete
             // Initialize project directory
-            console.log('[App] Initializing project directory for:', projectName);
-            await initializeProject(projectName);
+            logInfo(`[App] Initializing project directory for: ${projectName}`);
+            await initializeProject(projectName, lastProjectPath);
           }
         } else {
-          console.log('[App] No valid last project found');
-          // Check for default project
-          const exists = await checkForExistingProject();
-          if (exists) {
-            await loadProject(state.projectName);
-          } else {
-            // Initialize default project directory only (no files)
-            console.log('[App] Initializing default project directory');
-            await initializeProject(state.projectName);
-          }
+          logInfo('[App] No valid last project found');
+          // No project opened yet - user will need to open one
+          // Don't create default project in Documents
         }
       } catch (error) {
-        console.error('[App] Error initializing app:', error);
+        logError(`[App] Error initializing app: ${error}`);
       } finally {
         setLoading(false);
       }

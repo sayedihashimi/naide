@@ -2,6 +2,151 @@
 
 This document tracks updates made to specification files based on merged PRs.
 
+## 2026-02-02: Chat Persistence Fix & Logging Infrastructure
+
+### Overview
+Fixed critical bug where chat sessions weren't persisting and implemented comprehensive logging infrastructure. The `.naide` folder was being created in the Documents directory instead of user-opened project directories, and Tauri's security model was blocking file access.
+
+### Root Causes Identified
+
+1. **Incorrect Path Handling**: App stored only project name, not actual opened project path
+2. **Missing Permissions**: Tauri 2.x blocked file access to user-selected directories
+3. **Invisible Diagnostics**: Frontend logs didn't appear in Tauri log file
+
+### Changes Made
+
+#### 1. State Management & Path Handling
+**Files**: `AppContext.tsx`, `GenerateAppScreen.tsx`, `App.tsx`
+- Added `projectPath: string | null` to AppState to track actual opened directory
+- Added `setProjectPath()` function to AppContextType
+- Updated `loadProject()` to accept `projectPath` parameter instead of just name
+- Pass actual project path through entire application flow
+
+#### 2. File System Functions
+**Files**: `fileSystem.ts`, `chatPersistence.ts`
+- Added optional `actualPath?: string` parameter to all functions
+- Modified `getProjectPath()` to return actual path if provided, else generate in Documents
+- Updated all persistence functions: `loadChatSession()`, `saveChatSession()`, `archiveChatSession()`
+- Updated all file operations: `initializeProject()`, `saveSectionToFile()`, `readSectionFromFile()`, etc.
+
+#### 3. Logging Infrastructure
+**Files**: `logger.ts` (new), `lib.rs`
+
+Created command-based logging system:
+```rust
+// Backend command
+#[tauri::command]
+async fn log_to_file(level: String, message: String) -> Result<(), String> {
+    match level.as_str() {
+        "info" => log::info!("{}", message),
+        "error" => log::error!("{}", message),
+        "warn" => log::warn!("{}", message),
+        "debug" => log::debug!("{}", message),
+        _ => log::info!("{}", message),
+    }
+    Ok(())
+}
+```
+
+```typescript
+// Frontend utility
+export function logInfo(message: string, ...args: unknown[]): void {
+  console.log(message, ...args);  // DevTools
+  invoke('log_to_file', { level: 'info', message });  // Log file
+}
+```
+
+Instrumented critical paths:
+- `App.tsx` - Application initialization
+- `GenerateAppScreen.tsx` - Chat lifecycle
+- `chatPersistence.ts` - Read/write operations
+
+#### 4. Tauri Permissions Fix
+**File**: `src-tauri/capabilities/default.json`
+
+Fixed file system permissions to allow access to user-selected directories:
+```json
+{
+  "permissions": [
+    "fs:default",
+    {
+      "identifier": "fs:scope",
+      "allow": [{ "path": "**" }]  // Wildcard pattern for any user-selected path
+    },
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-exists",
+    "fs:allow-mkdir",
+    "fs:allow-read-dir",
+    "dialog:default"
+  ]
+}
+```
+
+**Key Insight**: `fs:scope` permission alone doesn't grant access - you must explicitly define path patterns. The wildcard `**` is appropriate for dev tools that need access to user-selected project directories.
+
+#### 5. Configuration
+**File**: `.gitignore`
+- Added `.naide/` to prevent committing project-local state
+
+**File**: `tauri.conf.json`
+- Removed invalid `devTools` property (auto-enabled in Tauri 2.x dev mode)
+- Removed invalid `withGlobalTauri` property
+
+### Spec Files Updated
+
+- `.prompts/features/2026-02-01-fix-naide-folder-location.md`: Marked as IMPLEMENTED, added detailed implementation notes
+- `.prompts/features/FEATURES_INDEX.md`: Updated status to "shipped"
+- `.prompts/SPEC_CHANGELOG.md`: This entry
+
+### Key Learnings
+
+#### Tauri 2.x File System Permissions
+1. **Default Behavior**: Tauri blocks all file access by default for security
+2. **Scope Requirement**: `fs:scope` permission needs explicit `allow` patterns
+3. **Wildcard Pattern**: Use `{ "path": "**" }` for broad access (appropriate for dev tools)
+4. **Dialog Integration**: Dialog-selected paths need scope to be accessible
+5. **Security Model**: User-selected directories via dialog is considered safe access
+
+#### Frontend Logging in Tauri
+1. **console.log Limitation**: Only visible in DevTools, not in Tauri log file
+2. **Plugin API Issues**: `@tauri-apps/plugin-log` async calls failed silently
+3. **Command Approach**: Using Tauri commands (`invoke('log_to_file')`) is more reliable
+4. **TargetKind::Webview**: Captures console output but not plugin API calls
+5. **Test Environment**: Need graceful handling when Tauri is unavailable
+
+#### Path Management
+1. **State Tracking**: Store both project name AND actual path
+2. **Fallback Pattern**: Use actual path if available, else generate in Documents
+3. **Parameter Threading**: Pass `actualPath` through entire function call chain
+4. **Backward Compatibility**: Maintain fallback to Documents for legacy behavior
+
+#### Debugging Best Practices
+1. **Comprehensive Logging**: Log function entry with all parameters
+2. **Path Visibility**: Always log full resolved file paths
+3. **Operation Results**: Log success/failure with details
+4. **Error Context**: Include operation context in error messages
+
+### Files Modified (Full List)
+- `src/naide-desktop/src/context/AppContext.tsx`
+- `src/naide-desktop/src/pages/GenerateAppScreen.tsx`
+- `src/naide-desktop/src/App.tsx`
+- `src/naide-desktop/src/utils/fileSystem.ts`
+- `src/naide-desktop/src/utils/chatPersistence.ts`
+- `src/naide-desktop/src/utils/logger.ts` (new)
+- `src/naide-desktop/src/utils/permissions.ts` (new, placeholder)
+- `src/naide-desktop/src-tauri/src/lib.rs`
+- `src/naide-desktop/src-tauri/capabilities/default.json`
+- `src/naide-desktop/src-tauri/tauri.conf.json`
+- `.gitignore`
+
+### Test Coverage
+- Added 2 new tests for `getProjectPath()` behavior with actual paths
+- All 100 tests pass
+- No breaking changes to existing functionality
+
+---
+
 ## 2026-01-31: Conversation Memory & Context Management
 
 ### Overview

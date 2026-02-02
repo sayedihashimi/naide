@@ -121,12 +121,210 @@ GitHub Actions workflow configured for continuous integration:
 - Tauri bundle identifier: `com.naide.desktop` (changed from default `com.tauri.dev`)
 
 ## Build verification
-Ensure:
-- `tauri dev` starts the app
-- Screen 1 renders at `/`
-- Planning Mode renders at `/planning`
-- Generate App screen renders at `/generate`
-- Screen 1 Continue behavior works (modal on empty; navigation on non-empty)
-- All tests pass with `npm run testonly`
-- Linting passes with `npm run lint`
-- Build succeeds on all platforms (ubuntu, windows, macos)
+Finally, verify:
+- `npm run tauri:dev` launches the app
+- App shows the Generate App screen (single route: `/`)
+- `npm test` runs Vitest tests successfully
+- `npm run lint` runs ESLint without critical errors
+- Multi-platform builds work (ubuntu, windows, macos) via GitHub Actions
+
+## Tauri 2.x File System Permissions (Implemented 2026-02-02)
+
+### Overview
+Tauri 2.x has a strict security model that blocks file system access by default. For Naide to access user-selected project directories and create `.naide` folders, specific permissions are required.
+
+### Required Capabilities Configuration
+
+**File**: `src-tauri/capabilities/default.json`
+
+```json
+{
+  "permissions": [
+    "core:default",
+    "fs:default",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "**" }
+      ]
+    },
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-exists",
+    "fs:allow-mkdir",
+    "fs:allow-read-dir",
+    "dialog:default"
+  ]
+}
+```
+
+### Key Insights
+
+1. **fs:scope Requires Path Patterns**: Simply including `"fs:scope"` permission doesn't grant access to any paths. You must explicitly define which paths are allowed using `allow` or `deny` arrays.
+
+2. **Wildcard Pattern for Dev Tools**: Using `{ "path": "**" }` allows access to any path on the system. This is appropriate for:
+   - Development tools that need broad file access
+   - Apps where users explicitly select directories via dialog
+   - Similar to VSCode, IntelliJ, and other IDEs
+
+3. **Alternative Approach**: If you need more restrictive permissions:
+   ```json
+   {
+     "identifier": "fs:scope",
+     "allow": [
+       { "path": "$DOCUMENT/**" },
+       { "path": "$HOME/projects/**" },
+       { "path": "C:\\Users\\*\\Documents\\**" }  // Windows
+     ]
+   }
+   ```
+
+4. **Dialog Integration**: The `dialog:default` permission allows users to select directories, but `fs:scope` determines which selected directories are actually accessible.
+
+### Common Permission Errors
+
+**Error Message:**
+```
+forbidden path: C:\path\to\project\.naide\file.json, 
+maybe it is not allowed on the scope for `allow-exists` permission in your capability file
+```
+
+**Solutions:**
+- Add the path pattern to `fs:scope` allow list
+- Use wildcard `**` for broad access
+- Ensure operation-specific permissions are included (`allow-exists`, `allow-read-text-file`, etc.)
+
+### Security Considerations
+
+**Why Wildcard is Acceptable:**
+- User explicitly selects directories via file dialog
+- Desktop development tools require broad file access
+- Tauri still provides process isolation and sandboxing
+- Alternative would be to prompt user for every directory (poor UX)
+
+**What Wildcard Grants:**
+- Access to any path the app attempts to read/write
+- Still requires user interaction to select directories
+- Does not grant network access or other system capabilities
+- Only grants file system operations allowed by specific permissions
+
+## Frontend Logging in Tauri (Implemented 2026-02-02)
+
+### Overview
+Frontend JavaScript `console.log` statements only appear in browser DevTools, not in Tauri's backend log file. For production debugging, we need to forward frontend logs to the backend.
+
+### Implementation Pattern
+
+**Backend Command** (`src-tauri/src/lib.rs`):
+```rust
+#[tauri::command]
+async fn log_to_file(level: String, message: String) -> Result<(), String> {
+    match level.as_str() {
+        "info" => log::info!("{}", message),
+        "error" => log::error!("{}", message),
+        "warn" => log::warn!("{}", message),
+        "debug" => log::debug!("{}", message),
+        _ => log::info!("{}", message),
+    }
+    Ok(())
+}
+```
+
+Register in invoke_handler:
+```rust
+.invoke_handler(tauri::generate_handler![
+    // ... other commands
+    log_to_file
+])
+```
+
+**Frontend Utility** (`src/utils/logger.ts`):
+```typescript
+import { invoke } from '@tauri-apps/api/core';
+
+export function logInfo(message: string, ...args: unknown[]): void {
+  const fullMessage = args.length > 0 ? `${message} ${JSON.stringify(args)}` : message;
+  console.log(message, ...args);  // DevTools
+  invoke('log_to_file', { level: 'info', message: fullMessage });  // Log file
+}
+```
+
+### Key Insights
+
+1. **TargetKind::Webview Limitation**: The `TargetKind::Webview` log target in Rust captures `console.log` output from the WebView, but these logs may not be formatted or timed properly. Using commands provides better control.
+
+2. **Plugin API vs Commands**: 
+   - `@tauri-apps/plugin-log` API functions (`info()`, `error()`) are async and can fail silently
+   - Tauri commands (`invoke('log_to_file')`) provide better error handling
+   - Commands are more reliable for critical logging
+
+3. **Test Environment Handling**: The logger must gracefully handle test environments where Tauri is unavailable:
+   ```typescript
+   function safeInvoke(level: string, message: string): void {
+     try {
+       if (typeof invoke !== 'undefined') {
+         invoke('log_to_file', { level, message });
+       }
+     } catch (e) {
+       // Silently fail in test environment
+     }
+   }
+   ```
+
+4. **Dual Output**: Always log to both console and file:
+   - Console for DevTools during development
+   - File for production debugging and user support
+
+### Usage Pattern
+
+Replace all `console.log/error` with logger functions:
+```typescript
+// Before
+console.log('[Component] Doing something:', value);
+console.error('[Component] Error:', error);
+
+// After
+import { logInfo, logError } from '../utils/logger';
+
+logInfo('[Component] Doing something:', value);
+logError('[Component] Error:', error);
+```
+
+### Log File Location
+- Windows: `%TEMP%\com.naide.desktop\logs\naide-{timestamp}.log`
+- macOS: `/tmp/com.naide.desktop/logs/naide-{timestamp}.log`
+- Linux: `/tmp/com.naide.desktop/logs/naide-{timestamp}.log`
+
+### Backend Logging Configuration
+
+**File**: `src-tauri/src/lib.rs` setup function
+
+```rust
+// Create log directory
+let temp_dir = env::temp_dir();
+let log_dir = temp_dir.join("com.naide.desktop").join("logs");
+fs::create_dir_all(&log_dir)?;
+
+// Configure log targets
+app.handle().plugin(
+  tauri_plugin_log::Builder::default()
+    .level(log::LevelFilter::Info)
+    .targets([
+      tauri_plugin_log::Target::new(
+        tauri_plugin_log::TargetKind::Folder {
+          path: log_dir,
+          file_name: Some(log_filename),
+        }
+      ),
+      tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+      tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+    ])
+    .build(),
+)?;
+```
+
+**Targets Explained:**
+- `Folder`: Writes logs to timestamped file in temp directory
+- `Stdout`: Prints logs to console during development
+- `Webview`: Captures frontend console.log (supplementary to command-based logging)
+
