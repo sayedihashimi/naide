@@ -515,7 +515,10 @@ const GenerateAppScreen: React.FC = () => {
         const pathParts = selectedPath.split(/[/\\]/);
         const newProjectName = pathParts[pathParts.length - 1];
         
-        // Update project name and path
+        // Clear conversation summary for new project
+        setConversationSummary(null);
+        
+        // Update project name and path (this will trigger the loadChat useEffect)
         setProjectName(newProjectName);
         setProjectPath(selectedPath);
         
@@ -523,11 +526,7 @@ const GenerateAppScreen: React.FC = () => {
         const loaded = await loadProject(selectedPath);
         if (loaded) {
           console.log('[GenerateApp] Successfully loaded project:', newProjectName);
-          // Reset chat for new project
-          setChatInitialized(false);
-          setMessages(getWelcomeMessages(copilotMode));
-          // Clear conversation summary for new project
-          setConversationSummary(null);
+          // The loadChat useEffect will automatically load the last chat session
           
           // Reload recent projects to include the newly opened project
           const projects = await getRecentProjects();
@@ -557,7 +556,10 @@ const GenerateAppScreen: React.FC = () => {
       const pathParts = projectPath.split(/[/\\]/);
       const newProjectName = pathParts[pathParts.length - 1];
       
-      // Update project name and path
+      // Clear conversation summary for new project
+      setConversationSummary(null);
+      
+      // Update project name and path (this will trigger the loadChat useEffect)
       setProjectName(newProjectName);
       setProjectPath(projectPath);
       
@@ -565,11 +567,7 @@ const GenerateAppScreen: React.FC = () => {
       const loaded = await loadProject(projectPath);
       if (loaded) {
         console.log('[GenerateApp] Successfully loaded project:', newProjectName);
-        // Reset chat for new project
-        setChatInitialized(false);
-        setMessages(getWelcomeMessages(copilotMode));
-        // Clear conversation summary for new project
-        setConversationSummary(null);
+        // The loadChat useEffect will automatically load the last chat session
       } else {
         console.log('[GenerateApp] Project not found at path:', projectPath);
         console.log('[GenerateApp] A new project structure will be created on first interaction');
