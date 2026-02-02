@@ -7,50 +7,13 @@
   ],
   "permissions": [
     "core:default",
-    {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [
-        {
-          "path": "$DOCUMENT/naide/**"
-        },
-        {
-          "path": "$DOCUMENT/.naide/**"
-        }
-      ]
-    },
-    {
-      "identifier": "fs:allow-write-text-file",
-      "allow": [
-        {
-          "path": "$DOCUMENT/naide/**"
-        },
-        {
-          "path": "$DOCUMENT/.naide/**"
-        }
-      ]
-    },
-    {
-      "identifier": "fs:allow-exists",
-      "allow": [
-        {
-          "path": "$DOCUMENT/naide/**"
-        },
-        {
-          "path": "$DOCUMENT/.naide/**"
-        }
-      ]
-    },
-    {
-      "identifier": "fs:allow-mkdir",
-      "allow": [
-        {
-          "path": "$DOCUMENT/naide/**"
-        },
-        {
-          "path": "$DOCUMENT/.naide/**"
-        }
-      ]
-    },
+    "fs:default",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-exists",
+    "fs:allow-mkdir",
+    "fs:allow-read-dir",
+    "fs:scope",
     "dialog:default"
   ]
 }
