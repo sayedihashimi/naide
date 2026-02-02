@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { exists, readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs'
 import { documentDir, join } from '@tauri-apps/api/path'
-import { loadConfig, saveConfig, getConfigPath, getConfigFilePath, addMarkdownFooter, formatSectionAsMarkdown } from './fileSystem'
+import { 
+  loadConfig, 
+  saveConfig, 
+  getConfigPath, 
+  getConfigFilePath, 
+  addMarkdownFooter, 
+  formatSectionAsMarkdown,
+  getProjectPath 
+} from './fileSystem'
 
 // Mock Tauri APIs
 vi.mock('@tauri-apps/plugin-fs', () => ({
@@ -159,6 +167,21 @@ describe('fileSystem utilities', () => {
       expect(result).toContain('## What is this?')
       expect(result).toContain('_No answer provided_')
       expect(result.endsWith('<!-- created by naide -->')).toBe(true)
+    })
+  })
+
+  describe('getProjectPath', () => {
+    it('should return actual path when provided', async () => {
+      const actualPath = '/user/opened/project'
+      const path = await getProjectPath('MyProject', actualPath)
+      
+      expect(path).toBe(actualPath)
+    })
+
+    it('should generate path in Documents when no actual path provided', async () => {
+      const path = await getProjectPath('MyProject')
+      
+      expect(path).toBe('/mock/documents/naide/projects/MyProject')
     })
   })
 })
