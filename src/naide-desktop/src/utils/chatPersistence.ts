@@ -23,7 +23,9 @@ export interface ChatSession {
 // Get the .naide directory path within a project
 async function getProjectNaideDir(projectName: string, actualPath?: string): Promise<string> {
   const projectPath = await getProjectPath(projectName, actualPath);
-  return await join(projectPath, '.naide');
+  const naideDir = await join(projectPath, '.naide');
+  console.log('[ChatPersistence] getProjectNaideDir:', { projectName, actualPath, projectPath, naideDir });
+  return naideDir;
 }
 
 // Get the chat sessions directory path
@@ -88,6 +90,7 @@ async function saveProjectConfig(projectName: string, config: { lastChatSession:
 
 // Load chat session
 export async function loadChatSession(projectName: string, sessionFilename?: string, actualPath?: string): Promise<ChatMessage[]> {
+  console.log('[ChatPersistence] loadChatSession called with:', { projectName, sessionFilename, actualPath });
   try {
     // Determine which session to load
     let filename = sessionFilename;
@@ -95,20 +98,22 @@ export async function loadChatSession(projectName: string, sessionFilename?: str
       // Check project config for last used session
       const config = await loadProjectConfig(projectName, actualPath);
       filename = config.lastChatSession || getDefaultChatSessionFilename();
+      console.log('[ChatPersistence] Using filename:', filename);
     }
     
     const chatSessionsDir = await getChatSessionsDir(projectName, actualPath);
     const sessionPath = await join(chatSessionsDir, filename);
+    console.log('[ChatPersistence] Attempting to load chat from:', sessionPath);
     
     const sessionExists = await exists(sessionPath);
     if (!sessionExists) {
-      console.log('[ChatPersistence] Chat session not found:', sessionPath);
+      console.log('[ChatPersistence] Chat session file does not exist:', sessionPath);
       return [];
     }
     
     const content = await readTextFile(sessionPath);
     const session: ChatSession = JSON.parse(content);
-    console.log('[ChatPersistence] Loaded chat session:', session.id, 'with', session.messages.length, 'messages');
+    console.log('[ChatPersistence] Successfully loaded chat session:', session.id, 'with', session.messages.length, 'messages from:', sessionPath);
     return session.messages;
   } catch (error) {
     console.error('[ChatPersistence] Error loading chat session:', error);
@@ -123,11 +128,18 @@ export async function saveChatSession(
   sessionFilename?: string,
   actualPath?: string
 ): Promise<void> {
+  console.log('[ChatPersistence] saveChatSession called with:', { 
+    projectName, 
+    messageCount: messages.length, 
+    sessionFilename, 
+    actualPath 
+  });
   try {
     const filename = sessionFilename || getDefaultChatSessionFilename();
     
     // Ensure chat sessions directory exists
     const chatSessionsDir = await getChatSessionsDir(projectName, actualPath);
+    console.log('[ChatPersistence] Chat sessions directory:', chatSessionsDir);
     const chatSessionsDirExists = await exists(chatSessionsDir);
     
     if (!chatSessionsDirExists) {
@@ -137,11 +149,13 @@ export async function saveChatSession(
     
     // Create session object
     const sessionPath = await join(chatSessionsDir, filename);
+    console.log('[ChatPersistence] Attempting to save chat to:', sessionPath);
     const sessionExists = await exists(sessionPath);
     
     let session: ChatSession;
     if (sessionExists) {
       // Update existing session
+      console.log('[ChatPersistence] Updating existing chat session');
       const existingContent = await readTextFile(sessionPath);
       const existingSession: ChatSession = JSON.parse(existingContent);
       session = {
@@ -151,6 +165,7 @@ export async function saveChatSession(
       };
     } else {
       // Create new session
+      console.log('[ChatPersistence] Creating new chat session');
       session = {
         id: filename.replace('.json', ''),
         projectName,
@@ -161,9 +176,8 @@ export async function saveChatSession(
     }
     
     const content = JSON.stringify(session, null, 2);
-    console.log('[ChatPersistence] Saving chat session to:', sessionPath);
     await writeTextFile(sessionPath, content);
-    console.log('[ChatPersistence] Chat session saved successfully');
+    console.log('[ChatPersistence] Successfully saved chat session to:', sessionPath, 'with', messages.length, 'messages');
     
     // Update project config with last used session
     await saveProjectConfig(projectName, { lastChatSession: filename }, actualPath);
