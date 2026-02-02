@@ -13,6 +13,7 @@ This index provides a chronological overview of all feature files in `.prompts/f
 | [2026-02-01-building-mode.md](./2026-02-01-building-mode.md) | Enable AI-assisted code implementation in Building mode | in-progress |
 | [2026-02-01-conversation-memory.md](./2026-02-01-conversation-memory.md) | Add conversation memory and context management for chat | shipped |
 | [2026-02-01-feature-files-viewer.md](./2026-02-01-feature-files-viewer.md) | UI component to browse and view feature files | planned |
+| [2026-02-01-fix-naide-folder-location.md](./2026-02-01-fix-naide-folder-location.md) | Fix .naide folder to use opened project directory instead of Documents | shipped |
 | [2026-02-01-generate-app-screen.md](./2026-02-01-generate-app-screen.md) | 3-column layout with chat interface and mode selector | shipped |
 | [2026-02-01-last-used-project.md](./2026-02-01-last-used-project.md) | Automatically remember and reload last opened project | planned |
 | [2026-02-01-mode-tabs-left-nav.md](./2026-02-01-mode-tabs-left-nav.md) | Replace mode dropdown with Planning/Building/Analyzing tabs | planned |
