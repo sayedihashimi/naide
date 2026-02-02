@@ -93,7 +93,7 @@ interface CopilotResponse {
 3. **Long-Term Memory**: Repository files (authoritative)
    - `.prompts/plan/**` - Spec files
    - `.prompts/features/**` - Feature specs
-   - `.naide/learnings/**` - Learnings from past interactions
+   - `.prompts/learnings/**` - Learnings from past interactions
 
 #### Prompt Assembly Order
 1. Base system prompt
@@ -110,7 +110,7 @@ interface CopilotResponse {
 - Loaded on app startup
 
 ### Learnings
-- Markdown files in `.naide/learnings/`
+- Markdown files in `.prompts/learnings/`
 - Grouped by category (e.g., ui-and-layout.md, build-and-tooling.md)
 - Each entry timestamped with context
 
@@ -125,6 +125,6 @@ interface CopilotResponse {
 Sidecar can only write to:
 - `.prompts/plan/**`
 - `.prompts/features/**`
-- `.naide/learnings/**`
+- `.prompts/learnings/**`
 
 All other paths are blocked for safety.

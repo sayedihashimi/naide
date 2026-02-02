@@ -53,7 +53,7 @@ The Generate App screen supports three different modes for the Copilot chat:
 - **Behavior**: 
   - Goal is to create/update spec files (intent.md, app-spec.md, data-spec.md, rules.md, tasks.json)
   - Does NOT write or modify code
-  - Reads context from .prompts/plan/**, .prompts/features/**, .naide/learnings/**
+  - Reads context from .prompts/plan/**, .prompts/features/**, .prompts/learnings/**
 - **Welcome Messages**: Introduces the mode and explains it focuses on specs only
 - **Default**: This is the default mode (will be changed to Building mode later)
 
