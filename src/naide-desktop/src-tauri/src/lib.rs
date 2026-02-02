@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 mod settings;
 use settings::{LastProject, read_settings, write_settings, add_recent_project, get_recent_projects as get_recent_projects_from_settings};
@@ -138,6 +139,153 @@ async fn add_recent_project_cmd(app: tauri::AppHandle, path: String) -> Result<(
     Ok(())
 }
 
+// Feature file structure for tree view
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct FeatureFileNode {
+    name: String,          // Display name (without date prefix)
+    full_name: String,     // Full filename
+    path: String,          // Relative path from .prompts/features/
+    date: Option<String>,  // Parsed date (YYYY-MM-DD)
+    is_folder: bool,
+    children: Option<Vec<FeatureFileNode>>,
+}
+
+// Tauri command: List feature files from .prompts/features/
+#[tauri::command]
+async fn list_feature_files(project_path: String) -> Result<Vec<FeatureFileNode>, String> {
+    let features_dir = PathBuf::from(&project_path).join(".prompts").join("features");
+    
+    if !features_dir.exists() {
+        return Ok(Vec::new());
+    }
+    
+    if !features_dir.is_dir() {
+        return Err("Features path is not a directory".to_string());
+    }
+    
+    // Recursively scan the directory
+    scan_directory(&features_dir, &features_dir)
+}
+
+fn scan_directory(base_dir: &PathBuf, current_dir: &PathBuf) -> Result<Vec<FeatureFileNode>, String> {
+    let mut nodes = Vec::new();
+    
+    let entries = fs::read_dir(current_dir)
+        .map_err(|e| format!("Failed to read directory: {}", e))?;
+    
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let path = entry.path();
+        let file_name = entry.file_name().to_string_lossy().to_string();
+        
+        // Skip hidden files and directories
+        if file_name.starts_with('.') {
+            continue;
+        }
+        
+        if path.is_dir() {
+            // Recursively scan subdirectories
+            let children = scan_directory(base_dir, &path)?;
+            
+            nodes.push(FeatureFileNode {
+                name: file_name.clone(),
+                full_name: file_name.clone(),
+                path: path.strip_prefix(base_dir)
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string(),
+                date: None,
+                is_folder: true,
+                children: Some(children),
+            });
+        } else if file_name.ends_with(".md") {
+            // Parse date prefix and display name
+            let (display_name, date) = parse_filename(&file_name);
+            
+            nodes.push(FeatureFileNode {
+                name: display_name,
+                full_name: file_name.clone(),
+                path: path.strip_prefix(base_dir)
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string(),
+                date,
+                is_folder: false,
+                children: None,
+            });
+        }
+    }
+    
+    // Sort nodes: files by date (most recent first), then alphabetically
+    // Folders alphabetically
+    nodes.sort_by(|a, b| {
+        match (a.is_folder, b.is_folder) {
+            (true, true) => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            (false, false) => {
+                // Both are files - sort by date (descending) then name
+                match (&a.date, &b.date) {
+                    (Some(date_a), Some(date_b)) => {
+                        // Reverse order for descending (most recent first)
+                        date_b.cmp(date_a).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+                    }
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                }
+            }
+        }
+    });
+    
+    Ok(nodes)
+}
+
+// Parse filename to extract date prefix and display name
+// Example: "2026-02-01-add-copilot-integration.md" -> ("add-copilot-integration", Some("2026-02-01"))
+fn parse_filename(filename: &str) -> (String, Option<String>) {
+    // Remove .md extension
+    let name_without_ext = filename.strip_suffix(".md").unwrap_or(filename);
+    
+    // Check if it starts with a date pattern (YYYY-MM-DD-)
+    if name_without_ext.len() >= 11 {
+        let potential_date = &name_without_ext[0..10];
+        if potential_date.chars().nth(4) == Some('-') 
+            && potential_date.chars().nth(7) == Some('-')
+            && name_without_ext.chars().nth(10) == Some('-') {
+            // Looks like a date prefix
+            let date = potential_date.to_string();
+            let display_name = name_without_ext[11..].to_string();
+            return (display_name, Some(date));
+        }
+    }
+    
+    (name_without_ext.to_string(), None)
+}
+
+// Tauri command: Read feature file content
+#[tauri::command]
+async fn read_feature_file(project_path: String, file_path: String) -> Result<String, String> {
+    let full_path = PathBuf::from(&project_path)
+        .join(".prompts")
+        .join("features")
+        .join(&file_path);
+    
+    // Security check: ensure the path is within .prompts/features/
+    let base_dir = PathBuf::from(&project_path).join(".prompts").join("features");
+    let canonical_full_path = full_path.canonicalize()
+        .map_err(|e| format!("Invalid file path: {}", e))?;
+    let canonical_base_dir = base_dir.canonicalize()
+        .map_err(|e| format!("Invalid base directory: {}", e))?;
+    
+    if !canonical_full_path.starts_with(&canonical_base_dir) {
+        return Err("Access denied: path outside of features directory".to_string());
+    }
+    
+    fs::read_to_string(&canonical_full_path)
+        .map_err(|e| format!("Failed to read file: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -255,7 +403,9 @@ pub fn run() {
       get_settings_file_path,
       get_recent_projects,
       add_recent_project_cmd,
-      log_to_file
+      log_to_file,
+      list_feature_files,
+      read_feature_file
     ])
     .on_window_event(|_window, event| {
       // Clean up sidecar on app exit
