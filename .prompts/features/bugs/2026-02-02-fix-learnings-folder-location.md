@@ -2,7 +2,7 @@
 
 **Type:** Bug Fix  
 **Priority:** Medium  
-**Status:** Open
+**Status:** Fixed
 
 ---
 
@@ -132,13 +132,13 @@ Recommend **Option A** - learnings should be committed.
 
 ## Acceptance Criteria
 
-- [ ] Sidecar reads learnings from `.prompts/learnings/`
-- [ ] Sidecar writes learnings to `.prompts/learnings/`
-- [ ] Directory is created automatically if it doesn't exist
-- [ ] Specs consistently reference `.prompts/learnings/`
-- [ ] Decision made about gitignore (commit or not)
-- [ ] App builds and runs successfully
-- [ ] Manual test: Create a learning and verify it's in the correct location
+- [x] Sidecar reads learnings from `.prompts/learnings/`
+- [x] Sidecar writes learnings to `.prompts/learnings/`
+- [x] Directory is created automatically if it doesn't exist
+- [x] Specs consistently reference `.prompts/learnings/`
+- [x] Decision made about gitignore (commit or not) - Learnings should be committed (not gitignored)
+- [x] App builds and runs successfully
+- [ ] Manual test: Create a learning and verify it's in the correct location (can be tested by user)
 
 ---
 
