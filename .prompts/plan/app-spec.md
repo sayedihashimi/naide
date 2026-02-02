@@ -15,7 +15,7 @@ Naide is a Tauri desktop application with a React + Vite frontend that helps non
 ### 1. Planning Mode
 - AI-assisted planning and specification creation
 - Updates files under `.prompts/plan/**` and `.prompts/features/**`
-- Reads and applies learnings from `.naide/learnings/**`
+- Reads and applies learnings from `.prompts/learnings/**`
 - Does not modify code files
 - Interactive chat interface with Copilot integration
 
@@ -61,7 +61,7 @@ Dropdown with three options:
 3. Frontend calls sidecar API at `/api/copilot/chat`
 4. Sidecar assembles full prompt in required order:
    - Base system prompt + mode system prompt
-   - Learnings from `.naide/learnings/`
+   - Learnings from `.prompts/learnings/`
    - Spec files from `.prompts/plan/`
    - Feature files from `.prompts/features/`
    - Conversation summary (mid-term memory)

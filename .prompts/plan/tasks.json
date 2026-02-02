@@ -25,7 +25,7 @@
       "id": "learnings-support",
       "title": "Add learnings read/write support",
       "status": "completed",
-      "description": "Read learnings from .naide/learnings/ and write new entries",
+      "description": "Read learnings from .prompts/learnings/ and write new entries",
       "dependencies": ["setup-sidecar"]
     },
     {

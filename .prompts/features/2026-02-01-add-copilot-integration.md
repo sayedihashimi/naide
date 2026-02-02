@@ -110,7 +110,7 @@ IMPORTANT: The chat UI is on the Generate App screen, but Planning mode behavior
   - `.prompts/**`
   - `.prompts/plan/**`
   - `.prompts/features/**`
-  - `.naide/learnings/**` (if present)
+  - `.prompts/learnings/**` (if present)
 
 5) Writing/updating planning specs and feature files
 In Planning mode, Copilot must be allowed to:
@@ -129,7 +129,7 @@ Implementation expectation:
 
 6) Learnings capture (required in this issue)
 Implement project memory capture at:
-  `.naide/learnings/`
+  `.prompts/learnings/`
 
 Rules (MVP version):
 - When the AI (Copilot) is corrected by the user OR a build/test error occurs and the AI has to adjust:
@@ -137,9 +137,9 @@ Rules (MVP version):
 - Learnings must be high-signal and reusable. Do NOT dump long logs.
 - Group learnings into reasonably sized markdown files so Copilot can ingest them later.
   - Example grouping approach:
-    - `.naide/learnings/ui-and-layout.md`
-    - `.naide/learnings/routing-and-navigation.md`
-    - `.naide/learnings/build-and-tooling.md`
+    - `.prompts/learnings/ui-and-layout.md`
+    - `.prompts/learnings/routing-and-navigation.md`
+    - `.prompts/learnings/build-and-tooling.md`
 - Each learning entry should include:
   - What happened
   - Why it mattered
@@ -179,7 +179,7 @@ Acceptance Criteria
 - Planning mode can update repo files under:
   - `.prompts/plan/**`
   - `.prompts/features/**`
-- Learnings are written to `.naide/learnings/**` when:
+- Learnings are written to `.prompts/learnings/**` when:
   - the user corrects the AI, or
   - an error forces a correction (build/test failure handling can be minimal; if there are no tests yet, focus on the correction mechanism)
 - The app still runs via `tauri dev`.

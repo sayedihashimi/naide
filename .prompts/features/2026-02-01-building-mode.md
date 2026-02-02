@@ -114,7 +114,7 @@ If build/test fails:
 2. AI attempts fix (up to 2 retries)
 3. If still failing:
    - Revert changes (optional)
-   - Write learning to .naide/learnings/
+   - Write learning to .prompts/learnings/
    - Report failure to user with diagnosis
    - Ask for guidance
 ```
@@ -150,7 +150,7 @@ Key instructions:
 ### Context Assembly Order
 1. Base system prompt
 2. **Building mode system prompt** ← activated in this mode
-3. Learnings from `.naide/learnings/**`
+3. Learnings from `.prompts/learnings/**`
 4. Specs from `.prompts/plan/**`
 5. Feature files from `.prompts/features/**`
 6. Conversation summary
@@ -225,7 +225,7 @@ const ALLOWED_WRITE_PATHS = [
   'public/**',
   '.prompts/plan/**',
   '.prompts/features/**',
-  '.naide/learnings/**'
+  '.prompts/learnings/**'
 ];
 
 // Blocked paths (even with wildcard match)
@@ -309,7 +309,7 @@ When adding dark mode feature:
 2. Identify likely cause
 3. Attempt fix
 4. If fix fails:
-   - Write learning to `.naide/learnings/build-and-tooling.md`
+   - Write learning to `.prompts/learnings/build-and-tooling.md`
    - Report to user with explanation
    - Suggest reverting or manual intervention
 

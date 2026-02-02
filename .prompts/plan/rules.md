@@ -11,7 +11,7 @@
 ### Allowed Writes
 - `.prompts/plan/**` - Planning documents
 - `.prompts/features/**` - Feature specifications
-- `.naide/learnings/**` - Project learnings
+- `.prompts/learnings/**` - Project learnings
 
 ### Prohibited Writes
 - Application source code (unless in Building mode - future)
