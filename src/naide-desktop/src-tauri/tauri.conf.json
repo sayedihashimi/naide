@@ -16,14 +16,12 @@
         "width": 1200,
         "height": 800,
         "resizable": true,
-        "fullscreen": false,
-        "devTools": true
+        "fullscreen": false
       }
     ],
     "security": {
       "csp": null
-    },
-    "withGlobalTauri": true
+    }
   },
   "bundle": {
     "active": true,
