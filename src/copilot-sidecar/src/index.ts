@@ -643,6 +643,27 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       // Tool execution events - notify user about tool usage
       unsubscribeFns.push(session.on('tool.execution_start', (event) => {
+        const toolName = event.data.toolName?.toLowerCase() || '';
+        const args = event.data.arguments as Record<string, any> || {};
+        const filePath = args.path || args.file || args.filename;
+        
+        // Store tool call info for later use
+        toolCalls.set(event.data.toolCallId, {
+          toolName: event.data.toolName,
+          toolArgs: event.data.arguments
+        });
+        
+        // Emit status for file operations
+        if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
+          statusEmitter.emitFileWrite(filePath, 'in_progress');
+        } else if (toolName.includes('view') || toolName.includes('read')) {
+          if (filePath) {
+            statusEmitter.emitFileRead(filePath, 'in_progress');
+          }
+        } else if (toolName.includes('grep') || toolName.includes('glob')) {
+          statusEmitter.emitAnalysis('Searching code...', 'in_progress');
+        }
+        
         console.log(`[Sidecar] Tool started: ${event.data.toolName}`);
         sendEvent('tool_start', { toolName: event.data.toolName });
         resetTimeout(`tool started: ${event.data.toolName}`);
@@ -665,7 +686,7 @@ app.post('/api/copilot/stream', async (req, res) => {
         const toolCallInfo = toolCalls.get(event.data.toolCallId);
         if (toolCallInfo) {
           const toolName = toolCallInfo.toolName?.toLowerCase() || '';
-          const args = toolCallInfo.toolArgs as Record<string, any> || {};
+          const args = ((toolCallInfo.toolArgs as Record<string, any> | undefined) || {});
           const filePath = args.path || args.file || args.filename;
           
           // Emit completion status for file operations
@@ -900,6 +921,9 @@ app.post('/api/copilot/chat', async (req, res) => {
       // 7) Send current user message and collect response
       const responseChunks: string[] = [];
       
+      // Track tool calls for status reporting
+      const toolCalls = new Map<string, { toolName: string; toolArgs: any }>();
+      
       // Set up event listeners for the response BEFORE sending
       const responsePromise = new Promise<string>((resolve, reject) => {
         let timeoutHandle: NodeJS.Timeout;
@@ -970,6 +994,27 @@ app.post('/api/copilot/chat', async (req, res) => {
         
         // Tool execution events - CRITICAL for long-running tool calls
         unsubscribeFns.push(session.on('tool.execution_start', (event) => {
+          const toolName = event.data.toolName?.toLowerCase() || '';
+          const args = event.data.arguments as Record<string, any> || {};
+          const filePath = args.path || args.file || args.filename;
+          
+          // Store tool call info for later use
+          toolCalls.set(event.data.toolCallId, {
+            toolName: event.data.toolName,
+            toolArgs: event.data.arguments
+          });
+          
+          // Emit status for file operations
+          if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
+            statusEmitter.emitFileWrite(filePath, 'in_progress');
+          } else if (toolName.includes('view') || toolName.includes('read')) {
+            if (filePath) {
+              statusEmitter.emitFileRead(filePath, 'in_progress');
+            }
+          } else if (toolName.includes('grep') || toolName.includes('glob')) {
+            statusEmitter.emitAnalysis('Searching code...', 'in_progress');
+          }
+          
           console.log(`[Sidecar] Tool started: ${event.data.toolName}`);
           resetTimeout(`tool started: ${event.data.toolName}`);
         }));
@@ -985,6 +1030,36 @@ app.post('/api/copilot/chat', async (req, res) => {
         
         unsubscribeFns.push(session.on('tool.execution_complete', (event) => {
           console.log(`[Sidecar] Tool completed: ${event.data.toolCallId}, success: ${event.data.success}`);
+          
+          // Get stored tool call info
+          const toolCallInfo = toolCalls.get(event.data.toolCallId);
+          if (toolCallInfo) {
+            const toolName = toolCallInfo.toolName?.toLowerCase() || '';
+            const args = ((toolCallInfo.toolArgs as Record<string, any> | undefined) || {});
+            const filePath = args.path || args.file || args.filename;
+            
+            // Emit completion status for file operations
+            if (event.data.success) {
+              if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
+                statusEmitter.emitFileWrite(filePath, 'complete');
+              } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
+                statusEmitter.emitFileRead(filePath, 'complete');
+              } else if (toolName.includes('grep') || toolName.includes('glob')) {
+                statusEmitter.emitAnalysis('Search complete', 'complete');
+              }
+            } else {
+              // Emit error status if tool failed
+              if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
+                statusEmitter.emitFileWrite(`Failed to write ${filePath}`, 'error');
+              } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
+                statusEmitter.emitFileRead(`Failed to read ${filePath}`, 'error');
+              }
+            }
+            
+            // Clean up stored tool call
+            toolCalls.delete(event.data.toolCallId);
+          }
+          
           resetTimeout('tool completed');
         }));
         
