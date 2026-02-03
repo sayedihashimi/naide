@@ -139,6 +139,14 @@ async fn add_recent_project_cmd(app: tauri::AppHandle, path: String) -> Result<(
     Ok(())
 }
 
+// View options for feature files
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ViewOptions {
+    show_bugs: bool,
+    show_removed: bool,
+    show_raw: bool,
+}
+
 // Feature file structure for tree view
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FeatureFileNode {
@@ -152,7 +160,7 @@ struct FeatureFileNode {
 
 // Tauri command: List feature files from .prompts/features/
 #[tauri::command]
-async fn list_feature_files(project_path: String) -> Result<Vec<FeatureFileNode>, String> {
+async fn list_feature_files(project_path: String, options: Option<ViewOptions>) -> Result<Vec<FeatureFileNode>, String> {
     let features_dir = PathBuf::from(&project_path).join(".prompts").join("features");
     
     if !features_dir.exists() {
@@ -163,11 +171,17 @@ async fn list_feature_files(project_path: String) -> Result<Vec<FeatureFileNode>
         return Err("Features path is not a directory".to_string());
     }
     
+    let opts = options.unwrap_or(ViewOptions {
+        show_bugs: false,
+        show_removed: false,
+        show_raw: false,
+    });
+    
     // Recursively scan the directory
-    scan_directory(&features_dir, &features_dir)
+    scan_directory(&features_dir, &features_dir, &opts)
 }
 
-fn scan_directory(base_dir: &PathBuf, current_dir: &PathBuf) -> Result<Vec<FeatureFileNode>, String> {
+fn scan_directory(base_dir: &PathBuf, current_dir: &PathBuf, options: &ViewOptions) -> Result<Vec<FeatureFileNode>, String> {
     let mut nodes = Vec::new();
     
     let entries = fs::read_dir(current_dir)
@@ -183,32 +197,46 @@ fn scan_directory(base_dir: &PathBuf, current_dir: &PathBuf) -> Result<Vec<Featu
             continue;
         }
         
+        // Get relative path for filtering
+        let rel_path = path.strip_prefix(base_dir)
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        
+        // Skip bugs/ folder if show_bugs is false
+        if !options.show_bugs && (rel_path == "bugs" || rel_path.starts_with("bugs/") || rel_path.starts_with("bugs\\")) {
+            continue;
+        }
+        
+        // Skip removed-features/ folder if show_removed is false
+        if !options.show_removed && (rel_path == "removed-features" || rel_path.starts_with("removed-features/") || rel_path.starts_with("removed-features\\")) {
+            continue;
+        }
+        
         if path.is_dir() {
             // Recursively scan subdirectories
-            let children = scan_directory(base_dir, &path)?;
+            let children = scan_directory(base_dir, &path, options)?;
             
             nodes.push(FeatureFileNode {
                 name: file_name.clone(),
                 full_name: file_name.clone(),
-                path: path.strip_prefix(base_dir)
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string(),
+                path: rel_path,
                 date: None,
                 is_folder: true,
                 children: Some(children),
             });
         } else if file_name.ends_with(".md") {
-            // Parse date prefix and display name
-            let (display_name, date) = parse_filename(&file_name);
+            // Parse date prefix and display name based on show_raw option
+            let (display_name, date) = if options.show_raw {
+                (file_name.strip_suffix(".md").unwrap_or(&file_name).to_string(), parse_date_from_filename(&file_name))
+            } else {
+                parse_filename(&file_name)
+            };
             
             nodes.push(FeatureFileNode {
                 name: display_name,
                 full_name: file_name.clone(),
-                path: path.strip_prefix(base_dir)
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string(),
+                path: rel_path,
                 date,
                 is_folder: false,
                 children: None,
@@ -263,6 +291,22 @@ fn parse_filename(filename: &str) -> (String, Option<String>) {
     (name_without_ext.to_string(), None)
 }
 
+// Parse just the date from filename without modifying the display name
+fn parse_date_from_filename(filename: &str) -> Option<String> {
+    let name_without_ext = filename.strip_suffix(".md").unwrap_or(filename);
+    
+    if name_without_ext.len() >= 11 {
+        let potential_date = &name_without_ext[0..10];
+        if potential_date.chars().nth(4) == Some('-') 
+            && potential_date.chars().nth(7) == Some('-')
+            && name_without_ext.chars().nth(10) == Some('-') {
+            return Some(potential_date.to_string());
+        }
+    }
+    
+    None
+}
+
 // Tauri command: Read feature file content
 #[tauri::command]
 async fn read_feature_file(project_path: String, file_path: String) -> Result<String, String> {
@@ -284,6 +328,41 @@ async fn read_feature_file(project_path: String, file_path: String) -> Result<St
     
     fs::read_to_string(&canonical_full_path)
         .map_err(|e| format!("Failed to read file: {}", e))
+}
+
+// Tauri command: Write feature file content
+#[tauri::command]
+async fn write_feature_file(project_path: String, file_path: String, content: String) -> Result<(), String> {
+    let full_path = PathBuf::from(&project_path)
+        .join(".prompts")
+        .join("features")
+        .join(&file_path);
+    
+    // Security check: ensure the path is within .prompts/features/
+    let base_dir = PathBuf::from(&project_path).join(".prompts").join("features");
+    
+    // For write operations, we need to handle paths that might not exist yet
+    // So we'll check the parent directory instead
+    let parent = full_path.parent()
+        .ok_or_else(|| "Invalid file path: no parent directory".to_string())?;
+    
+    // Ensure parent directory exists
+    if !parent.exists() {
+        return Err("Parent directory does not exist".to_string());
+    }
+    
+    let canonical_parent = parent.canonicalize()
+        .map_err(|e| format!("Invalid parent directory: {}", e))?;
+    let canonical_base_dir = base_dir.canonicalize()
+        .map_err(|e| format!("Invalid base directory: {}", e))?;
+    
+    if !canonical_parent.starts_with(&canonical_base_dir) {
+        return Err("Access denied: path outside of features directory".to_string());
+    }
+    
+    // Write the file
+    fs::write(&full_path, content)
+        .map_err(|e| format!("Failed to write file: {}", e))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -405,7 +484,8 @@ pub fn run() {
       add_recent_project_cmd,
       log_to_file,
       list_feature_files,
-      read_feature_file
+      read_feature_file,
+      write_feature_file
     ])
     .on_window_event(|_window, event| {
       // Clean up sidecar on app exit
