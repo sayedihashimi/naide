@@ -32,7 +32,7 @@ Successfully implemented the chat history viewer feature as specified in `.promp
 
 **Features:**
 - Clock icon button trigger
-- Dropdown positioned absolutely below the button
+- Dropdown positioned absolutely above the button (opens upward)
 - Lazy loading (only fetches when opened)
 - Click-outside detection to close
 - ESC key support to close
@@ -107,7 +107,7 @@ Each chat session shows:
 
 ### Opening Chat History
 1. User clicks clock icon next to "New Chat" button
-2. Dropdown appears below the button
+2. Dropdown appears above the button (opens upward for better visibility)
 3. List of archived chats loads and displays
 4. Most recent chats appear at top
 

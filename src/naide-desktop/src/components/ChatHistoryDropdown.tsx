@@ -149,7 +149,7 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
   return (
     <div
       ref={dropdownRef}
-      className="absolute top-full left-0 mt-2 w-96 max-h-96 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg overflow-hidden z-50"
+      className="absolute bottom-full left-0 mb-2 w-96 max-h-96 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg overflow-hidden z-50"
     >
       {isLoading && (
         <div className="p-4 text-center text-gray-400">
