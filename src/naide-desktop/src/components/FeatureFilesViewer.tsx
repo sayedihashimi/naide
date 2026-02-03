@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../context/useAppContext';
 import { listFeatureFiles, readFeatureFile, writeFeatureFile, filterFeatureFiles, type FeatureFileNode, type ViewOptions } from '../utils/featureFiles';
 import FeatureFilesList from './FeatureFilesList';
@@ -142,7 +142,7 @@ const FeatureFilesViewer: React.FC = () => {
     setHasUnsavedChanges(e.target.value !== fileContent);
   };
   
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!selectedFile || !state.projectPath) {
       return;
     }
@@ -159,7 +159,7 @@ const FeatureFilesViewer: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [selectedFile, state.projectPath, editedContent]);
   
   const handleCancel = () => {
     if (hasUnsavedChanges) {
@@ -176,26 +176,9 @@ const FeatureFilesViewer: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+S / Cmd+S to save
-      if ((e.ctrlKey || e.metaKey) && e.key === 's' && isEditing && selectedFile && state.projectPath) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's' && isEditing) {
         e.preventDefault();
-        
-        // Inline save logic to avoid dependency issues
-        const saveFile = async () => {
-          try {
-            setIsSaving(true);
-            await writeFeatureFile(state.projectPath!, selectedFile!.path, editedContent);
-            setFileContent(editedContent);
-            setHasUnsavedChanges(false);
-            setIsEditing(false);
-          } catch (err) {
-            console.error('[FeatureFilesViewer] Error saving file:', err);
-            alert('Failed to save file: ' + err);
-          } finally {
-            setIsSaving(false);
-          }
-        };
-        
-        saveFile();
+        handleSave();
       }
     };
     
@@ -203,7 +186,7 @@ const FeatureFilesViewer: React.FC = () => {
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isEditing, editedContent, selectedFile, state.projectPath]);
+  }, [isEditing, handleSave]);
   
   return (
     <div className="h-full flex flex-col">

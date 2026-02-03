@@ -204,13 +204,19 @@ fn scan_directory(base_dir: &PathBuf, current_dir: &PathBuf, options: &ViewOptio
             .to_string();
         
         // Skip bugs/ folder if show_bugs is false
-        if !options.show_bugs && (rel_path == "bugs" || rel_path.starts_with("bugs/") || rel_path.starts_with("bugs\\")) {
-            continue;
+        if !options.show_bugs {
+            let normalized_path = rel_path.replace('\\', "/");
+            if normalized_path == "bugs" || normalized_path.starts_with("bugs/") {
+                continue;
+            }
         }
         
         // Skip removed-features/ folder if show_removed is false
-        if !options.show_removed && (rel_path == "removed-features" || rel_path.starts_with("removed-features/") || rel_path.starts_with("removed-features\\")) {
-            continue;
+        if !options.show_removed {
+            let normalized_path = rel_path.replace('\\', "/");
+            if normalized_path == "removed-features" || normalized_path.starts_with("removed-features/") {
+                continue;
+            }
         }
         
         if path.is_dir() {
