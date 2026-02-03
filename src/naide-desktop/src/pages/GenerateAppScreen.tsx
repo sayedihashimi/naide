@@ -9,6 +9,7 @@ import {
   mergeSummary,
 } from '../utils/conversationMemory';
 import MessageContent from '../components/MessageContent';
+import FeatureFilesViewer from '../components/FeatureFilesViewer';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, type LastProject } from '../utils/globalSettings';
@@ -674,8 +675,8 @@ const GenerateAppScreen: React.FC = () => {
       {/* Main content area - 3 columns */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Navigation Sidebar */}
-        <div className="w-64 bg-zinc-900 border-r border-zinc-800 overflow-y-auto">
-          <div className="p-4">
+        <div className="w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-zinc-800">
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Navigation
             </h2>
@@ -699,6 +700,18 @@ const GenerateAppScreen: React.FC = () => {
                 Files
               </button>
             </nav>
+          </div>
+          
+          {/* Divider and Features section */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-zinc-800">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Features
+              </h2>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <FeatureFilesViewer />
+            </div>
           </div>
         </div>
 
