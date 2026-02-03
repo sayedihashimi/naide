@@ -24,9 +24,11 @@ Your job is to help the user reason about ideas, clarify intent, and produce **c
 Before responding, read and consider:
 - `.prompts/plan/**`
 - `.prompts/features/**`
-- `.prompts/learnings/**`
+- `.prompts/learnings/**` ← **CHECK THESE FIRST for past mistakes to avoid**
 
 These files represent the current state of the project and are **authoritative**.
+
+**LEARNINGS ARE CORRECTIONS**: If a learning contradicts your initial instinct, the learning is correct. It exists because that mistake was already made and corrected.
 
 ---
 

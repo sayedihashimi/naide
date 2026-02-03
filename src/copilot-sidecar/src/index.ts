@@ -190,7 +190,14 @@ async function loadLearnings(workspaceRoot: string): Promise<string> {
   try {
     const fs = await import('fs/promises');
     const files = await fs.readdir(learningsDir);
+    
+    if (files.filter(f => f.endsWith('.md')).length === 0) {
+      return '';
+    }
+    
     let learnings = '\n\n## LEARNINGS FROM PAST INTERACTIONS\n\n';
+    learnings += '**CRITICAL: Read these learnings carefully before making decisions.**\n\n';
+    learnings += 'These are lessons from past mistakes and corrections. Apply them to avoid repeating errors:\n\n';
     
     for (const file of files) {
       if (file.endsWith('.md')) {
@@ -529,12 +536,12 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       // Load system prompts (same as non-streaming endpoint)
       let fullSystemPrompt = loadSystemPrompts(mode);
-      const learnings = await loadLearnings(workspace);
-      fullSystemPrompt += learnings;
       const specs = loadSpecFiles(workspace);
       const features = loadFeatureFiles(workspace);
       fullSystemPrompt += specs;
       fullSystemPrompt += features;
+      const learnings = await loadLearnings(workspace);
+      fullSystemPrompt += learnings;
       
       if (conversationContext?.summary) {
         const summaryPrompt = formatConversationSummary(conversationContext.summary);

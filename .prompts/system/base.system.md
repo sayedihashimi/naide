@@ -59,8 +59,15 @@ Implementation plans describe HOW to build something and are temporary artifacts
 Naide uses explicit, project-local memory stored as files within the user's currently loaded project:
 - **Location:** `.prompts/learnings/**` (relative to the project root)
 
-### Read-before-do
-Before planning or building, scan relevant learnings and apply them.
+### CRITICAL: Apply learnings BEFORE making decisions
+**Learnings contain corrections from past mistakes. These are high-signal, actionable lessons.**
+
+**Before any significant action (creating files, updating specs, making code changes):**
+1. **Scan learnings** for relevant patterns
+2. **Apply them** to your current task
+3. **Do NOT repeat mistakes** documented in learnings
+
+Learnings override general assumptions. They are project-specific truths learned through experience.
 
 ### When to write a learning (only if novel + reusable)
 Write a learning **when**:
@@ -87,7 +94,8 @@ If YES to any: Write a learning.
 
 ### Authority
 - Specs/features are the contract.
-- Learnings are heuristics that inform decisions but do not override explicit specs.
+- Learnings are corrections and heuristics that inform decisions but do not override explicit specs.
+- **When learnings conflict with your initial approach, follow the learnings.**
 
 ---
 

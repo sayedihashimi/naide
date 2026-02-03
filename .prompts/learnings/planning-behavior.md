@@ -49,3 +49,36 @@ The AI was producing detailed feature plans in chat responses but not writing th
 
 **Key principle:**
 In Planning mode, creating the specification file is not preparation for implementation—it IS the implementation. Write files as soon as you have enough information to create a build-ready spec.
+
+---
+
+## Learnings Must Be Applied (2026-02-03)
+
+**What happened:**
+User noticed that Copilot was not consistently applying lessons from `.prompts/learnings/` files, repeating mistakes that had already been documented and corrected.
+
+**Why it mattered:**
+- Learnings exist to prevent repeating past mistakes
+- If learnings aren't applied, the same errors occur repeatedly, wasting user time
+- Learnings represent expensive lessons learned through trial and error
+- Ignoring learnings defeats the purpose of the project memory system
+
+**Root cause:**
+1. **Prompt placement**: Learnings were loaded BEFORE specs/features, making them less prominent
+2. **Weak framing**: The learnings section had no emphasis on importance or application
+3. **No enforcement**: System prompts mentioned reading learnings but didn't enforce applying them
+
+**What was fixed:**
+1. **Reordered prompt assembly**: Learnings now come AFTER specs/features (fresher in context)
+2. **Stronger framing**: Added "CRITICAL: Read these learnings carefully before making decisions"
+3. **Explicit instructions**: System prompts now explicitly require checking and applying learnings
+
+**What to do next time:**
+- **ALWAYS** scan `.prompts/learnings/**` BEFORE making any significant decision
+- **If a learning contradicts your initial approach, follow the learning** (it exists because that approach was already tried and failed)
+- Learnings are corrections, not suggestions—they override general assumptions
+- Before creating files, updating specs, or writing code: check for relevant learnings
+- If a learning says "never do X", then never do X—even if it seems reasonable
+
+**Key principle:**
+Learnings are project-specific truths learned through experience. They have higher authority than general best practices because they represent what actually works (or doesn't work) in THIS specific project.
