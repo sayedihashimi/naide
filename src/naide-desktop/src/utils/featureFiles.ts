@@ -9,12 +9,21 @@ export interface FeatureFileNode {
   children: FeatureFileNode[] | null;
 }
 
+export interface ViewOptions {
+  show_bugs: boolean;
+  show_removed: boolean;
+  show_raw: boolean;
+}
+
 /**
  * List all feature files from .prompts/features/
  */
-export async function listFeatureFiles(projectPath: string): Promise<FeatureFileNode[]> {
+export async function listFeatureFiles(projectPath: string, options?: ViewOptions): Promise<FeatureFileNode[]> {
   try {
-    const files = await invoke<FeatureFileNode[]>('list_feature_files', { projectPath });
+    const files = await invoke<FeatureFileNode[]>('list_feature_files', { 
+      projectPath,
+      options: options || null
+    });
     return files;
   } catch (error) {
     console.error('[FeatureFiles] Error listing feature files:', error);
@@ -34,6 +43,22 @@ export async function readFeatureFile(projectPath: string, filePath: string): Pr
     return content;
   } catch (error) {
     console.error('[FeatureFiles] Error reading feature file:', error);
+    throw error;
+  }
+}
+
+/**
+ * Write content to a feature file
+ */
+export async function writeFeatureFile(projectPath: string, filePath: string, content: string): Promise<void> {
+  try {
+    await invoke<void>('write_feature_file', {
+      projectPath,
+      filePath,
+      content
+    });
+  } catch (error) {
+    console.error('[FeatureFiles] Error writing feature file:', error);
     throw error;
   }
 }
