@@ -12,6 +12,7 @@ import MessageContent from '../components/MessageContent';
 import FeatureFilesViewer from '../components/FeatureFilesViewer';
 import FeatureFilePopup from '../components/FeatureFilePopup';
 import ChatHistoryDropdown from '../components/ChatHistoryDropdown';
+import ActivityStatusBar from '../components/ActivityStatusBar';
 import type { FeatureFileNode } from '../utils/featureFiles';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
@@ -879,6 +880,9 @@ const GenerateAppScreen: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Activity Status Bar - between chat and input */}
+          <ActivityStatusBar />
 
           {/* Input row */}
           <div className="border-t border-zinc-800 p-6">
