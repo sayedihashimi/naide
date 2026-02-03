@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getProjectPath } from '../utils/fileSystem';
 
@@ -30,7 +30,7 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
   const [error, setError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const loadChatSessions = async () => {
+  const loadChatSessions = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
@@ -47,15 +47,14 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [projectName, projectPath]);
 
   // Load chat sessions when dropdown opens
   useEffect(() => {
     if (isOpen) {
       loadChatSessions();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, projectName, projectPath]);
+  }, [isOpen, loadChatSessions]);
 
   // Click outside handler
   useEffect(() => {
