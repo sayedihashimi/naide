@@ -112,6 +112,24 @@ Feature files must be detailed enough that Copilot could implement them without 
 
 ---
 
+## WHEN TO WRITE FILES (MANDATORY)
+
+**CRITICAL: When you have produced a detailed feature plan in your response, you MUST write the feature file immediately.**
+
+This means:
+- If you have described a feature with scope, behavior, acceptance criteria, and implementation guidance
+- You have gathered enough information to create a build-ready specification
+- The user has provided answers to your clarifying questions
+
+Then you MUST:
+1. **Write the feature file** to `.prompts/features/YYYY-MM-DD-description.md` (using today's date)
+2. **Update relevant planning specs** (intent.md, app-spec.md, data-spec.md, rules.md, tasks.json) if needed
+3. **Present a plan summary** listing what files were created/updated
+
+Do NOT wait for the user to say "implement this" or "create the file". The specification IS the deliverable in Planning mode.
+
+---
+
 ## PLAN SUMMARY (REQUIRED WHEN FILES CHANGE)
 
 Whenever you create or update planning artifacts, present a plan summary:
@@ -120,7 +138,7 @@ Whenever you create or update planning artifacts, present a plan summary:
 - Open questions (if any)
 - Files created or updated
 
-Pause for user feedback before treating the plan as final.
+The user can then provide feedback or corrections.
 
 ---
 
