@@ -371,6 +371,132 @@ async fn write_feature_file(project_path: String, file_path: String, content: St
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
+// Chat session metadata structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ChatSessionMetadata {
+    filename: String,
+    last_modified: u64,
+    message_count: usize,
+    mode: String,
+    first_user_message: String,
+}
+
+// Tauri command: List chat sessions (excluding active session)
+#[tauri::command]
+async fn list_chat_sessions(project_path: String) -> Result<Vec<ChatSessionMetadata>, String> {
+    let chat_sessions_dir = PathBuf::from(&project_path)
+        .join(".naide")
+        .join("chatsessions");
+    
+    if !chat_sessions_dir.exists() {
+        return Ok(Vec::new());
+    }
+    
+    if !chat_sessions_dir.is_dir() {
+        return Err("Chat sessions path is not a directory".to_string());
+    }
+    
+    let mut sessions = Vec::new();
+    
+    let entries = fs::read_dir(&chat_sessions_dir)
+        .map_err(|e| format!("Failed to read chat sessions directory: {}", e))?;
+    
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let path = entry.path();
+        let file_name = entry.file_name().to_string_lossy().to_string();
+        
+        // Skip the active chat file and non-JSON files
+        if file_name == "default-chat.json" || !file_name.ends_with(".json") {
+            continue;
+        }
+        
+        // Read file metadata
+        let metadata = fs::metadata(&path)
+            .map_err(|e| format!("Failed to read file metadata: {}", e))?;
+        
+        let last_modified = metadata.modified()
+            .ok()
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs())
+            .unwrap_or(0);
+        
+        // Read and parse the chat session file
+        match fs::read_to_string(&path) {
+            Ok(content) => {
+                match serde_json::from_str::<serde_json::Value>(&content) {
+                    Ok(session) => {
+                        let messages = session.get("messages")
+                            .and_then(|m| m.as_array())
+                            .cloned()
+                            .unwrap_or_default();
+                        
+                        let mode = session.get("mode")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Planning")
+                            .to_string();
+                        
+                        // Find first user message
+                        let first_user_message = messages.iter()
+                            .find(|msg| {
+                                msg.get("role")
+                                    .and_then(|r| r.as_str())
+                                    .map(|r| r == "user")
+                                    .unwrap_or(false)
+                            })
+                            .and_then(|msg| msg.get("content"))
+                            .and_then(|c| c.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        
+                        sessions.push(ChatSessionMetadata {
+                            filename: file_name,
+                            last_modified,
+                            message_count: messages.len(),
+                            mode,
+                            first_user_message,
+                        });
+                    }
+                    Err(_) => {
+                        // Skip corrupted files
+                        log::warn!("Skipping corrupted chat session file: {}", file_name);
+                    }
+                }
+            }
+            Err(_) => {
+                // Skip files that can't be read
+                log::warn!("Skipping unreadable chat session file: {}", file_name);
+            }
+        }
+    }
+    
+    // Sort by last_modified descending (most recent first)
+    sessions.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+    
+    Ok(sessions)
+}
+
+// Tauri command: Load a specific chat session
+#[tauri::command]
+async fn load_chat_session_file(project_path: String, filename: String) -> Result<String, String> {
+    // Security check: validate filename
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Err("Invalid filename".to_string());
+    }
+    
+    let session_path = PathBuf::from(&project_path)
+        .join(".naide")
+        .join("chatsessions")
+        .join(&filename);
+    
+    if !session_path.exists() {
+        return Err(format!("Chat session file not found: {}", filename));
+    }
+    
+    fs::read_to_string(&session_path)
+        .map_err(|e| format!("Failed to read chat session file: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -491,7 +617,9 @@ pub fn run() {
       log_to_file,
       list_feature_files,
       read_feature_file,
-      write_feature_file
+      write_feature_file,
+      list_chat_sessions,
+      load_chat_session_file
     ])
     .on_window_event(|_window, event| {
       // Clean up sidecar on app exit
