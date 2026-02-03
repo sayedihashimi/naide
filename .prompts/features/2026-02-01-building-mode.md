@@ -45,7 +45,7 @@ Building mode bridges this gap by allowing the AI to implement what was planned.
 
 ### When Building Mode is Active
 1. **AI can modify**:
-   - Application source code under `src/`
+   - Application source code in the project folder
    - Test files
    - Configuration files (with restrictions)
    - UI components and assets
