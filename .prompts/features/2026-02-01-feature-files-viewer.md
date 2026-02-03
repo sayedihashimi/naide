@@ -1,11 +1,12 @@
 ---
-Status: planned
+Status: shipped
 Area: ui, planning
 Created: 2026-02-01
 LastUpdated: 2026-02-03
 ---
 
 # Feature: Feature Files Viewer
+**Status**: ✅ IMPLEMENTED
 
 ## Overview
 Add a UI component to the left navigation column that displays all feature files from `.prompts/features/`, allowing users to browse and view their contents in a markdown preview with advanced filtering options and optional editing capabilities.

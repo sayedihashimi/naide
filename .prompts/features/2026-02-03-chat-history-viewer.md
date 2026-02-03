@@ -1,12 +1,36 @@
 ---
-Status: planned
+Status: shipped
 Area: ui, chat
 Created: 2026-02-03
 LastUpdated: 2026-02-03
 ---
 
 # Feature: Chat History Viewer
-**Status**: 🟡 PLANNED
+**Status**: ✅ IMPLEMENTED
+
+# Feature: Chat History Viewer
+**Status**: ✅ IMPLEMENTED
+
+## Implementation Summary
+
+The Chat History Viewer has been fully implemented with a ChatHistoryDropdown component that displays archived chat sessions and allows users to load them.
+
+**Key Features Implemented:**
+- Clock icon button next to "New Chat" button
+- Dropdown displays list of archived chats sorted by most recent first
+- Each chat item shows: date, mode, message count, and preview
+- Clicking a chat loads it successfully
+- Current chat auto-saves before loading another
+- Dropdown closes after selection and when clicking outside
+- Empty state when no archived chats exist
+- Error handling for corrupted/missing files
+- Keyboard support (ESC to close)
+- Dark theme styling consistent with Naide's design system
+
+**Files Implemented:**
+- `src/components/ChatHistoryDropdown.tsx` - Main dropdown component
+- `src/pages/GenerateAppScreen.tsx` - Integration and state management
+- `src/utils/chatPersistence.ts` - File operations
 
 ## Summary
 Add a UI component that allows users to view and load previous chat sessions. Users can click a clock icon above the chat area to see a dropdown list of archived chats and select one to open.

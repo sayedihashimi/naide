@@ -1,11 +1,12 @@
 ---
-Status: planned
+Status: shipped
 Area: ui, planning
 Created: 2026-02-01
-LastUpdated: 2026-02-01
+LastUpdated: 2026-02-03
 ---
 
 # Feature: Simplify Naide to a single chat-driven screen (Generate App only)
+**Status**: ✅ IMPLEMENTED
 
 ## Summary
 Refactor the Naide prototype to remove:

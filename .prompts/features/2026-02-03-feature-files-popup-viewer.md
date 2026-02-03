@@ -1,11 +1,41 @@
 ---
-Status: planned
+Status: shipped
 Area: ui, features
 Created: 2026-02-03
 LastUpdated: 2026-02-03
 ---
 
 # Feature: Popup Window for Feature Files Viewer
+**Status**: 🟡 PARTIALLY IMPLEMENTED (Inline viewer with edit mode)
+
+## Current Implementation
+
+Instead of a popup window, the feature files viewer is currently implemented as an **inline viewer in the left panel** with the following features:
+
+**Implemented Features:**
+- File list tree view with folders
+- Filter bar for searching files
+- View options menu (show bugs, show removed features, show raw filenames)
+- Inline markdown preview (rendered below file list)
+- Edit mode with textarea
+- Save/Cancel buttons
+- Keyboard shortcuts (Ctrl+S/Cmd+S to save, ESC to close edit mode)
+- Date-based sorting (most recent first)
+- Dark theme styling
+
+**Components:**
+- `src/components/FeatureFilesViewer.tsx` - Main viewer component
+- `src/components/FeatureFilesList.tsx` - File tree component
+- `src/components/ViewOptionsMenu.tsx` - View options dropdown
+- `src/components/MarkdownPreview.tsx` - Markdown rendering
+- `src/components/Modal.tsx` - Basic modal (not draggable)
+
+**Not Implemented:**
+- DraggableModal component
+- Popup window functionality
+- Drag to reposition
+- Resize from corners/edges
+- Multiple simultaneous windows
 
 ## Summary
 Convert the inline feature files preview in the left panel to a movable/resizable popup window. This provides more space for viewing and editing feature files without losing the compact file list navigation.
