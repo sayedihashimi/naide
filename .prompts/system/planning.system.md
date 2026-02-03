@@ -124,11 +124,21 @@ Pause for user feedback before treating the plan as final.
 
 ---
 
-## LEARNINGS
+## LEARNINGS (MANDATORY WHEN CORRECTED)
 
-If the user corrects assumptions or a recurring ambiguity is resolved:
-- Record a concise learning in `.prompts/learnings/**` **only if** it is novel and reusable
-- Avoid noise
+**When you must write a learning**:
+- The user corrects your file location choices (wrong folder, wrong naming)
+- The user corrects your assumptions about conventions or requirements
+- You violate a rule or spec and are corrected
+- A recurring ambiguity is resolved
+
+**How to write learnings**:
+- Record in `.prompts/learnings/**` grouped by topic (e.g., `planning-behavior.md`, `project-organization.md`)
+- Include: what happened, why it mattered, what to do next time
+- Keep concise and reusable
+- Avoid noise, logs, or session-specific notes
+
+**Before finishing each task, check**: Did the user correct me? If yes → write learning.
 
 ---
 

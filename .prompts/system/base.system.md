@@ -63,12 +63,27 @@ Naide uses explicit, project-local memory stored as files within the user's curr
 Before planning or building, scan relevant learnings and apply them.
 
 ### When to write a learning (only if novel + reusable)
-Write a learning only when it would prevent future mistakes or speed up future work, for example:
-- The user corrects a wrong assumption or preference.
-- A build/test/tooling failure is diagnosed and fixed in a stable way.
-- A repo-specific convention is discovered or clarified.
+Write a learning **when**:
+- **The user corrects you** about file locations, conventions, or project-specific practices
+- **You make a mistake that gets caught** (wrong folder, incorrect assumption, spec violation)
+- A build/test/tooling failure is diagnosed and fixed in a stable way
+- A repo-specific convention is discovered or clarified
+
+**Critical**: If you saved a file to the wrong location, made an incorrect assumption, or violated a convention and the user corrected you, you **must** write a learning to `.prompts/learnings/` describing:
+- What you did wrong
+- Why it was wrong
+- What to do instead next time
 
 Do **not** write noisy logs, long stack traces, or session diaries. Keep learnings concise and topic-grouped.
+
+### Learning decision checklist
+Before completing a task, ask yourself:
+- ☐ Did the user correct me about anything?
+- ☐ Did I make a mistake that was caught?
+- ☐ Would recording this prevent the same mistake in the future?
+- ☐ Is this a novel insight (not already in learnings or specs)?
+
+If YES to any: Write a learning.
 
 ### Authority
 - Specs/features are the contract.
