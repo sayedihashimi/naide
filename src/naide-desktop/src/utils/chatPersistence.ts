@@ -122,6 +122,30 @@ export async function loadChatSession(projectName: string, sessionFilename?: str
   }
 }
 
+// Load full chat session (including messages and summary)
+export async function loadFullChatSession(projectName: string, sessionFilename: string, actualPath?: string): Promise<ChatSession | null> {
+  logInfo(`[ChatPersistence] loadFullChatSession called with: projectName=${projectName}, sessionFilename=${sessionFilename}, actualPath=${actualPath}`);
+  try {
+    const chatSessionsDir = await getChatSessionsDir(projectName, actualPath);
+    const sessionPath = await join(chatSessionsDir, sessionFilename);
+    logInfo(`[ChatPersistence] Attempting to load full chat session from: ${sessionPath}`);
+    
+    const sessionExists = await exists(sessionPath);
+    if (!sessionExists) {
+      logInfo(`[ChatPersistence] Chat session file does not exist: ${sessionPath}`);
+      return null;
+    }
+    
+    const content = await readTextFile(sessionPath);
+    const session: ChatSession = JSON.parse(content);
+    logInfo(`[ChatPersistence] Successfully loaded full chat session: ${session.id} with ${session.messages.length} messages from: ${sessionPath}`);
+    return session;
+  } catch (error) {
+    logError(`[ChatPersistence] Error loading full chat session: ${error}`);
+    return null;
+  }
+}
+
 // Save chat session
 export async function saveChatSession(
   projectName: string,

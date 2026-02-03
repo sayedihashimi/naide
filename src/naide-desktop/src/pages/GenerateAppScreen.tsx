@@ -10,6 +10,7 @@ import {
 } from '../utils/conversationMemory';
 import MessageContent from '../components/MessageContent';
 import FeatureFilesViewer from '../components/FeatureFilesViewer';
+import ChatHistoryDropdown from '../components/ChatHistoryDropdown';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, type LastProject } from '../utils/globalSettings';
@@ -91,6 +92,8 @@ const GenerateAppScreen: React.FC = () => {
   // Recent projects dropdown state
   const [showRecentProjects, setShowRecentProjects] = useState(false);
   const [recentProjects, setRecentProjects] = useState<LastProject[]>([]);
+  // Chat history dropdown state
+  const [showChatHistory, setShowChatHistory] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -492,6 +495,66 @@ const GenerateAppScreen: React.FC = () => {
     }
   };
 
+  const handleLoadChat = async (filename: string) => {
+    logInfo(`[GenerateApp] Loading chat from history: ${filename}`);
+    
+    // Save current chat if it has user messages
+    const hasUserMessages = messages.some((m) => m.role === 'user');
+    if (hasUserMessages && chatInitialized) {
+      try {
+        const { saveChatSession } = await import('../utils/chatPersistence');
+        await saveChatSession(
+          state.projectName,
+          messages,
+          undefined,
+          state.projectPath || undefined
+        );
+        logInfo('[GenerateApp] Current chat saved before loading from history');
+      } catch (error) {
+        logError(`[GenerateApp] Error saving current chat: ${error}`);
+        // Continue with loading even if save fails
+      }
+    }
+    
+    try {
+      // Load the selected chat session
+      const { loadFullChatSession } = await import('../utils/chatPersistence');
+      const session = await loadFullChatSession(
+        state.projectName,
+        filename,
+        state.projectPath || undefined
+      );
+      
+      if (session) {
+        logInfo(`[GenerateApp] Loaded chat session from history: ${session.id}`);
+        setMessages(session.messages);
+        
+        // Restore mode if available
+        if (session.mode) {
+          setCopilotMode(session.mode as CopilotMode);
+        }
+        
+        // Restore summary if available
+        if (session.summary) {
+          setConversationSummary(session.summary as ConversationSummary);
+        } else {
+          setConversationSummary(null);
+        }
+        
+        setChatInitialized(true);
+        
+        // Focus the textarea
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        }
+      } else {
+        logError('[GenerateApp] Failed to load chat session from history');
+      }
+    } catch (error) {
+      logError(`[GenerateApp] Error loading chat from history: ${error}`);
+    }
+  };
+
   const handleOpenProjectFolder = async () => {
     try {
       // Get the current project path
@@ -789,7 +852,7 @@ const GenerateAppScreen: React.FC = () => {
           {/* Input row */}
           <div className="border-t border-zinc-800 p-6">
             <div className="max-w-3xl mx-auto">
-              {/* Mode selector with New Chat button */}
+              {/* Mode selector with New Chat and Chat History buttons */}
               <div className="mb-3 flex items-center gap-2">
                 {/* New Chat button */}
                 <button
@@ -812,6 +875,36 @@ const GenerateAppScreen: React.FC = () => {
                     />
                   </svg>
                 </button>
+                {/* Chat History button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowChatHistory(!showChatHistory)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-gray-100 transition-colors"
+                    title="View chat history"
+                    aria-label="View chat history"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </button>
+                  <ChatHistoryDropdown
+                    projectName={state.projectName}
+                    projectPath={state.projectPath || undefined}
+                    onLoadChat={handleLoadChat}
+                    isOpen={showChatHistory}
+                    onClose={() => setShowChatHistory(false)}
+                  />
+                </div>
                 <label htmlFor="mode-select" className="text-sm text-gray-400">
                   Mode:
                 </label>
