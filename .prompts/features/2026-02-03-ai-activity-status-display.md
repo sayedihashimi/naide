@@ -1,12 +1,39 @@
 ---
-Status: planned
+Status: shipped
 Area: ui, chat, ux
 Created: 2026-02-03
 LastUpdated: 2026-02-03
 ---
 
 # Feature: AI Activity Status Display
-**Status**: 🟡 PLANNED
+**Status**: ✅ IMPLEMENTED
+
+## Implementation Summary
+
+The AI Activity Status Display has been fully implemented with real-time status updates during AI operations.
+
+**Key Features Implemented:**
+- WebSocket connection between frontend and sidecar for real-time status events
+- Status bar positioned between chat messages and input area
+- Event types: file read/write, API calls, build/test operations, analysis steps
+- Smart event deduplication: in_progress events are updated in place with complete events (no duplicates)
+- Auto-hide behavior: status events automatically clear 10 seconds after AI session completes
+- Animated icons for in-progress operations (spinning loader)
+- Visual feedback for completed (checkmark) and error (X) states
+- Dark theme styling consistent with Naide's design system
+
+**Technical Implementation:**
+- **Backend**: StatusEventEmitter class in `src/copilot-sidecar/src/statusEvents.ts`
+- **WebSocket Server**: `ws://localhost:3001` with status event broadcasting
+- **Frontend Component**: `ActivityStatusBar.tsx` with event tracking by file path
+- **Event Tracking**: Events are keyed by file path to enable in-place updates (prevents duplicates)
+- **Session Management**: `session_complete` event triggers 10-second auto-hide timer
+
+**Files Modified:**
+- `src/copilot-sidecar/src/statusEvents.ts` - Event types and emitter
+- `src/copilot-sidecar/src/index.ts` - WebSocket server and event emission
+- `src/naide-desktop/src/components/ActivityStatusBar.tsx` - Status display component
+- `src/naide-desktop/src/pages/GenerateAppScreen.tsx` - Integration
 
 ## Summary
 Show real-time information about what the AI is doing during operations (files being read/written, analysis steps, etc.) in a persistent status area below the chat. This information is ephemeral and not saved to chat history, similar to VS Code's output panels.

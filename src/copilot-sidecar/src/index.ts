@@ -739,6 +739,9 @@ app.post('/api/copilot/stream', async (req, res) => {
         // Emit status: response complete
         statusEmitter.emitApiCall('Response complete', 'complete');
         
+        // Emit session complete to trigger auto-hide in frontend
+        statusEmitter.emitSessionComplete();
+        
         // Send the complete buffered response for any post-processing
         sendEvent('done', { fullResponse: responseBuffer.join('') });
         res.end();
@@ -1078,6 +1081,9 @@ app.post('/api/copilot/chat', async (req, res) => {
           console.log('[Sidecar] Session idle - request complete');
           clearTimeout(timeoutHandle);
           cleanupListeners();
+          
+          // Emit session complete to trigger auto-hide in frontend
+          statusEmitter.emitSessionComplete();
           
           // Destroy session after use
           session.destroy().catch(err => console.error('[Sidecar] Error destroying session:', err));

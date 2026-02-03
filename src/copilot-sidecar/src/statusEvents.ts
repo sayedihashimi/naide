@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { WebSocket, WebSocketServer } from 'ws';
 
-export type StatusEventType = 'file_read' | 'file_write' | 'analysis' | 'build' | 'test' | 'api_call';
+export type StatusEventType = 'file_read' | 'file_write' | 'analysis' | 'build' | 'test' | 'api_call' | 'session_complete';
 export type StatusEventStatus = 'in_progress' | 'complete' | 'error';
 
 export interface StatusEvent {
@@ -57,6 +57,10 @@ export class StatusEventEmitter extends EventEmitter {
 
   emitApiCall(message: string, status: StatusEventStatus = 'in_progress'): StatusEvent {
     return this.emitStatus('api_call', status, message);
+  }
+
+  emitSessionComplete(): StatusEvent {
+    return this.emitStatus('session_complete', 'complete', 'Session complete');
   }
 }
 

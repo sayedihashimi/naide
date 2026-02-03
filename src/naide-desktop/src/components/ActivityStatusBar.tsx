@@ -11,7 +11,7 @@ import {
   Loader2,
 } from 'lucide-react';
 
-export type StatusEventType = 'file_read' | 'file_write' | 'analysis' | 'build' | 'test' | 'api_call';
+export type StatusEventType = 'file_read' | 'file_write' | 'analysis' | 'build' | 'test' | 'api_call' | 'session_complete';
 export type StatusEventStatus = 'in_progress' | 'complete' | 'error';
 
 export interface StatusEvent {
@@ -81,6 +81,7 @@ const ActivityStatusBar: React.FC = () => {
   const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const removeTimersRef = useRef<Map<string, number>>(new Map());
+  const autoHideTimerRef = useRef<number | null>(null);
 
   // WebSocket connection management
   useEffect(() => {
@@ -95,7 +96,36 @@ const ActivityStatusBar: React.FC = () => {
         try {
           const statusEvent: StatusEvent = JSON.parse(event.data);
           
+          // Handle session_complete - auto-hide after 10 seconds
+          if (statusEvent.type === 'session_complete') {
+            if (autoHideTimerRef.current) {
+              window.clearTimeout(autoHideTimerRef.current);
+            }
+            autoHideTimerRef.current = window.setTimeout(() => {
+              setStatusEvents([]);
+              autoHideTimerRef.current = null;
+            }, 10000); // 10 seconds
+            return; // Don't add session_complete to the events list
+          }
+          
           setStatusEvents((prev) => {
+            // Check if we should update an existing event (same file path for file operations)
+            // This prevents duplicates when we get in_progress followed by complete
+            if (statusEvent.details && (statusEvent.type === 'file_read' || statusEvent.type === 'file_write')) {
+              const existingIndex = prev.findIndex(
+                e => e.details === statusEvent.details && 
+                     e.type === statusEvent.type &&
+                     e.status === 'in_progress'
+              );
+              
+              if (existingIndex >= 0 && statusEvent.status === 'complete') {
+                // Replace the in_progress event with the complete event
+                const updated = [...prev];
+                updated[existingIndex] = statusEvent;
+                return updated;
+              }
+            }
+            
             // Add new event
             const updated = [...prev, statusEvent];
             
@@ -139,6 +169,11 @@ const ActivityStatusBar: React.FC = () => {
       // Clear all removal timers
       removeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
       removeTimersRef.current.clear();
+      
+      // Clear auto-hide timer
+      if (autoHideTimerRef.current) {
+        window.clearTimeout(autoHideTimerRef.current);
+      }
       
       // Close WebSocket
       if (wsRef.current) {
