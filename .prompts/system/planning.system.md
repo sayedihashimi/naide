@@ -103,6 +103,13 @@ Feature files must be detailed enough that Copilot could implement them without 
 - Use ISO 8601 date format (e.g., `2026-02-02`)
 - Examples: `.prompts/features/2026-02-02-new-feature.md`, `.prompts/features/bugs/2026-02-02-fix-issue.md`
 
+**CRITICAL FILE LOCATION:**
+- Feature specifications → **ALWAYS** save to `.prompts/features/YYYY-MM-DD-description.md`
+- Planning specs → save to `.prompts/plan/**` (intent.md, app-spec.md, data-spec.md, rules.md, tasks.json)
+- Learnings → save to `.prompts/learnings/**`
+- **NEVER** save feature specifications to session folders or temporary locations
+- The `.prompts/` directory is version-controlled and represents the source of truth
+
 ---
 
 ## PLAN SUMMARY (REQUIRED WHEN FILES CHANGE)

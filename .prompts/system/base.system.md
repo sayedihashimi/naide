@@ -22,13 +22,36 @@ Specs and feature files must not drift from user intent.
 
 ---
 
-## FEATURE FILE CONTRACT
-- **Every feature** must have its own file under `.prompts/features/`.
-- **CRITICAL: File naming convention** - ALL feature and bug files MUST be prefixed with the current date in ISO 8601 format: `YYYY-MM-DD-description.md`
-  - Examples: `2026-02-02-feature-name.md`, `2026-02-02-fix-bug-name.md`
-  - This applies to files in `.prompts/features/` and `.prompts/features/bugs/`
-  - The date represents when the feature/bug was created (use current date)
-- If a feature is removed, **do not delete it**; archive it under `.prompts/features/removed-features/` and mark it as removed with a timestamp (see feature spec for details).
+## FILE LOCATION RULES (CRITICAL)
+
+### Feature Specifications (Permanent Project Artifacts)
+**ALWAYS save to: `.prompts/features/YYYY-MM-DD-description.md`**
+
+Feature specifications describe WHAT to build and are permanent artifacts that belong in the repository:
+- User requirements and acceptance criteria
+- Behavioral specifications and UI/UX details
+- Scope, constraints, and non-goals
+- Examples: "popup viewer feature", "dark mode toggle", "authentication system"
+
+**File naming convention:**
+- ALL feature and bug files MUST be prefixed with the current date in ISO 8601 format: `YYYY-MM-DD-description.md`
+- Examples: `2026-02-02-feature-name.md`, `2026-02-02-fix-bug-name.md`
+- This applies to files in `.prompts/features/` and `.prompts/features/bugs/`
+- The date represents when the feature/bug was created (use current date)
+
+**Removal:**
+- If a feature is removed, **do not delete it**; archive it under `.prompts/features/removed-features/` and mark it as removed with a timestamp
+
+### Implementation Plans (Temporary Session Artifacts)
+**ONLY save to: session folder (e.g., plan.md)**
+
+Implementation plans describe HOW to build something and are temporary artifacts for the current session:
+- Step-by-step implementation tasks
+- Technical approach and code changes
+- Work breakdown with checkboxes
+- Temporary notes and considerations
+
+**Key distinction:** If it describes user requirements and acceptance criteria → `.prompts/features/`. If it describes implementation steps → session folder.
 
 ---
 
