@@ -1,10 +1,12 @@
 import express from 'express';
 import cors from 'cors';
+import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve, sep } from 'path';
 import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { CopilotClient } from '@github/copilot-sdk';
 import { initializeLogger } from './logger.js';
+import { StatusEventEmitter, createStatusWebSocketServer } from './statusEvents.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -63,6 +65,9 @@ const PORT = 3001;
 // Track Copilot client
 let copilotClient: CopilotClient | null = null;
 let copilotReady = false;
+
+// Create status event emitter
+const statusEmitter = new StatusEventEmitter();
 
 // Initialize Copilot client
 async function initializeCopilot(): Promise<{ success: boolean; error?: string }> {
@@ -563,6 +568,9 @@ app.post('/api/copilot/stream', async (req, res) => {
       // Buffer for safety - we still collect the full response for file operations
       const responseBuffer: string[] = [];
       
+      // Track tool calls for status reporting
+      const toolCalls = new Map<string, { toolName: string; toolArgs: any }>();
+      
       // Track all unsubscribe functions for cleanup
       const unsubscribeFns: Array<() => void> = [];
       
@@ -605,6 +613,10 @@ app.post('/api/copilot/stream', async (req, res) => {
         if (event.data.deltaContent) {
           responseBuffer.push(event.data.deltaContent);
           sendEvent('delta', { content: event.data.deltaContent });
+          // Emit status: streaming response (only once at start)
+          if (responseBuffer.length === 1) {
+            statusEmitter.emitApiCall('Streaming response...', 'in_progress');
+          }
         }
         resetTimeout('streaming content');
       }));
@@ -648,6 +660,36 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       unsubscribeFns.push(session.on('tool.execution_complete', (event) => {
         console.log(`[Sidecar] Tool completed: ${event.data.toolCallId}, success: ${event.data.success}`);
+        
+        // Get stored tool call info
+        const toolCallInfo = toolCalls.get(event.data.toolCallId);
+        if (toolCallInfo) {
+          const toolName = toolCallInfo.toolName?.toLowerCase() || '';
+          const args = toolCallInfo.toolArgs as Record<string, any> || {};
+          const filePath = args.path || args.file || args.filename;
+          
+          // Emit completion status for file operations
+          if (event.data.success) {
+            if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
+              statusEmitter.emitFileWrite(filePath, 'complete');
+            } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
+              statusEmitter.emitFileRead(filePath, 'complete');
+            } else if (toolName.includes('grep') || toolName.includes('glob')) {
+              statusEmitter.emitAnalysis('Search complete', 'complete');
+            }
+          } else {
+            // Emit error status if tool failed
+            if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
+              statusEmitter.emitFileWrite(`Failed to write ${filePath}`, 'error');
+            } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
+              statusEmitter.emitFileRead(`Failed to read ${filePath}`, 'error');
+            }
+          }
+          
+          // Clean up stored tool call
+          toolCalls.delete(event.data.toolCallId);
+        }
+        
         sendEvent('tool_complete', { 
           toolCallId: event.data.toolCallId,
           success: event.data.success 
@@ -672,6 +714,9 @@ app.post('/api/copilot/stream', async (req, res) => {
         console.log('[Sidecar] Session idle - streaming complete');
         clearTimeout(timeoutHandle);
         cleanupListeners();
+        
+        // Emit status: response complete
+        statusEmitter.emitApiCall('Response complete', 'complete');
         
         // Send the complete buffered response for any post-processing
         sendEvent('done', { fullResponse: responseBuffer.join('') });
@@ -704,6 +749,9 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       // Set initial timeout
       resetTimeout();
+      
+      // Emit status: requesting Copilot response
+      statusEmitter.emitApiCall('Requesting Copilot response...', 'in_progress');
       
       // Send the message to start streaming
       await session.send({ prompt: message });
@@ -1013,8 +1061,14 @@ app.get('/health', (req, res) => {
 });
 
 // Start the server and initialize Copilot
-app.listen(PORT, async () => {
+const server = createServer(app);
+
+// Create WebSocket server for status events
+createStatusWebSocketServer(server, statusEmitter);
+
+server.listen(PORT, async () => {
   console.log(`[Sidecar] Copilot sidecar running on http://localhost:${PORT}`);
+  console.log(`[Sidecar] WebSocket server ready at ws://localhost:${PORT}/api/status`);
   
   // Initialize Copilot on startup
   const initResult = await initializeCopilot();
