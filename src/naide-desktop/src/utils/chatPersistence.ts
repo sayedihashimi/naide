@@ -205,11 +205,17 @@ export async function listChatSessions(projectName: string, actualPath?: string)
   }
 }
 
-// Generate a unique chat session ID using timestamp and random string
+// Generate a unique chat session ID with date prefix (YYYY-MM-DD-)
 function generateChatId(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const datePrefix = `${year}-${month}-${day}`;
+  
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substr(2, 9);
-  return `chat-${timestamp}-${randomStr}`;
+  return `${datePrefix}-chat-${timestamp}-${randomStr}`;
 }
 
 // Archive the current chat session by saving it with a unique ID
