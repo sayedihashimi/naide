@@ -702,11 +702,11 @@ const GenerateAppScreen: React.FC = () => {
             </nav>
           </div>
           
-          {/* Divider and Feature Files section */}
+          {/* Divider and Features section */}
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="p-4 border-b border-zinc-800">
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Feature Files
+                Features
               </h2>
             </div>
             <div className="flex-1 overflow-hidden">
