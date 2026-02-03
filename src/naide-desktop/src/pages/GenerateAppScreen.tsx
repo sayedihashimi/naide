@@ -10,7 +10,9 @@ import {
 } from '../utils/conversationMemory';
 import MessageContent from '../components/MessageContent';
 import FeatureFilesViewer from '../components/FeatureFilesViewer';
+import FeatureFilePopup from '../components/FeatureFilePopup';
 import ChatHistoryDropdown from '../components/ChatHistoryDropdown';
+import type { FeatureFileNode } from '../utils/featureFiles';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, type LastProject } from '../utils/globalSettings';
@@ -94,6 +96,16 @@ const GenerateAppScreen: React.FC = () => {
   const [recentProjects, setRecentProjects] = useState<LastProject[]>([]);
   // Chat history dropdown state
   const [showChatHistory, setShowChatHistory] = useState(false);
+  // Feature file popup state
+  const [featureFilePopup, setFeatureFilePopup] = useState<{
+    isOpen: boolean;
+    filePath: string;
+    fileName: string;
+  }>({
+    isOpen: false,
+    filePath: '',
+    fileName: '',
+  });
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -644,6 +656,22 @@ const GenerateAppScreen: React.FC = () => {
     }
   };
 
+  const handleFeatureFileSelect = (file: FeatureFileNode) => {
+    setFeatureFilePopup({
+      isOpen: true,
+      filePath: file.path,
+      fileName: file.name,
+    });
+  };
+
+  const handleFeatureFilePopupClose = () => {
+    setFeatureFilePopup({
+      isOpen: false,
+      filePath: '',
+      fileName: '',
+    });
+  };
+
   return (
     <div className="h-screen bg-zinc-950 flex flex-col">
       {/* Header */}
@@ -773,7 +801,10 @@ const GenerateAppScreen: React.FC = () => {
               </h2>
             </div>
             <div className="flex-1 overflow-hidden">
-              <FeatureFilesViewer />
+              <FeatureFilesViewer 
+                onFileSelect={handleFeatureFileSelect}
+                selectedPath={featureFilePopup.isOpen ? featureFilePopup.filePath : null}
+              />
             </div>
           </div>
         </div>
@@ -1085,6 +1116,17 @@ const GenerateAppScreen: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Feature File Popup */}
+      {state.projectPath && (
+        <FeatureFilePopup
+          filePath={featureFilePopup.filePath}
+          fileName={featureFilePopup.fileName}
+          isOpen={featureFilePopup.isOpen}
+          onClose={handleFeatureFilePopupClose}
+          projectPath={state.projectPath}
+        />
+      )}
     </div>
   );
 };

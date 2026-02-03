@@ -1,27 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/useAppContext';
-import { listFeatureFiles, readFeatureFile, writeFeatureFile, filterFeatureFiles, type FeatureFileNode, type ViewOptions } from '../utils/featureFiles';
+import { listFeatureFiles, filterFeatureFiles, type FeatureFileNode, type ViewOptions } from '../utils/featureFiles';
 import FeatureFilesList from './FeatureFilesList';
-import MarkdownPreview from './MarkdownPreview';
 import ViewOptionsMenu from './ViewOptionsMenu';
 
 // LocalStorage keys for persisting view options
 const STORAGE_KEY_VIEW_OPTIONS = 'naide-feature-viewer-options';
 
-const FeatureFilesViewer: React.FC = () => {
+interface FeatureFilesViewerProps {
+  onFileSelect?: (file: FeatureFileNode) => void;
+  selectedPath?: string | null;
+}
+
+const FeatureFilesViewer: React.FC<FeatureFilesViewerProps> = ({ 
+  onFileSelect, 
+  selectedPath = null 
+}) => {
   const { state } = useAppContext();
   const [files, setFiles] = useState<FeatureFileNode[]>([]);
   const [filteredFiles, setFilteredFiles] = useState<FeatureFileNode[]>([]);
   const [filterQuery, setFilterQuery] = useState('');
-  const [selectedFile, setSelectedFile] = useState<FeatureFileNode | null>(null);
-  const [fileContent, setFileContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedContent, setEditedContent] = useState('');
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   
   // Load view options from localStorage
   const [viewOptions, setViewOptions] = useState<ViewOptions>(() => {
@@ -83,110 +84,11 @@ const FeatureFilesViewer: React.FC = () => {
     setFilteredFiles(filtered);
   }, [files, filterQuery]);
   
-  // Load file content when selected file changes
-  useEffect(() => {
-    const loadContent = async () => {
-      if (!selectedFile || !state.projectPath || selectedFile.is_folder) {
-        setFileContent(null);
-        setIsEditing(false);
-        setHasUnsavedChanges(false);
-        return;
-      }
-      
-      try {
-        const content = await readFeatureFile(state.projectPath, selectedFile.path);
-        setFileContent(content);
-        setEditedContent(content);
-        setIsEditing(false);
-        setHasUnsavedChanges(false);
-      } catch (err) {
-        console.error('[FeatureFilesViewer] Error reading file:', err);
-        setFileContent('Error loading file content');
-      }
-    };
-    
-    loadContent();
-  }, [selectedFile, state.projectPath]);
-  
   const handleFileSelect = (node: FeatureFileNode) => {
-    // Warn if there are unsaved changes
-    if (hasUnsavedChanges) {
-      if (!confirm('You have unsaved changes. Do you want to discard them?')) {
-        return;
-      }
-    }
-    
-    if (!node.is_folder) {
-      setSelectedFile(node);
+    if (!node.is_folder && onFileSelect) {
+      onFileSelect(node);
     }
   };
-  
-  const handleToggleEdit = () => {
-    if (isEditing) {
-      // Warn if there are unsaved changes
-      if (hasUnsavedChanges) {
-        if (!confirm('You have unsaved changes. Do you want to discard them?')) {
-          return;
-        }
-      }
-      setIsEditing(false);
-      setEditedContent(fileContent || '');
-      setHasUnsavedChanges(false);
-    } else {
-      setIsEditing(true);
-    }
-  };
-  
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditedContent(e.target.value);
-    setHasUnsavedChanges(e.target.value !== fileContent);
-  };
-  
-  const handleSave = useCallback(async () => {
-    if (!selectedFile || !state.projectPath) {
-      return;
-    }
-    
-    try {
-      setIsSaving(true);
-      await writeFeatureFile(state.projectPath, selectedFile.path, editedContent);
-      setFileContent(editedContent);
-      setHasUnsavedChanges(false);
-      setIsEditing(false);
-    } catch (err) {
-      console.error('[FeatureFilesViewer] Error saving file:', err);
-      alert('Failed to save file: ' + err);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [selectedFile, state.projectPath, editedContent]);
-  
-  const handleCancel = () => {
-    if (hasUnsavedChanges) {
-      if (!confirm('You have unsaved changes. Do you want to discard them?')) {
-        return;
-      }
-    }
-    setEditedContent(fileContent || '');
-    setIsEditing(false);
-    setHasUnsavedChanges(false);
-  };
-  
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+S / Cmd+S to save
-      if ((e.ctrlKey || e.metaKey) && e.key === 's' && isEditing) {
-        e.preventDefault();
-        handleSave();
-      }
-    };
-    
-    if (isEditing) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isEditing, handleSave]);
   
   return (
     <div className="h-full flex flex-col">
@@ -235,8 +137,8 @@ const FeatureFilesViewer: React.FC = () => {
         </div>
       </div>
       
-      {/* File list - 30% of vertical space */}
-      <div className="flex-[0.3] min-h-[200px] overflow-hidden border-b border-zinc-800">
+      {/* File list - full vertical space */}
+      <div className="flex-1 overflow-hidden">
         {loading ? (
           <div className="p-4 text-center text-gray-500 text-sm">
             Loading...
@@ -253,49 +155,7 @@ const FeatureFilesViewer: React.FC = () => {
           <FeatureFilesList
             nodes={filteredFiles}
             onFileSelect={handleFileSelect}
-            selectedPath={selectedFile?.path || null}
-          />
-        )}
-      </div>
-      
-      {/* Markdown preview - 70% of vertical space */}
-      <div className="flex-[0.7] min-h-0 flex flex-col">
-        {isEditing ? (
-          <>
-            <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900">
-              <span className="text-sm font-medium text-gray-300">
-                Editing: {selectedFile?.name}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCancel}
-                  disabled={isSaving}
-                  className="px-3 py-1 text-sm text-gray-300 hover:text-gray-100 hover:bg-zinc-800 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving || !hasUnsavedChanges}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSaving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
-            <textarea
-              value={editedContent}
-              onChange={handleContentChange}
-              className="flex-1 p-4 bg-zinc-900 text-gray-100 font-mono text-sm resize-none focus:outline-none"
-              placeholder="Enter markdown content..."
-            />
-          </>
-        ) : (
-          <MarkdownPreview
-            content={fileContent}
-            fileName={selectedFile?.name || null}
-            onEdit={handleToggleEdit}
-            canEdit={!!selectedFile && !!fileContent}
+            selectedPath={selectedPath}
           />
         )}
       </div>
