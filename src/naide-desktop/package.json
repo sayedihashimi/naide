@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:dev": "npm run build:sidecar && tauri dev",
+    "tauri:dev": "npm run build:sidecar && tauri dev --no-watch",
     "tauri:build": "npm run build:sidecar && tauri build",
     "build:sidecar": "cd ../copilot-sidecar && npm install && npm run build",
     "test": "vitest",

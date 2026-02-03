@@ -45,6 +45,8 @@ The app will:
 2. Start the Tauri app
 3. Launch the sidecar in the background
 
+**Note**: File watching is disabled by default (`--no-watch` flag). This allows you to use Naide to modify its own code without triggering automatic reloads. The app will not automatically reload when you make changes to the source files.
+
 ### Manual sidecar development (optional)
 
 If you want to run the sidecar separately for development:
