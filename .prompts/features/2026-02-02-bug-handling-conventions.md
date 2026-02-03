@@ -2,7 +2,7 @@
 Status: shipped
 Area: process, documentation
 Created: 2026-02-02
-LastUpdated: 2026-02-02
+LastUpdated: 2026-02-03
 ---
 
 # Feature: Bug Handling Conventions

@@ -2,7 +2,24 @@
 
 **Type:** Bug Fix  
 **Priority:** High  
-**Status:** Open
+**Status:** ❌ Open (As of 2026-02-03)
+
+---
+
+## Verification Status
+
+Confirmed the bug still exists in `src/copilot-sidecar/src/index.ts` (lines 124-129):
+
+```typescript
+if (existsSync(basePath)) {
+  systemPrompt += readFileSync(basePath, 'utf-8') + '\n\n';
+  console.log(`[Sidecar] Loaded base system prompt from: ${basePath}`);
+} else {
+  console.warn(`[Sidecar] Base system prompt not found at: ${basePath}`);  // ← Just warns!
+}
+```
+
+The code continues execution even when the base system prompt is missing, which can lead to incorrect AI behavior.
 
 ---
 

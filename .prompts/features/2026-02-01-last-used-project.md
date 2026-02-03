@@ -1,12 +1,43 @@
 ---
-Status: planned
+Status: shipped
 Area: ui, infra
 Created: 2026-02-01
-LastUpdated: 2026-02-01
+LastUpdated: 2026-02-03
 ---
 
 # Feature: Last Used Project Persistence
-**Status**: 🟡 PLANNED
+**Status**: ✅ IMPLEMENTED
+
+## Implementation Summary
+
+The last used project persistence feature has been fully implemented with automatic project loading on app launch.
+
+**Implemented Features:**
+- Global settings file stored in OS-appropriate location (`%AppData%/com.naide.desktop/naide-settings.json`)
+- Last project path saved automatically when project is opened
+- Automatic project reload on app launch
+- Path validation (checks if project still exists)
+- Graceful fallback to project picker if path is invalid
+- Integration with recent projects list
+
+**Backend (Rust):**
+- `save_last_project` command in `src-tauri/src/lib.rs`
+- `load_last_project` command in `src-tauri/src/lib.rs`
+- Settings stored with version field for future migrations
+- Automatic directory creation for settings file
+
+**Frontend:**
+- `loadLastProject()` function in `src/utils/globalSettings.ts`
+- `saveLastProject()` function in `src/utils/globalSettings.ts`
+- Auto-load on startup in `src/App.tsx`
+- Project name and path extracted from settings
+- Fallback to project picker if no valid last project
+
+**Files Modified:**
+- `src/naide-desktop/src/App.tsx` - Added auto-load logic in `initializeApp()`
+- `src/naide-desktop/src/utils/globalSettings.ts` - Added API functions
+- `src/naide-desktop/src-tauri/src/lib.rs` - Added Tauri commands
+- `src/naide-desktop/src-tauri/src/settings.rs` - Settings persistence logic
 
 ## Summary
 Automatically remember and reload the last opened project when Naide launches. This provides a seamless user experience by eliminating the need to manually navigate to the project folder on every launch.

@@ -2,10 +2,11 @@
 Status: shipped
 Area: ui
 Created: 2026-02-01
-LastUpdated: 2026-02-01
+LastUpdated: 2026-02-03
 ---
 
 # Feature: Recent Projects Dropdown
+**Status**: ✅ IMPLEMENTED
 
 ## Overview
 Enhance the project switcher UI to show a dropdown list of recent projects when clicking the current project button, and add a separate "Open Project" button for browsing to a new folder.
