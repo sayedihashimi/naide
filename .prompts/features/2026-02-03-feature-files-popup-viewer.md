@@ -1,5 +1,5 @@
 ---
-Status: shipped
+Status: partially-implemented
 Area: ui, features
 Created: 2026-02-03
 LastUpdated: 2026-02-03

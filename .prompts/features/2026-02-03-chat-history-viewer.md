@@ -8,9 +8,6 @@ LastUpdated: 2026-02-03
 # Feature: Chat History Viewer
 **Status**: ✅ IMPLEMENTED
 
-# Feature: Chat History Viewer
-**Status**: ✅ IMPLEMENTED
-
 ## Implementation Summary
 
 The Chat History Viewer has been fully implemented with a ChatHistoryDropdown component that displays archived chat sessions and allows users to load them.
