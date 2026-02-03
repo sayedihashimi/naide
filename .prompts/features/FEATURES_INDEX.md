@@ -22,6 +22,7 @@ This index provides a chronological overview of all feature files in `.prompts/f
 | [2026-02-01-simplify-to-single-chat-screen.md](./2026-02-01-simplify-to-single-chat-screen.md) | Simplify to single chat-driven screen, remove intent capture | planned |
 | [2026-02-01-stream-copilot-responses.md](./2026-02-01-stream-copilot-responses.md) | Stream Copilot responses incrementally for better UX | planned |
 | [2026-02-02-bug-handling-conventions.md](./2026-02-02-bug-handling-conventions.md) | Establish conventions for bug reporting and tracking | shipped |
+| [2026-02-03-chat-history-viewer.md](./2026-02-03-chat-history-viewer.md) | UI component to view and load previous chat sessions | planned |
 
 ---
 
