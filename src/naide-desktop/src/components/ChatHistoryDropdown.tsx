@@ -96,7 +96,11 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    
+    // Reset time to midnight for accurate day comparison
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffMs = nowOnly.getTime() - dateOnly.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     // Today
