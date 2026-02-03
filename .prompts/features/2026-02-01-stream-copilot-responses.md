@@ -1,11 +1,12 @@
 ---
-Status: planned
+Status: shipped
 Area: chat, copilot
 Created: 2026-02-01
-LastUpdated: 2026-02-01
+LastUpdated: 2026-02-03
 ---
 
 # Feature: Stream Copilot Responses in Chat
+**Status**: ✅ IMPLEMENTED
 
 ## Summary
 Improve Naide’s chat experience by streaming Copilot responses incrementally instead of waiting for the full response before rendering.

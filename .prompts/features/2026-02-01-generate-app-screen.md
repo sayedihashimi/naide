@@ -2,7 +2,7 @@
 Status: shipped
 Area: ui, chat
 Created: 2026-02-01
-LastUpdated: 2026-02-01
+LastUpdated: 2026-02-03
 ---
 
 # Feature: Generate App Screen (3-column layout)

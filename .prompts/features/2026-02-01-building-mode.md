@@ -1,12 +1,12 @@
 ---
-Status: in-progress
+Status: planned
 Area: copilot, planning
 Created: 2026-02-01
-LastUpdated: 2026-02-01
+LastUpdated: 2026-02-03
 ---
 
 # Feature: Building Mode Implementation
-**Status**: 🔵 IN PROGRESS
+**Status**: 🟡 PLANNED (Stub implementation only)
 
 ## Summary
 Implement Building mode in the chat interface to enable AI-assisted code implementation and maintenance. Building mode updates both application code and specification files, keeping them synchronized. This transforms Naide from a planning-only tool into a full-cycle development assistant.
