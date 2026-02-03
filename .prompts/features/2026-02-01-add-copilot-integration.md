@@ -2,7 +2,7 @@
 Status: shipped
 Area: copilot, infra
 Created: 2026-02-01
-LastUpdated: 2026-02-01
+LastUpdated: 2026-02-03
 ---
 
 # Title: Initial Copilot SDK + Copilot CLI integration (Planning mode only; Building/Analyzing stubbed)
