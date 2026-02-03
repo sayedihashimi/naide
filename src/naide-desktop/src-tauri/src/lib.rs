@@ -3,9 +3,11 @@ use std::sync::Mutex;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use notify::{Watcher, RecursiveMode, recommended_watcher, Event, EventKind};
+use std::sync::mpsc::channel;
 
 mod settings;
 use settings::{LastProject, read_settings, write_settings, add_recent_project, get_recent_projects as get_recent_projects_from_settings};
@@ -13,6 +15,11 @@ use settings::{LastProject, read_settings, write_settings, add_recent_project, g
 // Global state to track the sidecar process
 struct SidecarState {
     process: Option<Child>,
+}
+
+// Global state to track file watchers
+struct WatcherState {
+    _watcher: Option<Box<dyn Watcher + Send>>,
 }
 
 // Tauri command: Log from frontend to backend log file
@@ -497,6 +504,69 @@ async fn load_chat_session_file(project_path: String, filename: String) -> Resul
         .map_err(|e| format!("Failed to read chat session file: {}", e))
 }
 
+// Tauri command: Watch feature files directory for changes
+#[tauri::command]
+async fn watch_feature_files(window: tauri::Window, project_path: String) -> Result<(), String> {
+    let features_path = PathBuf::from(&project_path)
+        .join(".prompts")
+        .join("features");
+    
+    if !features_path.exists() {
+        log::warn!("Features directory does not exist: {:?}", features_path);
+        return Err("Features directory does not exist".to_string());
+    }
+    
+    log::info!("Starting file watcher for: {:?}", features_path);
+    
+    let (tx, rx) = channel();
+    
+    // Create the watcher
+    let mut watcher = recommended_watcher(move |res: Result<Event, notify::Error>| {
+        match res {
+            Ok(event) => {
+                // Filter for events we care about
+                match event.kind {
+                    EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_) => {
+                        log::debug!("File change detected: {:?}", event);
+                        // Send through channel
+                        let _ = tx.send(());
+                    }
+                    _ => {}
+                }
+            }
+            Err(e) => {
+                log::error!("Watch error: {:?}", e);
+            }
+        }
+    }).map_err(|e| format!("Failed to create watcher: {}", e))?;
+    
+    // Start watching
+    watcher.watch(&features_path, RecursiveMode::Recursive)
+        .map_err(|e| format!("Failed to watch directory: {}", e))?;
+    
+    log::info!("File watcher started successfully");
+    
+    // Clone window for the thread, keep original for state access
+    let window_clone = window.clone();
+    
+    // Spawn a thread to listen for events and emit to frontend
+    std::thread::spawn(move || {
+        while let Ok(_) = rx.recv() {
+            // Emit event to frontend
+            log::debug!("Emitting feature-files-changed event");
+            if let Err(e) = window_clone.emit("feature-files-changed", ()) {
+                log::error!("Failed to emit event: {}", e);
+            }
+        }
+    });
+    
+    // Store watcher to keep it alive
+    // Note: The watcher will be dropped when the app closes, which is fine
+    window.state::<Mutex<WatcherState>>().lock().unwrap()._watcher = Some(Box::new(watcher));
+    
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -541,6 +611,11 @@ pub fn run() {
       // Test that logging works
       log::info!("Naide application starting");
       log::info!("Logging configured successfully");
+      
+      // Initialize watcher state
+      app.manage(Mutex::new(WatcherState {
+        _watcher: None,
+      }));
       
       // Start the copilot sidecar
       // Get the current executable directory and construct path to sidecar
@@ -619,7 +694,8 @@ pub fn run() {
       read_feature_file,
       write_feature_file,
       list_chat_sessions,
-      load_chat_session_file
+      load_chat_session_file,
+      watch_feature_files
     ])
     .on_window_event(|_window, event| {
       // Clean up sidecar on app exit

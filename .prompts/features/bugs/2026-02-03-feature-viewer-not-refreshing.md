@@ -2,7 +2,7 @@
 
 **Type:** Bug Fix  
 **Priority:** Medium  
-**Status:** Open
+**Status:** ✅ Fixed (2026-02-03)
 
 ---
 
@@ -237,6 +237,47 @@ const debouncedRefresh = debounce(() => {
 - Consider platform differences (Windows, macOS, Linux) for file watching
 - File watching might not work on network drives or certain file systems
 - Manual refresh button provides good fallback UX
+
+---
+
+## Fix Summary (2026-02-03)
+
+**Implementation**: Hybrid approach with automatic file watching and manual refresh button.
+
+**Changes Made**:
+
+1. **Backend (Rust)**:
+   - Added `notify = "6.1"` dependency to `Cargo.toml`
+   - Created `WatcherState` struct to track file watcher
+   - Implemented `watch_feature_files` Tauri command
+   - Watches `.prompts/features/` directory recursively
+   - Emits `feature-files-changed` events on file create/modify/delete
+   - Events are debounced at the file system level
+
+2. **Frontend (React)**:
+   - Updated `FeatureFilesViewer.tsx`:
+     - Added Tauri event imports (`invoke`, `listen`)
+     - Created memoized `loadFiles` function
+     - Implemented `debouncedRefresh` with 500ms debounce
+     - Set up event listener for `feature-files-changed` events
+     - Added manual refresh button (↻ icon) next to filter input
+     - Refresh button shows spinner when loading
+     - Proper cleanup on component unmount (removes listeners)
+
+**Benefits**:
+- ✅ Automatic refresh when AI creates/modifies/deletes files
+- ✅ Works for external changes (VS Code, file explorer, git)
+- ✅ Manual refresh button as fallback if watcher fails
+- ✅ Debounced to avoid excessive refreshes (500ms)
+- ✅ No memory leaks (proper cleanup)
+- ✅ Visual feedback (loading spinner)
+
+**Testing Recommendations**:
+- Ask AI to create a feature file → should auto-refresh within 1 second
+- Create file manually in `.prompts/features/` → should auto-refresh
+- Delete a file → should auto-refresh
+- Click refresh button → should refresh immediately
+- Verify no console errors
 
 ---
 

@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from '../context/useAppContext';
 import { listFeatureFiles, filterFeatureFiles, type FeatureFileNode, type ViewOptions } from '../utils/featureFiles';
 import FeatureFilesList from './FeatureFilesList';
 import ViewOptionsMenu from './ViewOptionsMenu';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 // LocalStorage keys for persisting view options
 const STORAGE_KEY_VIEW_OPTIONS = 'naide-feature-viewer-options';
@@ -50,33 +52,96 @@ const FeatureFilesViewer: React.FC<FeatureFilesViewerProps> = ({
     }
   }, [viewOptions]);
   
+  // Debounce timer ref
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Load files function (memoized)
+  const loadFiles = useCallback(async () => {
+    if (!state.projectPath) {
+      setFiles([]);
+      setFilteredFiles([]);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      const fileList = await listFeatureFiles(state.projectPath, viewOptions);
+      setFiles(fileList);
+      setFilteredFiles(fileList);
+    } catch (err) {
+      console.error('[FeatureFilesViewer] Error loading files:', err);
+      setError('Failed to load feature files');
+      setFiles([]);
+      setFilteredFiles([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [state.projectPath, viewOptions]);
+  
+  // Debounced refresh function
+  const debouncedRefresh = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      console.log('[FeatureFilesViewer] Refreshing file list (debounced)');
+      loadFiles();
+    }, 500);
+  }, [loadFiles]);
+  
   // Load feature files when project path or view options change
   useEffect(() => {
-    const loadFiles = async () => {
-      if (!state.projectPath) {
-        setFiles([]);
-        setFilteredFiles([]);
-        return;
-      }
-      
+    loadFiles();
+  }, [loadFiles]);
+  
+  // Set up file watcher
+  useEffect(() => {
+    if (!state.projectPath) {
+      return;
+    }
+    
+    let unlisten: (() => void) | null = null;
+    
+    // Set up event listener
+    const setupListener = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        const fileList = await listFeatureFiles(state.projectPath, viewOptions);
-        setFiles(fileList);
-        setFilteredFiles(fileList);
-      } catch (err) {
-        console.error('[FeatureFilesViewer] Error loading files:', err);
-        setError('Failed to load feature files');
-        setFiles([]);
-        setFilteredFiles([]);
-      } finally {
-        setLoading(false);
+        // Listen for file change events
+        unlisten = await listen('feature-files-changed', () => {
+          console.log('[FeatureFilesViewer] File change event received');
+          debouncedRefresh();
+        });
+        
+        // Start watching
+        await invoke('watch_feature_files', { 
+          projectPath: state.projectPath 
+        });
+        
+        console.log('[FeatureFilesViewer] File watcher started');
+      } catch (error) {
+        console.error('[FeatureFilesViewer] Failed to start file watcher:', error);
+        // Non-fatal error - manual refresh still works
       }
     };
     
+    setupListener();
+    
+    // Cleanup
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [state.projectPath, debouncedRefresh]);
+  
+  // Manual refresh handler
+  const handleRefresh = () => {
+    console.log('[FeatureFilesViewer] Manual refresh triggered');
     loadFiles();
-  }, [state.projectPath, viewOptions]);
+  };
   
   // Apply filter when query or files change
   useEffect(() => {
@@ -92,7 +157,7 @@ const FeatureFilesViewer: React.FC<FeatureFilesViewerProps> = ({
   
   return (
     <div className="h-full flex flex-col">
-      {/* Filter input with gear icon */}
+      {/* Filter input with refresh and gear icons */}
       <div className="p-3 border-b border-zinc-800">
         <div className="relative flex items-center gap-2">
           <input
@@ -102,6 +167,26 @@ const FeatureFilesViewer: React.FC<FeatureFilesViewerProps> = ({
             placeholder="Filter features..."
             className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-200 hover:bg-zinc-800 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh file list"
+          >
+            <svg
+              className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
           <button
             onClick={() => setShowOptionsMenu(!showOptionsMenu)}
             className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-200 hover:bg-zinc-800 rounded transition-colors"
