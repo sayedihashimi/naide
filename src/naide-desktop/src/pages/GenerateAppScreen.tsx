@@ -210,23 +210,7 @@ const GenerateAppScreen: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // For Building and Analyzing modes, use stub responses
-      if (copilotMode === 'Building') {
-        const assistantMessage: ChatMessage = {
-          id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          role: 'assistant',
-          content: 'Building coming soon',
-          timestamp: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-        setIsLoading(false);
-        
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-        }
-        return;
-      }
-
+      // For Analyzing mode, use stub response (not ready yet)
       if (copilotMode === 'Analyzing') {
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -243,7 +227,7 @@ const GenerateAppScreen: React.FC = () => {
         return;
       }
 
-      // For Planning mode, call the sidecar with streaming
+      // For Planning and Building modes, call the sidecar with streaming
       // Get the project path to use as workspace root
       const projectPath = state.projectPath || await getProjectPath(state.projectName);
       

@@ -1,12 +1,31 @@
 ---
-Status: planned
+Status: shipped
 Area: copilot, planning
 Created: 2026-02-01
 LastUpdated: 2026-02-03
 ---
 
 # Feature: Building Mode Implementation
-**Status**: 🟡 PLANNED (Stub implementation only)
+**Status**: ✅ IMPLEMENTED
+
+## Recent Updates (2026-02-03)
+
+### What's Been Implemented ✅
+1. **Copilot Integration Enabled**: Building mode now uses the Copilot SDK instead of returning stub responses
+2. **System Prompt Enhanced**: Added CODE PLACEMENT RULES to `building.system.md`:
+   - For NEW applications: Place code in `src/` folder by default
+   - For EXISTING applications: Analyze and follow existing patterns
+   - Clear examples of good vs bad code placement decisions
+3. **Backend Updated**: Sidecar properly loads `building.system.md` and uses Copilot SDK for Building mode
+4. **Frontend Fixed**: Removed stub response from GenerateAppScreen.tsx that was blocking Building mode
+
+### Implementation Complete ✅
+- Building mode now fully functional with Copilot integration
+- System prompts properly loaded and applied
+- Code placement rules implemented and documented
+- Frontend and backend both support Building mode
+
+---
 
 ## Summary
 Implement Building mode in the chat interface to enable AI-assisted code implementation and maintenance. Building mode updates both application code and specification files, keeping them synchronized. This transforms Naide from a planning-only tool into a full-cycle development assistant.

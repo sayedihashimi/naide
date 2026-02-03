@@ -474,14 +474,7 @@ app.post('/api/copilot/stream', async (req, res) => {
     res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
   };
   
-  // For Building and Analyzing modes, return stub responses
-  if (mode === 'Building') {
-    sendEvent('delta', { content: 'Building coming soon' });
-    sendEvent('done', {});
-    res.end();
-    return;
-  }
-  
+  // For Analyzing mode, return stub response (not ready yet)
   if (mode === 'Analyzing') {
     sendEvent('delta', { content: 'Analyzing coming soon' });
     sendEvent('done', {});
@@ -489,8 +482,8 @@ app.post('/api/copilot/stream', async (req, res) => {
     return;
   }
   
-  // For Planning mode, use Copilot SDK with streaming
-  if (mode === 'Planning') {
+  // For Planning and Building modes, use Copilot SDK with streaming
+  if (mode === 'Planning' || mode === 'Building') {
     // Check if Copilot is initialized
     if (!copilotReady || !copilotClient) {
       const initResult = await initializeCopilot();
@@ -803,14 +796,7 @@ app.post('/api/copilot/chat', async (req, res) => {
     console.log(`[Sidecar] Conversation context: ${conversationContext.totalMessageCount} total messages, summary: ${conversationContext.summary ? 'yes' : 'no'}`);
   }
   
-  // For Building and Analyzing modes, return stub responses
-  if (mode === 'Building') {
-    return res.json({
-      replyText: 'Building coming soon',
-      actions: []
-    });
-  }
-  
+  // For Analyzing mode, return stub response (not ready yet)
   if (mode === 'Analyzing') {
     return res.json({
       replyText: 'Analyzing coming soon',
@@ -818,8 +804,8 @@ app.post('/api/copilot/chat', async (req, res) => {
     });
   }
   
-  // For Planning mode, use Copilot SDK
-  if (mode === 'Planning') {
+  // For Planning and Building modes, use Copilot SDK
+  if (mode === 'Planning' || mode === 'Building') {
     // Check if Copilot is initialized
     if (!copilotReady || !copilotClient) {
       const initResult = await initializeCopilot();

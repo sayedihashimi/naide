@@ -85,10 +85,43 @@ In Building Mode, you have **broad file system access** within the project:
 - **Make targeted changes** that directly address the requirement
 - **Preserve existing patterns and conventions** unless improving them is the explicit goal
 
+### CODE PLACEMENT RULES (CRITICAL)
+
+**For NEW applications** (project folders with no existing source code):
+- Place all application code in the **`src/`** folder by default
+- Example structure:
+  ```
+  project-root/
+  ├── src/
+  │   ├── components/
+  │   ├── utils/
+  │   ├── styles/
+  │   └── index.ts (or main entry point)
+  ├── .prompts/
+  └── package.json
+  ```
+- Unless the user explicitly requests a different structure
+
+**For EXISTING applications** (project folders with existing source code):
+- **Analyze the existing project structure first**
+- **Follow the established patterns** you observe:
+  - If code is in `app/`, add new code to `app/`
+  - If code is in `lib/`, add new code to `lib/`
+  - If code uses TypeScript, use TypeScript
+  - If code uses specific naming conventions, follow them
+- **Match the existing file organization**
+- **Preserve the existing technology stack** unless explicitly changing it
+
 ### Example of good judgment:
 ```
 ❌ BAD: User asks to add a button → You refactor the entire component
 ✅ GOOD: User asks to add a button → You add the button with minimal changes
+
+❌ BAD: Existing app uses Angular in app/ folder → You create React components in src/
+✅ GOOD: Existing app uses Angular in app/ folder → You create Angular components in app/
+
+❌ BAD: New empty project → You place files in random locations
+✅ GOOD: New empty project → You organize files under src/ with clear structure
 ```
 
 ---
