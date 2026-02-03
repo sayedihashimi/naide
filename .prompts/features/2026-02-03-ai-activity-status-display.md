@@ -31,9 +31,12 @@ The AI Activity Status Display has been fully implemented with real-time status 
 
 **Files Modified:**
 - `src/copilot-sidecar/src/statusEvents.ts` - Event types and emitter
-- `src/copilot-sidecar/src/index.ts` - WebSocket server and event emission
+- `src/copilot-sidecar/src/index.ts` - WebSocket server, event emission, and relative path conversion
 - `src/naide-desktop/src/components/ActivityStatusBar.tsx` - Status display component
 - `src/naide-desktop/src/pages/GenerateAppScreen.tsx` - Integration
+
+**Bug Fixes:**
+- Fixed status messages to display relative paths instead of absolute paths ([bug report](./bugs/2026-02-03-status-messages-show-relative-paths.md))
 
 ## Summary
 Show real-time information about what the AI is doing during operations (files being read/written, analysis steps, etc.) in a persistent status area below the chat. This information is ephemeral and not saved to chat history, similar to VS Code's output panels.
@@ -307,8 +310,10 @@ Status bar shows:
 - Example: `🔨 Running build... (45s)`
 
 ### File Path Display
+- **Show relative paths from project root** (e.g., `src/App.tsx` not `C:\full\path\src\App.tsx`)
+- Normalize path separators to forward slashes for consistency
 - Truncate long paths: `...src/components/LongFileName.tsx`
-- Show relative paths from project root
+- Fallback to absolute path if file is outside workspace
 - Hover to see full path (future enhancement)
 
 ---

@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
-import { dirname, join, resolve, sep } from 'path';
+import { dirname, join, resolve, sep, relative } from 'path';
 import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { CopilotClient } from '@github/copilot-sdk';
 import { initializeLogger } from './logger.js';
@@ -365,6 +365,36 @@ function writeLearning(workspaceRoot: string, category: string, content: string)
   writeFileSync(filepath, finalContent, 'utf-8');
 }
 
+/**
+ * Convert absolute path to relative path from workspace root
+ * @param workspaceRoot - The workspace root directory
+ * @param filePath - The absolute or relative file path
+ * @returns Relative path from workspace root
+ */
+function toRelativePath(workspaceRoot: string, filePath: string): string {
+  // If the path is already relative (doesn't start with / or drive letter on Windows)
+  if (!resolve(filePath).startsWith(resolve(workspaceRoot))) {
+    // Try to resolve it relative to workspace first
+    const resolvedPath = resolve(workspaceRoot, filePath);
+    if (resolvedPath.startsWith(resolve(workspaceRoot))) {
+      return relative(workspaceRoot, resolvedPath);
+    }
+    // If it's already relative and outside workspace, return as-is
+    return filePath;
+  }
+  
+  // Convert absolute path to relative
+  const relativePath = relative(workspaceRoot, filePath);
+  
+  // If the relative path starts with '..', the file is outside workspace
+  // Return the path as-is in this case
+  if (relativePath.startsWith('..')) {
+    return filePath;
+  }
+  
+  return relativePath;
+}
+
 // Safe file write - allow .prompts/** and project files, but block dangerous paths
 function safeFileWrite(workspaceRoot: string, relativePath: string, content: string): boolean {
   // Block dangerous paths - using precise patterns
@@ -646,12 +676,14 @@ app.post('/api/copilot/stream', async (req, res) => {
           toolArgs: event.data.arguments
         });
         
-        // Emit status for file operations
+        // Emit status for file operations (with relative paths)
         if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
-          statusEmitter.emitFileWrite(filePath, 'in_progress');
+          const relativePath = toRelativePath(workspace, filePath);
+          statusEmitter.emitFileWrite(relativePath, 'in_progress');
         } else if (toolName.includes('view') || toolName.includes('read')) {
           if (filePath) {
-            statusEmitter.emitFileRead(filePath, 'in_progress');
+            const relativePath = toRelativePath(workspace, filePath);
+            statusEmitter.emitFileRead(relativePath, 'in_progress');
           }
         } else if (toolName.includes('grep') || toolName.includes('glob')) {
           statusEmitter.emitAnalysis('Searching code...', 'in_progress');
@@ -682,21 +714,25 @@ app.post('/api/copilot/stream', async (req, res) => {
           const args = ((toolCallInfo.toolArgs as Record<string, any> | undefined) || {});
           const filePath = args.path || args.file || args.filename;
           
-          // Emit completion status for file operations
+          // Emit completion status for file operations (with relative paths)
           if (event.data.success) {
             if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
-              statusEmitter.emitFileWrite(filePath, 'complete');
+              const relativePath = toRelativePath(workspace, filePath);
+              statusEmitter.emitFileWrite(relativePath, 'complete');
             } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
-              statusEmitter.emitFileRead(filePath, 'complete');
+              const relativePath = toRelativePath(workspace, filePath);
+              statusEmitter.emitFileRead(relativePath, 'complete');
             } else if (toolName.includes('grep') || toolName.includes('glob')) {
               statusEmitter.emitAnalysis('Search complete', 'complete');
             }
           } else {
-            // Emit error status if tool failed
+            // Emit error status if tool failed (with relative paths)
             if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
-              statusEmitter.emitFileWrite(`Failed to write ${filePath}`, 'error');
+              const relativePath = toRelativePath(workspace, filePath);
+              statusEmitter.emitFileWrite(`Failed to write ${relativePath}`, 'error');
             } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
-              statusEmitter.emitFileRead(`Failed to read ${filePath}`, 'error');
+              const relativePath = toRelativePath(workspace, filePath);
+              statusEmitter.emitFileRead(`Failed to read ${relativePath}`, 'error');
             }
           }
           
@@ -993,12 +1029,14 @@ app.post('/api/copilot/chat', async (req, res) => {
             toolArgs: event.data.arguments
           });
           
-          // Emit status for file operations
+          // Emit status for file operations (with relative paths)
           if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
-            statusEmitter.emitFileWrite(filePath, 'in_progress');
+            const relativePath = toRelativePath(workspace, filePath);
+            statusEmitter.emitFileWrite(relativePath, 'in_progress');
           } else if (toolName.includes('view') || toolName.includes('read')) {
             if (filePath) {
-              statusEmitter.emitFileRead(filePath, 'in_progress');
+              const relativePath = toRelativePath(workspace, filePath);
+              statusEmitter.emitFileRead(relativePath, 'in_progress');
             }
           } else if (toolName.includes('grep') || toolName.includes('glob')) {
             statusEmitter.emitAnalysis('Searching code...', 'in_progress');
@@ -1027,21 +1065,25 @@ app.post('/api/copilot/chat', async (req, res) => {
             const args = ((toolCallInfo.toolArgs as Record<string, any> | undefined) || {});
             const filePath = args.path || args.file || args.filename;
             
-            // Emit completion status for file operations
+            // Emit completion status for file operations (with relative paths)
             if (event.data.success) {
               if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
-                statusEmitter.emitFileWrite(filePath, 'complete');
+                const relativePath = toRelativePath(workspace, filePath);
+                statusEmitter.emitFileWrite(relativePath, 'complete');
               } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
-                statusEmitter.emitFileRead(filePath, 'complete');
+                const relativePath = toRelativePath(workspace, filePath);
+                statusEmitter.emitFileRead(relativePath, 'complete');
               } else if (toolName.includes('grep') || toolName.includes('glob')) {
                 statusEmitter.emitAnalysis('Search complete', 'complete');
               }
             } else {
-              // Emit error status if tool failed
+              // Emit error status if tool failed (with relative paths)
               if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
-                statusEmitter.emitFileWrite(`Failed to write ${filePath}`, 'error');
+                const relativePath = toRelativePath(workspace, filePath);
+                statusEmitter.emitFileWrite(`Failed to write ${relativePath}`, 'error');
               } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
-                statusEmitter.emitFileRead(`Failed to read ${filePath}`, 'error');
+                const relativePath = toRelativePath(workspace, filePath);
+                statusEmitter.emitFileRead(`Failed to read ${relativePath}`, 'error');
               }
             }
             
