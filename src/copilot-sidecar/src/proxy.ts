@@ -1,6 +1,7 @@
-import express, { Request, Response, NextFunction } from 'express';
-import { createProxyMiddleware, Options as ProxyOptions, responseInterceptor } from 'http-proxy-middleware';
-import { Server } from 'http';
+import express from 'express';
+import { createProxyMiddleware, responseInterceptor } from 'http-proxy-middleware';
+import { Server, IncomingMessage, ServerResponse } from 'http';
+import type { Socket } from 'net';
 
 const PROXY_PORT = 3002;
 
@@ -66,40 +67,43 @@ export class ProxyServer {
       changeOrigin: true,
       ws: true, // Proxy WebSocket connections (for hot reload)
       selfHandleResponse: true, // We'll handle the response to inject script
-      onProxyReq: (proxyReq, req, res) => {
-        console.log(`[Proxy] ${req.method} ${req.url} -> ${targetUrl}${req.url}`);
-      },
-      onProxyRes: responseInterceptor(
-        async (responseBuffer, proxyRes, req, res) => {
-          const contentType = proxyRes.headers['content-type'] || '';
-          
-          // Only inject script into HTML responses
-          if (contentType.includes('text/html')) {
-            let html = responseBuffer.toString('utf8');
+      on: {
+        proxyReq: (proxyReq, req, res) => {
+          console.log(`[Proxy] ${req.method} ${req.url} -> ${targetUrl}${req.url}`);
+        },
+        proxyRes: responseInterceptor(
+          async (responseBuffer, proxyRes, req, res) => {
+            const contentType = proxyRes.headers['content-type'] || '';
             
-            // Inject script before closing </body> tag if it exists
-            if (html.includes('</body>')) {
-              html = html.replace('</body>', `${TRACKING_SCRIPT}</body>`);
-            } else if (html.includes('</html>')) {
-              // Fallback: inject before closing </html> tag
-              html = html.replace('</html>', `${TRACKING_SCRIPT}</html>`);
-            } else {
-              // Fallback: append to end
-              html += TRACKING_SCRIPT;
+            // Only inject script into HTML responses
+            if (contentType.includes('text/html')) {
+              let html = responseBuffer.toString('utf8');
+              
+              // Inject script before closing </body> tag if it exists
+              if (html.includes('</body>')) {
+                html = html.replace('</body>', `${TRACKING_SCRIPT}</body>`);
+              } else if (html.includes('</html>')) {
+                // Fallback: inject before closing </html> tag
+                html = html.replace('</html>', `${TRACKING_SCRIPT}</html>`);
+              } else {
+                // Fallback: append to end
+                html += TRACKING_SCRIPT;
+              }
+              
+              return Buffer.from(html, 'utf8');
             }
             
-            return Buffer.from(html, 'utf8');
+            // Return other content types unchanged
+            return responseBuffer;
           }
-          
-          // Return other content types unchanged
-          return responseBuffer;
-        }
-      ),
-      onError: (err, req, res) => {
-        console.error('[Proxy] Error:', err.message);
-        if (res instanceof Response) {
-          res.status(502).json({ error: 'Proxy error', message: err.message });
-        }
+        ),
+        error: (err: Error, req: IncomingMessage, res: ServerResponse | Socket) => {
+          console.error('[Proxy] Error:', err.message);
+          if (res instanceof ServerResponse && !res.headersSent) {
+            res.writeHead(502, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Proxy error', message: err.message }));
+          }
+        },
       },
     });
 
@@ -118,7 +122,7 @@ export class ProxyServer {
       });
 
       // Handle WebSocket upgrade for hot reload
-      this.server.on('upgrade', (req, socket, head) => {
+      this.server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
         console.log('[Proxy] WebSocket upgrade request');
         proxyMiddleware.upgrade!(req, socket, head);
       });
