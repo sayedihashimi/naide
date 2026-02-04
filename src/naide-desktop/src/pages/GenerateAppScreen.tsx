@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppContext } from '../context/useAppContext';
 import type { ChatMessage } from '../utils/chatPersistence';
 import {
@@ -99,6 +99,8 @@ const GenerateAppScreen: React.FC = () => {
   const [showChatHistory, setShowChatHistory] = useState(false);
   // Feature file popup state
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  // Ref to track current iframe URL (for immediate access in click handlers)
+  const currentIframeUrlRef = useRef<string | null>(null);
   const [featureFilePopup, setFeatureFilePopup] = useState<{
     isOpen: boolean;
     filePath: string;
@@ -127,8 +129,27 @@ const GenerateAppScreen: React.FC = () => {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [currentIframeUrl, setCurrentIframeUrl] = useState<string | null>(null);
+
+  // Compute display URL: convert proxy URL back to real app URL
+  const displayUrl = useMemo(() => {
+    if (currentIframeUrl && appRunState.proxyUrl && appRunState.url) {
+      try {
+        const proxyBase = new URL(appRunState.proxyUrl);
+        const appBase = new URL(appRunState.url);
+        const current = new URL(currentIframeUrl);
+        // Only convert if the current URL is using the proxy
+        if (current.host === proxyBase.host) {
+          current.host = appBase.host;
+          current.protocol = appBase.protocol;
+          return current.toString();
+        }
+      } catch {
+        // Fall through to default
+      }
+    }
+    return currentIframeUrl || appRunState.url || '';
+  }, [currentIframeUrl, appRunState.proxyUrl, appRunState.url]);
 
   // Load chat session on mount
   useEffect(() => {
@@ -239,14 +260,20 @@ const GenerateAppScreen: React.FC = () => {
   // Listen for navigation tracking from injected script (via postMessage)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      // Log all messages for debugging
+      if (event.data && typeof event.data === 'object') {
+        logInfo(`[AppRunner] Received postMessage: ${JSON.stringify(event.data)}`);
+      }
       // Validate message structure
       if (event.data && event.data.type === 'naide-navigation' && event.data.url) {
         logInfo(`[AppRunner] Navigation tracked: ${event.data.url}`);
+        currentIframeUrlRef.current = event.data.url;
         setCurrentIframeUrl(event.data.url);
       }
     };
     
     window.addEventListener('message', handleMessage);
+    logInfo('[AppRunner] Started listening for navigation messages');
     
     return () => {
       window.removeEventListener('message', handleMessage);
@@ -262,8 +289,9 @@ const GenerateAppScreen: React.FC = () => {
       unlistenFn = await listen('hot-reload-success', () => {
         logInfo('[AppRunner] Hot reload detected, refreshing iframe');
         if (appRunState.status === 'running' && iframeRef.current) {
-          // Use the tracked current URL (from navigation tracking) if available
-          const urlToRefresh = currentIframeUrl || appRunState.proxyUrl || appRunState.url;
+          // Use the ref for immediate access to the tracked URL (avoids React closure issues)
+          const urlToRefresh = currentIframeUrlRef.current || appRunState.proxyUrl || appRunState.url;
+          logInfo(`[AppRunner] Hot reload using tracked URL: ${currentIframeUrlRef.current}`);
           if (urlToRefresh) {
             try {
               const url = new URL(urlToRefresh);
@@ -287,7 +315,7 @@ const GenerateAppScreen: React.FC = () => {
         unlistenFn();
       }
     };
-  }, [appRunState.status, appRunState.url, appRunState.proxyUrl, currentIframeUrl]);
+  }, [appRunState.status, appRunState.url, appRunState.proxyUrl]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -883,6 +911,7 @@ const GenerateAppScreen: React.FC = () => {
       });
       
       // Reset current URL tracking
+      currentIframeUrlRef.current = null;
       setCurrentIframeUrl(null);
     } catch (error) {
       logError(`[AppRunner] Failed to start app: ${error}`);
@@ -926,6 +955,7 @@ const GenerateAppScreen: React.FC = () => {
       });
       
       // Clear current URL tracking
+      currentIframeUrlRef.current = null;
       setCurrentIframeUrl(null);
     } catch (error) {
       logError(`[AppRunner] Failed to stop app: ${error}`);
@@ -941,16 +971,22 @@ const GenerateAppScreen: React.FC = () => {
   const handleRefreshClick = () => {
     if (appRunState.status === 'running' && iframeRef.current) {
       logInfo('[AppRunner] Refreshing iframe (bypassing cache)');
-      // Use the tracked current URL (from navigation tracking) if available, otherwise use proxy or direct URL
-      const urlToRefresh = currentIframeUrl || appRunState.proxyUrl || appRunState.url || '';
+      // Use the ref for immediate access to the tracked URL (avoids React closure issues)
+      const urlToRefresh = currentIframeUrlRef.current || appRunState.proxyUrl || appRunState.url || '';
+      logInfo(`[AppRunner] Current tracked URL: ${currentIframeUrlRef.current}, using: ${urlToRefresh}`);
       if (urlToRefresh) {
         try {
           const url = new URL(urlToRefresh);
           // Remove old refresh param if exists
           url.searchParams.delete('_refresh');
           url.searchParams.set('_refresh', Date.now().toString());
-        logInfo(`[AppRunner] Refreshing to: ${url.toString()}`);
-        iframeRef.current.src = url.toString();
+          logInfo(`[AppRunner] Refreshing to: ${url.toString()}`);
+          iframeRef.current.src = url.toString();
+        } catch {
+          // If URL parsing fails, just refresh as-is
+          logInfo(`[AppRunner] Refreshing to: ${urlToRefresh}`);
+          iframeRef.current.src = urlToRefresh;
+        }
       }
     }
   };
@@ -1483,14 +1519,14 @@ const GenerateAppScreen: React.FC = () => {
                 {appRunState.url && (
                   <div className="mb-4 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg">
                     <p className="text-sm text-gray-400">
-                      Running on:{' '}
+                      Current:{' '}
                       <a
-                        href={appRunState.url}
+                        href={displayUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300"
                       >
-                        {appRunState.url}
+                        {displayUrl}
                       </a>
                     </p>
                   </div>
@@ -1503,6 +1539,7 @@ const GenerateAppScreen: React.FC = () => {
                       src={appRunState.proxyUrl || appRunState.url}
                       className="w-full h-full"
                       title="Running App"
+                      onLoad={() => logInfo(`[AppRunner] iframe loaded: ${iframeRef.current?.src || 'unknown'}`)}
                     />
                   </div>
                 ) : (

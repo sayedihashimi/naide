@@ -9,18 +9,24 @@ const PROXY_PORT = 3002;
 const TRACKING_SCRIPT = `
 <script>
 (function() {
+  console.log('[Naide] Navigation tracking script loaded');
+  
   // Only run if we're in an iframe
-  if (window.parent === window) return;
+  if (window.parent === window) {
+    console.log('[Naide] Not in iframe, skipping');
+    return;
+  }
   
   // Send current URL to parent
   function sendNavigation() {
+    console.log('[Naide] Sending navigation:', window.location.href);
     try {
       window.parent.postMessage({
         type: 'naide-navigation',
         url: window.location.href
       }, '*');
     } catch (e) {
-      console.error('Failed to send navigation:', e);
+      console.error('[Naide] Failed to send navigation:', e);
     }
   }
   
