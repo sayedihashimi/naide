@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { Trash2 } from 'lucide-react';
 import { getProjectPath } from '../utils/fileSystem';
+import ConfirmDialog from './ConfirmDialog';
 
 interface ChatSessionMetadata {
   filename: string;
@@ -14,6 +16,7 @@ interface ChatHistoryDropdownProps {
   projectName: string;
   projectPath?: string;
   onLoadChat: (filename: string) => void;
+  onChatDeleted: () => void; // Callback when a chat is deleted (to refresh if needed)
   isOpen: boolean;
   onClose: () => void;
 }
@@ -22,12 +25,22 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
   projectName,
   projectPath,
   onLoadChat,
+  onChatDeleted,
   isOpen,
   onClose,
 }) => {
   const [chatSessions, setChatSessions] = useState<ChatSessionMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    filename: string;
+    chatInfo: string;
+  }>({
+    isOpen: false,
+    filename: '',
+    chatInfo: '',
+  });
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const loadChatSessions = useCallback(async () => {
@@ -91,6 +104,52 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
   const handleChatClick = (filename: string) => {
     onLoadChat(filename);
     onClose();
+  };
+
+  const handleDeleteClick = (session: ChatSessionMetadata, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent chat selection
+    
+    // Format chat info for confirmation dialog
+    const chatInfo = `Date: ${formatDate(session.last_modified)}\nMode: ${session.mode}\nMessages: ${session.message_count}`;
+    
+    setConfirmDialog({
+      isOpen: true,
+      filename: session.filename,
+      chatInfo,
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    const { filename } = confirmDialog;
+    
+    try {
+      const actualPath = projectPath || await getProjectPath(projectName);
+      
+      // Call backend to delete (move to trash)
+      await invoke('delete_chat_session', {
+        projectPath: actualPath,
+        filename,
+      });
+      
+      // Close confirmation dialog
+      setConfirmDialog({ isOpen: false, filename: '', chatInfo: '' });
+      
+      // Reload chat list
+      await loadChatSessions();
+      
+      // Notify parent that a chat was deleted
+      onChatDeleted();
+      
+      console.log(`[ChatHistory] Chat moved to trash: ${filename}`);
+    } catch (error) {
+      console.error('[ChatHistory] Error deleting chat:', error);
+      setError('Failed to move chat to trash');
+      setConfirmDialog({ isOpen: false, filename: '', chatInfo: '' });
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setConfirmDialog({ isOpen: false, filename: '', chatInfo: '' });
   };
 
   const formatDate = (timestamp: number): string => {
@@ -172,32 +231,58 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
       {!isLoading && !error && chatSessions.length > 0 && (
         <div className="overflow-y-auto max-h-96">
           {chatSessions.map((session) => (
-            <button
+            <div
               key={session.filename}
-              onClick={() => handleChatClick(session.filename)}
-              className="w-full text-left px-4 py-3 hover:bg-zinc-700 transition-colors border-b border-zinc-700 last:border-b-0"
+              className="relative group"
             >
-              <div className="text-sm font-semibold text-gray-200 mb-1">
-                {formatDate(session.last_modified)}
-              </div>
-              <div className="flex items-center gap-2 text-xs mb-1">
-                <span className={getModeColor(session.mode)}>
-                  {session.mode}
-                </span>
-                <span className="text-gray-500">•</span>
-                <span className="text-gray-500">
-                  {session.message_count} message{session.message_count !== 1 ? 's' : ''}
-                </span>
-              </div>
-              {session.first_user_message && (
-                <div className="text-xs text-zinc-400">
-                  {truncateMessage(session.first_user_message)}
+              <button
+                onClick={() => handleChatClick(session.filename)}
+                className="w-full text-left px-4 py-3 hover:bg-zinc-700 transition-colors border-b border-zinc-700 last:border-b-0"
+              >
+                <div className="text-sm font-semibold text-gray-200 mb-1">
+                  {formatDate(session.last_modified)}
                 </div>
-              )}
-            </button>
+                <div className="flex items-center gap-2 text-xs mb-1">
+                  <span className={getModeColor(session.mode)}>
+                    {session.mode}
+                  </span>
+                  <span className="text-gray-500">•</span>
+                  <span className="text-gray-500">
+                    {session.message_count} message{session.message_count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                {session.first_user_message && (
+                  <div className="text-xs text-zinc-400">
+                    {truncateMessage(session.first_user_message)}
+                  </div>
+                )}
+              </button>
+              
+              {/* Delete button - shows on hover */}
+              <button
+                onClick={(e) => handleDeleteClick(session, e)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded hover:bg-zinc-600 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                aria-label="Delete chat"
+                title="Move to trash"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           ))}
         </div>
       )}
+      
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title="Move Chat to Trash?"
+        message={`This chat will be moved to trash and removed from your history.\n\n${confirmDialog.chatInfo}`}
+        confirmText="Move to Trash"
+        cancelText="Cancel"
+        destructive={false}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </div>
   );
 };

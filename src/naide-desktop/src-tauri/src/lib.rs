@@ -504,6 +504,43 @@ async fn load_chat_session_file(project_path: String, filename: String) -> Resul
         .map_err(|e| format!("Failed to read chat session file: {}", e))
 }
 
+// Tauri command: Delete a chat session (move to trash)
+#[tauri::command]
+async fn delete_chat_session(project_path: String, filename: String) -> Result<(), String> {
+    // Security check: validate filename (prevent path traversal)
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Err("Invalid filename".to_string());
+    }
+    
+    // Construct paths
+    let chatsessions_dir = PathBuf::from(&project_path)
+        .join(".naide")
+        .join("chatsessions");
+    
+    let source_path = chatsessions_dir.join(&filename);
+    let trash_dir = chatsessions_dir.join("trash");
+    let dest_path = trash_dir.join(&filename);
+    
+    // Check source file exists
+    if !source_path.exists() {
+        return Err("Chat file not found".to_string());
+    }
+    
+    // Create trash directory if it doesn't exist
+    if !trash_dir.exists() {
+        fs::create_dir_all(&trash_dir)
+            .map_err(|e| format!("Failed to create trash directory: {}", e))?;
+    }
+    
+    // Move the file to trash
+    fs::rename(&source_path, &dest_path)
+        .map_err(|e| format!("Failed to move file to trash: {}", e))?;
+    
+    log::info!("Moved chat session to trash: {}", filename);
+    
+    Ok(())
+}
+
 // Tauri command: Watch feature files directory for changes
 #[tauri::command]
 async fn watch_feature_files(window: tauri::Window, project_path: String) -> Result<(), String> {
@@ -695,6 +732,7 @@ pub fn run() {
       write_feature_file,
       list_chat_sessions,
       load_chat_session_file,
+      delete_chat_session,
       watch_feature_files
     ])
     .on_window_event(|_window, event| {

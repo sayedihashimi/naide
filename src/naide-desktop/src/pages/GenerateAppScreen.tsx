@@ -552,6 +552,28 @@ const GenerateAppScreen: React.FC = () => {
     }
   };
 
+  const handleChatDeleted = async () => {
+    logInfo('[GenerateApp] Chat deleted, checking if we need to create a new chat');
+    
+    // Check if there are any archived chats left
+    const { invoke } = await import('@tauri-apps/api/core');
+    const actualPath = state.projectPath || await getProjectPath(state.projectName);
+    const remainingChats = await invoke<any[]>('list_chat_sessions', {
+      projectPath: actualPath,
+    });
+    
+    logInfo(`[GenerateApp] Remaining chats after deletion: ${remainingChats.length}`);
+    
+    // If no chats remain, or if we just deleted the active chat,
+    // create a new empty chat
+    const hasUserMessages = messages.some((m) => m.role === 'user');
+    
+    if (remainingChats.length === 0 || hasUserMessages) {
+      logInfo('[GenerateApp] Creating new empty chat after deletion');
+      handleNewChat();
+    }
+  };
+
   const handleOpenProjectFolder = async () => {
     try {
       // Get the current project path
@@ -920,6 +942,7 @@ const GenerateAppScreen: React.FC = () => {
                     projectName={state.projectName}
                     projectPath={state.projectPath || undefined}
                     onLoadChat={handleLoadChat}
+                    onChatDeleted={handleChatDeleted}
                     isOpen={showChatHistory}
                     onClose={() => setShowChatHistory(false)}
                   />
