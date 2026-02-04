@@ -6,6 +6,7 @@ use std::io::{BufRead, BufReader};
 use std::thread;
 use std::sync::mpsc::{channel, Receiver};
 use regex::Regex;
+use tauri::Emitter;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppInfo {

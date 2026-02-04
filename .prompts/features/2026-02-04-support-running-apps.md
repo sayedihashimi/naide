@@ -175,8 +175,13 @@ By integrating app launching directly into Naide, users get immediate visual fee
 2. `dotnet watch` detects changes and applies hot reload
 3. Backend detects "Hot reload succeeded" in stderr output
 4. Backend emits `hot-reload-success` Tauri event
-5. Frontend receives event and refreshes iframe
+5. Frontend receives event and refreshes iframe with cache-busting parameter
 6. User sees updated app without manual refresh
+
+**Cache-Busting for Refresh:**
+- Both manual refresh and hot reload use cache-busting to ensure fresh content
+- Appends `?_refresh={timestamp}` to the URL to bypass browser cache
+- Ensures users see the latest changes immediately
 
 **Stopping:**
 1. User clicks Stop

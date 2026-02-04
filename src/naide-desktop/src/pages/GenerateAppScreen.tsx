@@ -240,9 +240,13 @@ const GenerateAppScreen: React.FC = () => {
     const setupListener = async () => {
       const { listen } = await import('@tauri-apps/api/event');
       unlistenFn = await listen('hot-reload-success', () => {
-        logInfo('[AppRunner] Hot reload detected, refreshing iframe');
-        if (appRunState.status === 'running' && iframeRef.current) {
-          iframeRef.current.contentWindow?.location.reload();
+        logInfo('[AppRunner] Hot reload detected, refreshing iframe (bypassing cache)');
+        if (appRunState.status === 'running' && iframeRef.current && iframeRef.current.contentWindow) {
+          // Force reload bypassing cache
+          const currentUrl = iframeRef.current.contentWindow.location.href;
+          const url = new URL(currentUrl);
+          url.searchParams.set('_refresh', Date.now().toString());
+          iframeRef.current.contentWindow.location.href = url.toString();
         }
       });
     };
@@ -864,10 +868,13 @@ const GenerateAppScreen: React.FC = () => {
 
   // Handle Refresh button click
   const handleRefreshClick = () => {
-    if (appRunState.status === 'running' && iframeRef.current) {
-      logInfo('[AppRunner] Refreshing iframe');
-      // Reload the current page in the iframe (preserves navigation state)
-      iframeRef.current.contentWindow?.location.reload();
+    if (appRunState.status === 'running' && iframeRef.current && iframeRef.current.contentWindow) {
+      logInfo('[AppRunner] Refreshing iframe (bypassing cache)');
+      // Force reload bypassing cache by adding a cache-busting parameter
+      const currentUrl = iframeRef.current.contentWindow.location.href;
+      const url = new URL(currentUrl);
+      url.searchParams.set('_refresh', Date.now().toString());
+      iframeRef.current.contentWindow.location.href = url.toString();
     }
   };
 
