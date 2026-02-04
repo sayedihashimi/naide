@@ -8,6 +8,7 @@ import { CopilotClient, defineTool } from '@github/copilot-sdk';
 import { z } from 'zod';
 import { initializeLogger } from './logger.js';
 import { StatusEventEmitter, createStatusWebSocketServer } from './statusEvents.js';
+import { proxyServer } from './proxy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -1252,6 +1253,72 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', copilotReady });
 });
 
+// =============================================================================
+// PROXY ENDPOINTS
+// =============================================================================
+
+// Start proxy server
+app.post('/api/proxy/start', async (req, res) => {
+  const { targetUrl } = req.body;
+  
+  if (!targetUrl) {
+    return res.status(400).json({
+      error: 'targetUrl is required'
+    });
+  }
+  
+  try {
+    const proxyUrl = await proxyServer.start(targetUrl);
+    console.log(`[Sidecar] Proxy started: ${proxyUrl} -> ${targetUrl}`);
+    
+    return res.json({
+      success: true,
+      proxyUrl,
+      targetUrl
+    });
+  } catch (error) {
+    console.error('[Sidecar] Failed to start proxy:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    return res.status(500).json({
+      error: 'Failed to start proxy',
+      message: errorMessage
+    });
+  }
+});
+
+// Stop proxy server
+app.post('/api/proxy/stop', async (req, res) => {
+  try {
+    await proxyServer.stop();
+    console.log('[Sidecar] Proxy stopped');
+    
+    return res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error('[Sidecar] Failed to stop proxy:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    return res.status(500).json({
+      error: 'Failed to stop proxy',
+      message: errorMessage
+    });
+  }
+});
+
+// Get proxy status
+app.get('/api/proxy/status', (req, res) => {
+  const isRunning = proxyServer.isRunning();
+  const targetUrl = proxyServer.getTargetUrl();
+  
+  return res.json({
+    isRunning,
+    targetUrl,
+    proxyUrl: isRunning ? 'http://localhost:3002' : null
+  });
+});
+
 // Start the server and initialize Copilot
 const server = createServer(app);
 
@@ -1277,6 +1344,11 @@ process.on('SIGINT', async () => {
   console.log('[Sidecar] Shutting down...');
   
   try {
+    // Stop proxy server if running
+    if (proxyServer.isRunning()) {
+      await proxyServer.stop();
+    }
+    
     // Clean up Copilot resources
     if (copilotClient) {
       await copilotClient.stop();

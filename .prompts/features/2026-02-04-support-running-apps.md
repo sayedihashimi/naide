@@ -6,11 +6,11 @@ LastUpdated: 2026-02-04
 ---
 
 # Feature: Support Running npm and .NET Apps
-**Status**: ✅ IMPLEMENTED (.NET support)
+**Status**: ✅ FULLY IMPLEMENTED (.NET support with proxy and navigation tracking)
 
 ## Implementation Summary
 
-The running apps feature has been implemented with .NET support. npm support is deferred to a future enhancement.
+The running apps feature has been fully implemented with .NET support and proxy-based navigation tracking. npm support is deferred to a future enhancement.
 
 **Key Features Implemented:**
 - Automatic detection of .NET web projects (ASP.NET, Blazor)
@@ -21,15 +21,22 @@ The running apps feature has been implemented with .NET support. npm support is 
   - `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` - Prevents automatic browser opening
   - `HotReloadAutoRestart=true` - Enables automatic restart on hot reload
 - **Automatic browser refresh on hot reload**: Backend detects "Hot reload succeeded" messages and emits event to frontend to refresh iframe
+- **Proxy server with script injection**: Solves CORS and enables navigation tracking
+  - Lightweight proxy on `localhost:3002` proxies the running app
+  - Injects tracking script into HTML responses
+  - Script sends postMessage on navigation (page loads, popstate, history changes)
+  - Frontend tracks current URL and preserves it on hot reload
 - URL detection from stdout with 30-second timeout
-- Running app displayed in iframe in right panel
+- Running app displayed in iframe in right panel (via proxy)
 - Process management with automatic cleanup on app close
 - Status indicators for all app states
 
 **Files Implemented:**
 - `src/naide-desktop/src-tauri/src/app_runner.rs` - App detection and process management
 - `src/naide-desktop/src-tauri/src/lib.rs` - Tauri commands and state management
-- `src/naide-desktop/src/pages/GenerateAppScreen.tsx` - UI and frontend integration
+- `src/naide-desktop/src/pages/GenerateAppScreen.tsx` - UI, proxy integration, and navigation tracking
+- `src/copilot-sidecar/src/proxy.ts` - **NEW**: Proxy server with script injection
+- `src/copilot-sidecar/src/index.ts` - Proxy lifecycle management and API endpoints
 
 **Backend (Rust):**
 - `detect_runnable_app` command - Scans for .csproj files and identifies web projects
@@ -38,13 +45,24 @@ The running apps feature has been implemented with .NET support. npm support is 
 - URL extraction from stdout using regex
 - Process state tracking
 
+**Backend (Node.js Sidecar):**
+- **NEW**: `POST /api/proxy/start` - Starts proxy server for a target URL
+- **NEW**: `POST /api/proxy/stop` - Stops running proxy server
+- **NEW**: `GET /api/proxy/status` - Returns proxy status
+- Proxy forwards all requests to target app
+- Intercepts HTML responses and injects tracking script
+- Proxies WebSocket connections for hot reload
+- Automatic cleanup on sidecar shutdown
+
 **Frontend (React):**
 - App run state management (none, detecting, ready, starting, running, error)
-- Play button (green) when app detected
-- Refresh button (blue) next to Stop button when app running
-- Stop button (red) when app running
-- Spinner during startup
-- Iframe displays running app when URL detected
+- Play button (green) when app detected → starts app AND proxy
+- Refresh button (blue) refreshes tracked URL (not base URL)
+- Stop button (red) → stops app AND proxy
+- **Navigation tracking**: postMessage listener receives URL updates from injected script
+- **Current URL state**: Tracks user's navigation within the app
+- **Hot reload**: Refreshes the tracked URL (preserves page position)
+- Iframe displays proxied app when URL detected
 - Error state with retry option
 
 **Simplified MVP Approach:**
@@ -54,6 +72,27 @@ The running apps feature has been implemented with .NET support. npm support is 
 **Bug Fixes:**
 - Fixed URL detection timeout issue where stdout reader thread wasn't communicating with main thread properly
 - Changed `start_dotnet_app` to return the URL receiver channel instead of a stop signal channel
+
+**Navigation Tracking Solution:**
+- Proxy runs on `localhost:3002` and proxies the running app (e.g., `localhost:5103`)
+- Both Naide (`localhost:5173`) and proxy (`localhost:3002`) are now same-origin-capable via postMessage
+- Injected script tracks:
+  - Initial page load
+  - `popstate` events (browser back/forward)
+  - `history.pushState` and `history.replaceState` (SPA navigation)
+- Frontend stores current URL in state
+- On hot reload or manual refresh, the tracked URL is preserved
+
+**Proxy Dependencies:**
+- `http-proxy-middleware@^3.0.0` - Proxy middleware for Express
+- `express` - HTTP server (already present)
+
+**To Complete Installation:**
+```bash
+cd src/copilot-sidecar
+npm install http-proxy-middleware
+npm run build
+```
 
 
 ---
@@ -181,7 +220,9 @@ By integrating app launching directly into Naide, users get immediate visual fee
 **Cache-Busting for Refresh:**
 - Both manual refresh and hot reload use cache-busting to ensure fresh content
 - Appends `?_refresh={timestamp}` to the URL to bypass browser cache
-- Ensures users see the latest changes immediately
+- **Preserves user's current page**: Uses `iframe.contentWindow.location.href` to get the current URL before refresh
+- Falls back to base URL if CORS prevents accessing contentWindow
+- Ensures users see the latest changes immediately while staying on their current page
 
 **Stopping:**
 1. User clicks Stop

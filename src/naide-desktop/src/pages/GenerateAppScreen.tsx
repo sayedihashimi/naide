@@ -121,11 +121,14 @@ const GenerateAppScreen: React.FC = () => {
     url?: string;
     errorMessage?: string;
     pid?: number;
+    proxyUrl?: string; // Proxied URL that includes script injection
   }>({ status: 'none' });
   
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [currentIframeUrl, setCurrentIframeUrl] = useState<string | null>(null);
 
   // Load chat session on mount
   useEffect(() => {
@@ -233,6 +236,23 @@ const GenerateAppScreen: React.FC = () => {
     detectApp();
   }, [state.projectPath]);
 
+  // Listen for navigation tracking from injected script (via postMessage)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Validate message structure
+      if (event.data && event.data.type === 'naide-navigation' && event.data.url) {
+        logInfo(`[AppRunner] Navigation tracked: ${event.data.url}`);
+        setCurrentIframeUrl(event.data.url);
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
   // Listen for hot reload events from backend
   useEffect(() => {
     let unlistenFn: (() => void) | null = null;
@@ -240,13 +260,20 @@ const GenerateAppScreen: React.FC = () => {
     const setupListener = async () => {
       const { listen } = await import('@tauri-apps/api/event');
       unlistenFn = await listen('hot-reload-success', () => {
-        logInfo('[AppRunner] Hot reload detected, refreshing iframe (bypassing cache)');
-        if (appRunState.status === 'running' && iframeRef.current && iframeRef.current.contentWindow) {
-          // Force reload bypassing cache
-          const currentUrl = iframeRef.current.contentWindow.location.href;
-          const url = new URL(currentUrl);
-          url.searchParams.set('_refresh', Date.now().toString());
-          iframeRef.current.contentWindow.location.href = url.toString();
+        logInfo('[AppRunner] Hot reload detected, refreshing iframe');
+        if (appRunState.status === 'running' && iframeRef.current) {
+          // Use the tracked current URL (from navigation tracking) if available
+          const urlToRefresh = currentIframeUrl || appRunState.proxyUrl || appRunState.url;
+          if (urlToRefresh) {
+            try {
+              const url = new URL(urlToRefresh);
+              url.searchParams.set('_refresh', Date.now().toString());
+              logInfo(`[AppRunner] Refreshing tracked URL: ${url.toString()}`);
+              iframeRef.current.src = url.toString();
+            } catch (error) {
+              logError(`[AppRunner] Failed to refresh iframe: ${error}`);
+            }
+          }
         }
       });
     };
@@ -260,7 +287,7 @@ const GenerateAppScreen: React.FC = () => {
         unlistenFn();
       }
     };
-  }, [appRunState.status]);
+  }, [appRunState.status, appRunState.url, appRunState.proxyUrl, currentIframeUrl]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -822,13 +849,41 @@ const GenerateAppScreen: React.FC = () => {
       );
       
       logInfo(`[AppRunner] App started with PID ${result.pid}, URL: ${result.url || 'not detected'}`);
+      
+      // Now start the proxy to inject tracking script
+      let proxyUrl: string | undefined;
+      if (result.url) {
+        try {
+          logInfo(`[AppRunner] Starting proxy for URL: ${result.url}`);
+          const proxyResponse = await fetch('http://localhost:3001/api/proxy/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetUrl: result.url }),
+          });
+          
+          if (proxyResponse.ok) {
+            const proxyData = await proxyResponse.json();
+            proxyUrl = proxyData.proxyUrl;
+            logInfo(`[AppRunner] Proxy started: ${proxyUrl} -> ${result.url}`);
+          } else {
+            logError('[AppRunner] Failed to start proxy, using direct URL');
+          }
+        } catch (error) {
+          logError(`[AppRunner] Failed to start proxy: ${error}, using direct URL`);
+        }
+      }
+      
       setAppRunState({
         status: 'running',
         type: appRunState.type,
         projectFile: appRunState.projectFile,
         url: result.url,
+        proxyUrl,
         pid: result.pid,
       });
+      
+      // Reset current URL tracking
+      setCurrentIframeUrl(null);
     } catch (error) {
       logError(`[AppRunner] Failed to start app: ${error}`);
       setAppRunState({
@@ -850,12 +905,28 @@ const GenerateAppScreen: React.FC = () => {
       const { invoke } = await import('@tauri-apps/api/core');
       await invoke('stop_app');
       
+      // Stop the proxy if it was started
+      if (appRunState.proxyUrl) {
+        try {
+          logInfo('[AppRunner] Stopping proxy');
+          await fetch('http://localhost:3001/api/proxy/stop', {
+            method: 'POST',
+          });
+          logInfo('[AppRunner] Proxy stopped');
+        } catch (error) {
+          logError(`[AppRunner] Failed to stop proxy: ${error}`);
+        }
+      }
+      
       logInfo('[AppRunner] App stopped');
       setAppRunState({
         status: 'ready',
         type: appRunState.type,
         projectFile: appRunState.projectFile,
       });
+      
+      // Clear current URL tracking
+      setCurrentIframeUrl(null);
     } catch (error) {
       logError(`[AppRunner] Failed to stop app: ${error}`);
       setAppRunState(prev => ({
@@ -868,13 +939,19 @@ const GenerateAppScreen: React.FC = () => {
 
   // Handle Refresh button click
   const handleRefreshClick = () => {
-    if (appRunState.status === 'running' && iframeRef.current && iframeRef.current.contentWindow) {
+    if (appRunState.status === 'running' && iframeRef.current) {
       logInfo('[AppRunner] Refreshing iframe (bypassing cache)');
-      // Force reload bypassing cache by adding a cache-busting parameter
-      const currentUrl = iframeRef.current.contentWindow.location.href;
-      const url = new URL(currentUrl);
-      url.searchParams.set('_refresh', Date.now().toString());
-      iframeRef.current.contentWindow.location.href = url.toString();
+      // Use the tracked current URL (from navigation tracking) if available, otherwise use proxy or direct URL
+      const urlToRefresh = currentIframeUrl || appRunState.proxyUrl || appRunState.url || '';
+      if (urlToRefresh) {
+        try {
+          const url = new URL(urlToRefresh);
+          // Remove old refresh param if exists
+          url.searchParams.delete('_refresh');
+          url.searchParams.set('_refresh', Date.now().toString());
+        logInfo(`[AppRunner] Refreshing to: ${url.toString()}`);
+        iframeRef.current.src = url.toString();
+      }
     }
   };
 
@@ -1423,7 +1500,7 @@ const GenerateAppScreen: React.FC = () => {
                   <div className="bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
                     <iframe
                       ref={iframeRef}
-                      src={appRunState.url}
+                      src={appRunState.proxyUrl || appRunState.url}
                       className="w-full h-full"
                       title="Running App"
                     />
