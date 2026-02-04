@@ -61,9 +61,12 @@ The button should be positioned to the left of the Mode dropdown in the chat inp
 
 ### Chat Persistence
 - Leverage existing `chatPersistence.ts` utilities
-- Save current chat with a timestamped filename or unique ID
-- File location: Inside project's `.naide/` folder
-- Naming convention: `chat-{timestamp}.json` or `chat-{uuid}.json`
+- Save current chat with a date-prefixed filename and unique ID
+- File location: Inside project's `.naide/chatsessions/` folder
+- Naming convention: `YYYY-MM-DD-chat-{timestamp}-{random}.json`
+  - Example: `2026-02-04-chat-1738641825123-a1b2c3.json`
+  - Date prefix enables chronological sorting and context
+  - Updated: 2026-02-04
 
 ### State Management
 - Clear `messages` state array
@@ -160,10 +163,11 @@ Each saved chat file should contain:
 ## Implementation Notes
 
 ### Phase 1 (This Feature)
-- Add button UI
-- Implement save-and-reset logic
-- Create archived chat files
-- Test chat state resets properly
+- ✅ Add button UI
+- ✅ Implement save-and-reset logic
+- ✅ Create archived chat files
+- ✅ Test chat state resets properly
+- ✅ Updated naming convention to use date prefix (2026-02-04)
 
 ### Phase 2 (Future)
 - Add chat history UI

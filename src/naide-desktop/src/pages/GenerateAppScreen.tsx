@@ -107,6 +107,11 @@ const GenerateAppScreen: React.FC = () => {
     filePath: '',
     fileName: '',
   });
+  // Right column resize state
+  const [rightColumnWidth, setRightColumnWidth] = useState(480); // Default: 480px (larger than w-96)
+  const [isResizingRight, setIsResizingRight] = useState(false);
+  const resizeStartRef = useRef({ x: 0, width: 0 });
+  
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -679,6 +684,47 @@ const GenerateAppScreen: React.FC = () => {
     });
   };
 
+  // Handle right column resize
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingRight(true);
+    resizeStartRef.current = {
+      x: e.clientX,
+      width: rightColumnWidth,
+    };
+  };
+
+  // Handle mouse move for resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingRight) {
+        const deltaX = resizeStartRef.current.x - e.clientX; // Inverted because left edge
+        const newWidth = Math.max(300, Math.min(800, resizeStartRef.current.width + deltaX)); // Min 300px, Max 800px
+        setRightColumnWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingRight) {
+        setIsResizingRight(false);
+      }
+    };
+
+    if (isResizingRight) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [isResizingRight]);
+
   return (
     <div className="h-screen bg-zinc-950 flex flex-col">
       {/* Header */}
@@ -1046,7 +1092,17 @@ const GenerateAppScreen: React.FC = () => {
         </div>
 
         {/* Right: Running App Preview */}
-        <div className="w-96 bg-zinc-900 border-l border-zinc-800 overflow-y-auto">
+        <div 
+          className="relative bg-zinc-900 border-l border-zinc-800 overflow-y-auto"
+          style={{ width: `${rightColumnWidth}px` }}
+        >
+          {/* Resize handle */}
+          <div
+            className="absolute left-0 top-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-blue-500 cursor-ew-resize transition-all z-10"
+            onMouseDown={handleResizeStart}
+            title="Drag to resize"
+          />
+          
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-100 mb-4">Running App</h3>
 

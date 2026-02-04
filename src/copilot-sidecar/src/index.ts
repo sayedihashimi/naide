@@ -4,7 +4,8 @@ import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve, sep, relative } from 'path';
 import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
-import { CopilotClient } from '@github/copilot-sdk';
+import { CopilotClient, defineTool } from '@github/copilot-sdk';
+import { z } from 'zod';
 import { initializeLogger } from './logger.js';
 import { StatusEventEmitter, createStatusWebSocketServer } from './statusEvents.js';
 
@@ -171,6 +172,28 @@ When the conversation has matured (4+ message exchanges), include a summary upda
 Only include non-empty arrays. The openQuestions array should contain the CURRENT state of open questions (replacing previous), while other arrays are additive (new items only).
 
 `;
+
+    // Add learnings tool instructions
+    systemPrompt += `
+PROJECT LEARNINGS INSTRUCTIONS:
+You have access to the search_learnings tool to retrieve relevant learnings from past interactions.
+
+WHEN TO USE:
+- At the START of each new task, search for relevant learnings using keywords from the user's request
+- When working on a topic where past decisions may be relevant
+- When you need to recall previous constraints or corrections
+
+HOW TO USE:
+- Call search_learnings with an array of keywords relevant to the current task
+- Example: search_learnings({ keywords: ["react", "testing"] }) for a React testing task
+- Example: search_learnings({ keywords: ["api", "error", "handling"] }) for API error handling
+
+IMPORTANT:
+- Learnings contain critical corrections and constraints - always check before making significant decisions
+- Apply relevant learnings to avoid repeating past mistakes
+- If no learnings are found, proceed with best practices
+
+`;
     
     return systemPrompt;
   } catch (error) {
@@ -179,38 +202,94 @@ Only include non-empty arrays. The openQuestions array should contain the CURREN
   }
 }
 
-// Load learnings from .prompts/learnings/
-async function loadLearnings(workspaceRoot: string): Promise<string> {
+// Search learnings from .prompts/learnings/ by keywords
+// Returns learnings that match any of the provided keywords (case-insensitive)
+function searchLearnings(workspaceRoot: string, keywords: string[]): string {
   const learningsDir = join(workspaceRoot, '.prompts', 'learnings');
   
   if (!existsSync(learningsDir)) {
-    return '';
+    return 'No learnings directory found. This is a new project with no recorded learnings yet.';
   }
   
   try {
-    const fs = await import('fs/promises');
-    const files = await fs.readdir(learningsDir);
+    const files = readdirSync(learningsDir).filter(f => f.endsWith('.md'));
     
-    if (files.filter(f => f.endsWith('.md')).length === 0) {
-      return '';
+    if (files.length === 0) {
+      return 'No learnings found. This is a new project with no recorded learnings yet.';
     }
     
-    let learnings = '\n\n## LEARNINGS FROM PAST INTERACTIONS\n\n';
-    learnings += '**CRITICAL: Read these learnings carefully before making decisions.**\n\n';
-    learnings += 'These are lessons from past mistakes and corrections. Apply them to avoid repeating errors:\n\n';
+    // Normalize keywords for matching
+    const normalizedKeywords = keywords.map(k => k.toLowerCase().trim()).filter(k => k.length > 0);
+    
+    if (normalizedKeywords.length === 0) {
+      // No keywords provided - return list of available learning files
+      return `Available learning files (use specific keywords to search):\n${files.map(f => `- ${f}`).join('\n')}`;
+    }
+    
+    // Search through learnings and score by relevance
+    const matches: Array<{ file: string; content: string; score: number }> = [];
     
     for (const file of files) {
-      if (file.endsWith('.md')) {
-        const content = await fs.readFile(join(learningsDir, file), 'utf-8');
-        learnings += `### ${file}\n${content}\n\n`;
+      const content = readFileSync(join(learningsDir, file), 'utf-8');
+      const lowerContent = content.toLowerCase();
+      const lowerFile = file.toLowerCase();
+      
+      // Score based on keyword matches
+      let score = 0;
+      for (const keyword of normalizedKeywords) {
+        // Check filename (higher weight)
+        if (lowerFile.includes(keyword)) {
+          score += 3;
+        }
+        // Check content (count occurrences)
+        const occurrences = (lowerContent.match(new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+        score += occurrences;
+      }
+      
+      if (score > 0) {
+        matches.push({ file, content, score });
       }
     }
     
-    return learnings;
+    if (matches.length === 0) {
+      return `No learnings found matching keywords: ${keywords.join(', ')}\n\nAvailable learning files:\n${files.map(f => `- ${f}`).join('\n')}`;
+    }
+    
+    // Sort by score (highest first) and return top matches
+    matches.sort((a, b) => b.score - a.score);
+    const topMatches = matches.slice(0, 5); // Limit to top 5 matches
+    
+    let result = `Found ${matches.length} relevant learning(s) for keywords: ${keywords.join(', ')}\n\n`;
+    result += '**CRITICAL: Apply these learnings to avoid repeating past mistakes.**\n\n';
+    
+    for (const match of topMatches) {
+      result += `### ${match.file}\n${match.content}\n\n`;
+    }
+    
+    if (matches.length > 5) {
+      result += `\n(${matches.length - 5} additional matches not shown)`;
+    }
+    
+    return result;
   } catch (error) {
-    console.error('Error loading learnings:', error);
-    return '';
+    console.error('Error searching learnings:', error);
+    return 'Error searching learnings: ' + (error instanceof Error ? error.message : String(error));
   }
+}
+
+// Create the search_learnings tool for a specific workspace
+function createLearningsTool(workspaceRoot: string) {
+  return defineTool('search_learnings', {
+    description: 'Search project learnings for relevant context based on keywords. Call this at the start of each task to find lessons from past interactions that may apply. Learnings contain important decisions, constraints, and corrections that should inform your work.',
+    parameters: z.object({
+      keywords: z.array(z.string()).describe('Keywords to search for in learnings (e.g., ["react", "routing"], ["api", "auth"], ["testing"]). Use terms relevant to the current task.')
+    }),
+    handler: async ({ keywords }) => {
+      console.log(`[Sidecar] search_learnings called with keywords: ${keywords.join(', ')}`);
+      const result = searchLearnings(workspaceRoot, keywords);
+      return result;
+    }
+  });
 }
 
 // Load spec files from .prompts/plan/
@@ -540,8 +619,7 @@ app.post('/api/copilot/stream', async (req, res) => {
       const features = loadFeatureFiles(workspace);
       fullSystemPrompt += specs;
       fullSystemPrompt += features;
-      const learnings = await loadLearnings(workspace);
-      fullSystemPrompt += learnings;
+      // Learnings are now accessed via the search_learnings tool, not bulk-loaded
       
       if (conversationContext?.summary) {
         const summaryPrompt = formatConversationSummary(conversationContext.summary);
@@ -564,6 +642,7 @@ app.post('/api/copilot/stream', async (req, res) => {
         systemMessage: {
           content: fullSystemPrompt
         },
+        tools: [createLearningsTool(workspace)],
         hooks: {
           // Hook to add footer to markdown files after they're written by the AI
           onPostToolUse: async (input) => {
@@ -865,11 +944,11 @@ app.post('/api/copilot/chat', async (req, res) => {
       // PROMPT ASSEMBLY ORDER (as per conversation-memory.feature.md)
       // 1) Base system prompt
       // 2) Mode system prompt
-      // 3) Relevant learnings
-      // 4) Relevant spec + feature files
-      // 5) Conversation summary
-      // 6) Recent messages
-      // 7) Current user message (sent separately)
+      // 3) Spec + feature files
+      // 4) Conversation summary
+      // 5) Recent messages
+      // 6) Current user message (sent separately)
+      // Note: Learnings are now accessed via the search_learnings tool
       // =========================================================================
       
       const workspace = workspaceRoot || process.cwd();
@@ -877,11 +956,7 @@ app.post('/api/copilot/chat', async (req, res) => {
       // 1-2) Load system prompts from naide app repository (base + mode)
       let fullSystemPrompt = loadSystemPrompts(mode);
       
-      // 3) Load learnings from user's project
-      const learnings = await loadLearnings(workspace);
-      fullSystemPrompt += learnings;
-      
-      // 4) Load spec and feature files from user's project
+      // 3) Load spec and feature files from user's project
       const specs = loadSpecFiles(workspace);
       const features = loadFeatureFiles(workspace);
       fullSystemPrompt += specs;
@@ -910,6 +985,7 @@ app.post('/api/copilot/chat', async (req, res) => {
         systemMessage: {
           content: fullSystemPrompt
         },
+        tools: [createLearningsTool(workspace)],
         hooks: {
           // Hook to add footer to markdown files after they're written by the AI
           onPostToolUse: async (input) => {

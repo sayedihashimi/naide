@@ -82,3 +82,35 @@ User noticed that Copilot was not consistently applying lessons from `.prompts/l
 
 **Key principle:**
 Learnings are project-specific truths learned through experience. They have higher authority than general best practices because they represent what actually works (or doesn't work) in THIS specific project.
+
+---
+
+## Create Plans Before Non-Trivial Changes (2026-02-04)
+
+**What happened:**
+The AI implemented a resizable right column feature (adding state, handlers, and UI changes) without first creating a feature specification or plan. When the user asked if a plan was created, the AI realized it had already started implementing before planning.
+
+**Why it mattered:**
+- Multi-file or non-trivial changes require upfront planning to ensure clarity and completeness
+- Plans help users understand what will change before it happens
+- Plans serve as documentation for the change and can be reviewed/adjusted
+- Implementing without planning can lead to incomplete or misguided solutions
+- Naide is spec-driven: the specification should exist before or during implementation, not after
+
+**What to do next time:**
+- **ALWAYS** create a feature specification in `.prompts/features/YYYY-MM-DD-description.md` BEFORE implementing non-trivial changes
+- Non-trivial changes include:
+  - Adding new UI components or features
+  - Multi-file modifications
+  - State management changes
+  - Layout or architecture changes
+  - Bug fixes requiring investigation
+- Trivial changes that DON'T need a plan:
+  - Single-line typo fixes
+  - Simple text or color adjustments
+  - Obvious fixes with no design decisions
+- If user asks for implementation directly, create the plan first, then implement
+- If you catch yourself implementing without a plan, stop and create the plan
+
+**Key principle:**
+For any change that requires design decisions or touches multiple files: Plan first, implement second. The specification is not just documentation—it's a thinking tool that ensures the change is well-considered.
