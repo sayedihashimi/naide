@@ -14,15 +14,17 @@ Add the ability to delete archived chat sessions from the chat history dropdown.
 ---
 
 ## Goals
-- Allow users to remove unwanted chat sessions
+- Allow users to remove unwanted chat sessions from history
 - Prevent clutter in chat history
+- Use soft-delete (move to trash) to enable recovery if needed
 - Provide clear confirmation to avoid accidental deletions
 - Maintain usability when last chat is deleted (auto-create new chat)
 
 ---
 
 ## Non-Goals
-- Trash/recycle bin for deleted chats (future enhancement)
+- Restore functionality from trash (future enhancement)
+- Auto-delete from trash after N days (future enhancement)
 - Undo delete functionality (future enhancement)
 - Bulk delete operations (future enhancement)
 - Export before delete (future enhancement)
@@ -35,6 +37,8 @@ Users accumulate chat sessions over time, and some become irrelevant or cluttere
 - Difficulty finding relevant chats
 - No way to clean up test/mistake chats
 - Potential confusion with many similar-looking chats
+
+Additionally, users may accidentally delete important chats. A soft-delete approach (trash folder) provides a safety net while keeping the history dropdown clean.
 
 ---
 
@@ -65,31 +69,29 @@ Add a small delete icon (trash/X) next to each chat item in the existing ChatHis
 1. User opens chat history dropdown
 2. User hovers over a chat item → delete icon appears/highlights
 3. User clicks delete icon
-4. Confirmation dialog appears: "Delete this chat? This cannot be undone."
-5. User confirms → chat file is deleted, dropdown updates
+4. Confirmation dialog appears: "Move this chat to trash?"
+5. User confirms → chat file moves to trash, dropdown updates
 6. If this was the only chat → new empty chat auto-creates
 
 ### Confirmation Dialog
-**Title:** "Delete Chat?"
+**Title:** "Move Chat to Trash?"
 
 **Message:**
 ```
-Are you sure you want to delete this chat?
+This chat will be moved to trash and removed from your history.
 
 Date: [Chat date]
 Mode: [Planning/Building/Analyzing]
 Messages: [Count]
-
-This action cannot be undone.
 ```
 
 **Buttons:**
 - Cancel (default focus)
-- Delete (red/destructive style)
+- Move to Trash (amber/warning style, less aggressive than red)
 
 ### Special Case: Last Chat Deletion
 **Behavior when deleting the only chat:**
-1. Delete the chat file
+1. Move the chat file to trash
 2. Immediately create a new empty chat
 3. Load welcome messages for current mode
 4. Close dropdown
@@ -99,6 +101,23 @@ This action cannot be undone.
 - Prevents "no chat loaded" broken state
 - Maintains expected workflow
 - User can immediately continue working
+
+### Trash Folder Structure
+```
+<project-root>/.naide/chatsessions/
+├── chat-active.json              (current session)
+├── chat-2026-02-01T14-30-45.json
+├── chat-2026-02-02T09-15-33.json
+└── trash/                         (soft-deleted chats)
+    ├── chat-2026-01-28T10-20-15.json
+    └── chat-2026-01-30T16-45-22.json
+```
+
+**Trash folder behavior:**
+- Deleted chats are moved (not copied) to `trash/` subdirectory
+- Files in trash are NOT shown in chat history dropdown
+- Trash folder is created automatically if it doesn't exist
+- Original filenames are preserved
 
 ---
 
@@ -115,17 +134,17 @@ const handleDeleteChat = async (filename: string, e: React.MouseEvent) => {
   
   // Show confirmation dialog
   const confirmed = await showConfirmDialog({
-    title: "Delete Chat?",
-    message: `Are you sure? This action cannot be undone.`,
-    confirmText: "Delete",
+    title: "Move Chat to Trash?",
+    message: `This chat will be moved to trash and removed from your history.`,
+    confirmText: "Move to Trash",
     cancelText: "Cancel",
-    destructive: true
+    destructive: false
   });
   
   if (!confirmed) return;
   
   try {
-    // Delete the file
+    // Move file to trash
     await invoke('delete_chat_session', { 
       projectPath: actualProjectPath,
       filename 
@@ -141,11 +160,11 @@ const handleDeleteChat = async (filename: string, e: React.MouseEvent) => {
     }
     
     // Show success toast (optional)
-    showToast({ message: "Chat deleted", type: "success" });
+    showToast({ message: "Chat moved to trash", type: "success" });
     
   } catch (error) {
-    console.error('Failed to delete chat:', error);
-    showToast({ message: "Failed to delete chat", type: "error" });
+    console.error('Failed to move chat to trash:', error);
+    showToast({ message: "Failed to move chat to trash", type: "error" });
   }
 };
 ```
@@ -195,22 +214,31 @@ async fn delete_chat_session(
         return Err("Invalid filename".to_string());
     }
     
-    // Construct full path
-    let chat_path = Path::new(&project_path)
+    // Construct paths
+    let chatsessions_dir = Path::new(&project_path)
         .join(".naide")
-        .join("chatsessions")
-        .join(&filename);
+        .join("chatsessions");
     
-    // Check file exists
-    if !chat_path.exists() {
+    let source_path = chatsessions_dir.join(&filename);
+    let trash_dir = chatsessions_dir.join("trash");
+    let dest_path = trash_dir.join(&filename);
+    
+    // Check source file exists
+    if !source_path.exists() {
         return Err("Chat file not found".to_string());
     }
     
-    // Delete the file
-    fs::remove_file(&chat_path)
-        .map_err(|e| format!("Failed to delete file: {}", e))?;
+    // Create trash directory if it doesn't exist
+    if !trash_dir.exists() {
+        fs::create_dir_all(&trash_dir)
+            .map_err(|e| format!("Failed to create trash directory: {}", e))?;
+    }
     
-    log::info!("Deleted chat session: {}", filename);
+    // Move the file to trash
+    fs::rename(&source_path, &dest_path)
+        .map_err(|e| format!("Failed to move file to trash: {}", e))?;
+    
+    log::info!("Moved chat session to trash: {}", filename);
     
     Ok(())
 }
@@ -317,11 +345,11 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
 ## Error Handling
 
-### File Deletion Errors
-**Scenario:** File doesn't exist or permission denied
+### File Move Errors
+**Scenario:** File doesn't exist, permission denied, or trash directory creation fails
 
 **Behavior:**
-- Show error toast: "Failed to delete chat"
+- Show error toast: "Failed to move chat to trash"
 - Log error details to console
 - Keep dropdown open
 - Chat remains in list (allow retry)
@@ -338,7 +366,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 **Scenario:** User deletes the currently open chat
 
 **Behavior:**
-- Delete the file
+- Move the file to trash
 - Create new empty chat
 - Load welcome messages
 - Close dropdown
@@ -367,9 +395,16 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
 ### Deleting from Different Instance
 **Behavior:**
-- If file is deleted externally, handle gracefully
+- If file is moved to trash externally, handle gracefully
 - Show "Chat no longer exists" if load fails
 - Refresh list automatically
+
+### Trash Directory Management
+**Behavior:**
+- Trash directory is created automatically on first delete
+- If trash directory is deleted externally, recreate it on next delete
+- Files in trash are never shown in chat history dropdown
+- Trash folder location: `.naide/chatsessions/trash/`
 
 ---
 
@@ -377,12 +412,12 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
 ### Path Validation
 - **Validate filename:** No path traversal (`../`, `..\\`)
-- **Restrict to chatsessions:** Only delete from `.naide/chatsessions/`
+- **Restrict to chatsessions:** Only move files from `.naide/chatsessions/` to `.naide/chatsessions/trash/`
 - **No arbitrary paths:** User cannot specify full paths
 
 ### Confirmation Required
 - **Always confirm:** No "delete without confirmation" option (in MVP)
-- **Clear warning:** Make it clear action is permanent
+- **Clear messaging:** Make it clear chat goes to trash (not permanent deletion)
 
 ### Permissions
 - **Check write access:** Verify user has permission to delete
@@ -397,11 +432,13 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 - [ ] Clicking delete icon shows confirmation dialog
 - [ ] Confirmation dialog shows chat details (date, mode, message count)
 - [ ] Clicking "Cancel" closes dialog, no changes made
-- [ ] Clicking "Delete" removes chat file from disk
+- [ ] Clicking "Move to Trash" moves chat file to trash folder
 - [ ] After deletion, dropdown updates (chat removed from list)
+- [ ] Trash folder is created automatically if it doesn't exist
 - [ ] If deleting active chat, new empty chat is created
 - [ ] If deleting only chat, new empty chat is created
-- [ ] Error toast shows if deletion fails
+- [ ] Error toast shows if move to trash fails
+- [ ] Files in trash folder do not appear in chat history dropdown
 - [ ] Success toast shows on successful deletion (optional)
 - [ ] Clicking delete does NOT trigger chat selection
 - [ ] Keyboard support: ESC closes confirmation dialog
@@ -420,8 +457,9 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 ### Integration Tests
 1. **Delete archived chat:**
    - Open dropdown, delete a chat
-   - Verify file removed from disk
-   - Verify chat removed from list
+   - Verify file moved to trash folder (not deleted)
+   - Verify chat removed from dropdown list
+   - Verify file exists in `.naide/chatsessions/trash/`
 
 2. **Delete active chat:**
    - Open a chat, then delete it from history
@@ -443,10 +481,18 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
    - Verify error toast appears
    - Verify chat remains in list
 
+6. **Trash folder creation:**
+   - Delete trash folder manually
+   - Delete a chat
+   - Verify trash folder is recreated automatically
+   - Verify file is moved to trash successfully
+
 ### Manual Testing
 - [ ] Test delete button visibility (hover states)
 - [ ] Test confirmation dialog appearance
-- [ ] Test successful deletion (file removed)
+- [ ] Test successful deletion (file moved to trash)
+- [ ] Test trash folder creation (if doesn't exist)
+- [ ] Verify files in trash don't appear in dropdown
 - [ ] Test error scenarios (permission denied)
 - [ ] Test keyboard navigation (ESC to cancel)
 - [ ] Test with 1, 5, 20 chats in history
@@ -457,10 +503,12 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
 ## Future Enhancements
 
-### Phase 2: Soft Delete (Trash)
-- Move deleted chats to `.naide/chatsessions/trash/`
-- Add "Restore" option in a trash viewer
-- Auto-delete from trash after 30 days
+### Phase 2: Trash Management UI
+- Add "View Trash" option in chat history dropdown or settings
+- Display list of trashed chats with restore option
+- Add "Empty Trash" button to permanently delete all trashed chats
+- Add "Restore" button next to each trashed chat
+- Auto-delete from trash after 30 days (configurable)
 
 ### Phase 3: Undo Delete
 - Keep deleted file in memory for 10 seconds
