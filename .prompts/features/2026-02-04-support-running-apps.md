@@ -1,12 +1,54 @@
 ---
-Status: planned
+Status: implemented
 Area: ui, build, infra
 Created: 2026-02-04
 LastUpdated: 2026-02-04
 ---
 
 # Feature: Support Running npm and .NET Apps
-**Status**: 🟡 PLANNED
+**Status**: ✅ IMPLEMENTED (.NET support)
+
+# Feature: Support Running npm and .NET Apps
+**Status**: ✅ IMPLEMENTED (.NET support)
+
+## Implementation Summary
+
+The running apps feature has been implemented with .NET support. npm support is deferred to a future enhancement.
+
+**Key Features Implemented:**
+- Automatic detection of .NET web projects (ASP.NET, Blazor)
+- Play/Stop button with visual states (ready, starting, running, error)
+- Uses `dotnet watch --non-interactive` for hot reload support
+- URL detection from stdout with 30-second timeout
+- Running app displayed in iframe in right panel
+- Process management with automatic cleanup on app close
+- Status indicators for all app states
+
+**Files Implemented:**
+- `src/naide-desktop/src-tauri/src/app_runner.rs` - App detection and process management
+- `src/naide-desktop/src-tauri/src/lib.rs` - Tauri commands and state management
+- `src/naide-desktop/src/pages/GenerateAppScreen.tsx` - UI and frontend integration
+
+**Backend (Rust):**
+- `detect_runnable_app` command - Scans for .csproj files and identifies web projects
+- `start_app` command - Spawns `dotnet watch --non-interactive` process
+- `stop_app` command - Kills running process
+- URL extraction from stdout using regex
+- Process state tracking
+
+**Frontend (React):**
+- App run state management (none, detecting, ready, starting, running, error)
+- Play button (green) when app detected
+- Stop button (red) when app running
+- Spinner during startup
+- Iframe displays running app when URL detected
+- Error state with retry option
+
+**Simplified MVP Approach:**
+- Automatically uses first web project found (no picker dialog)
+- Future enhancement: Multi-project selection with "remember choice"
+
+---
 
 ## Summary
 Add "Play" button to launch and preview web apps in the "Running App" panel. Support two app types: npm apps (package.json) and .NET apps (web projects). Automatically detect project type, discover runnable commands/projects, and display the running app in an iframe.
@@ -97,15 +139,12 @@ By integrating app launching directly into Naide, users get immediate visual fee
 2. Parse project files to find web projects:
    - Look for `<OutputType>Exe</OutputType>` or Web SDK
    - Check for `Microsoft.NET.Sdk.Web` or `Microsoft.AspNetCore.App`
-3. If multiple web projects found:
-   - Show project picker dialog
-   - User selects which project to run
-   - Remember selection in project config (`.naide/project-config.json`)
-4. Store selected project path
+3. **Simplified approach for MVP**: Use the first web project found
+   - Future enhancement: Allow user to select from multiple projects
 
 **Running:**
 1. User clicks Play
-2. Execute: `dotnet watch --non-interactive --project {selected-project-path}`
+2. Execute: `dotnet watch --non-interactive --project {first-web-project-path}`
 3. Capture stdout/stderr
 4. Detect app URL from output (e.g., "Now listening on: http://localhost:5000")
 5. Load URL in iframe in "Running App" panel
@@ -123,19 +162,8 @@ By integrating app launching directly into Naide, users get immediate visual fee
 4. Show status: "Stopped"
 
 **Multi-Project Handling:**
-- If user has selected a project before, use that selection automatically
-- Show "Change project" link/button to re-open picker
-- Store selection per workspace in `.naide/project-config.json`:
-  ```json
-  {
-    "projectName": "my-app",
-    "projectPath": "/path/to/project",
-    "runConfig": {
-      "type": "dotnet",
-      "projectFile": "src/Web/Web.csproj"
-    }
-  }
-  ```
+- **MVP**: Automatically use first web project found
+- **Future enhancement**: Project picker dialog with "remember choice"
 
 ---
 

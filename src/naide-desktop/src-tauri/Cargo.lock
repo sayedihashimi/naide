@@ -82,6 +82,7 @@ dependencies = [
  "chrono",
  "log",
  "notify",
+ "regex",
  "serde",
  "serde_json",
  "tauri",

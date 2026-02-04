@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::thread;
 use tauri::{Manager, Emitter};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,9 @@ use std::sync::mpsc::channel;
 mod settings;
 use settings::{LastProject, read_settings, write_settings, add_recent_project, get_recent_projects as get_recent_projects_from_settings};
 
+mod app_runner;
+use app_runner::{detect_dotnet_app, start_dotnet_app, wait_for_url, AppInfo, RunningAppInfo};
+
 // Global state to track the sidecar process
 struct SidecarState {
     process: Option<Child>,
@@ -20,6 +24,12 @@ struct SidecarState {
 // Global state to track file watchers
 struct WatcherState {
     _watcher: Option<Box<dyn Watcher + Send>>,
+}
+
+// Global state to track running app process
+struct RunningAppState {
+    process: Option<Child>,
+    pid: Option<u32>,
 }
 
 // Tauri command: Log from frontend to backend log file
@@ -604,6 +614,113 @@ async fn watch_feature_files(window: tauri::Window, project_path: String) -> Res
     Ok(())
 }
 
+// Tauri command: Detect runnable app in the project
+#[tauri::command]
+async fn detect_runnable_app(project_path: String) -> Result<Option<AppInfo>, String> {
+    log::info!("Detecting runnable app in: {}", project_path);
+    
+    // Try .NET first
+    if let Some(app_info) = detect_dotnet_app(&project_path)? {
+        log::info!("Detected .NET app: {:?}", app_info);
+        return Ok(Some(app_info));
+    }
+    
+    // TODO: Add npm detection later
+    
+    Ok(None)
+}
+
+// Tauri command: Start the app
+#[tauri::command]
+async fn start_app(
+    app_handle: tauri::AppHandle,
+    project_path: String,
+    app_info: AppInfo,
+) -> Result<RunningAppInfo, String> {
+    log::info!("Starting app: {:?}", app_info);
+    
+    match app_info.app_type.as_str() {
+        "dotnet" => {
+            let project_file = app_info.project_file
+                .ok_or_else(|| "No project file specified for .NET app".to_string())?;
+            
+            let (mut child, _stop_tx) = start_dotnet_app(&project_path, &project_file)?;
+            let pid = child.id();
+            
+            // Create a channel to wait for URL
+            let (tx, rx) = channel();
+            
+            // Spawn thread to read stdout and detect URL
+            if let Some(stdout) = child.stdout.take() {
+                thread::spawn(move || {
+                    use std::io::{BufRead, BufReader};
+                    let reader = BufReader::new(stdout);
+                    let url_regex = regex::Regex::new(r"https?://[^\s]+").unwrap();
+                    
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            log::info!("[dotnet stdout] {}", line);
+                            
+                            if let Some(captures) = url_regex.find(&line) {
+                                let url = captures.as_str().to_string();
+                                log::info!("Detected URL: {}", url);
+                                let _ = tx.send(url);
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Wait for URL with 30 second timeout
+            let url = wait_for_url(rx, 30);
+            
+            if url.is_none() {
+                log::warn!("URL not detected within timeout");
+            }
+            
+            // Store the process in state
+            app_handle.state::<Mutex<RunningAppState>>().lock().unwrap().process = Some(child);
+            app_handle.state::<Mutex<RunningAppState>>().lock().unwrap().pid = Some(pid);
+            
+            Ok(RunningAppInfo { pid, url })
+        }
+        _ => Err(format!("Unsupported app type: {}", app_info.app_type)),
+    }
+}
+
+// Tauri command: Stop the running app
+#[tauri::command]
+async fn stop_app(app_handle: tauri::AppHandle) -> Result<(), String> {
+    log::info!("Stopping app");
+    
+    let process_opt = {
+        let state_guard = app_handle.state::<Mutex<RunningAppState>>();
+        let mut state = state_guard.lock().unwrap();
+        state.process.take()
+    };
+    
+    if let Some(mut process) = process_opt {
+        let pid = process.id();
+        log::info!("Killing process with PID: {}", pid);
+        
+        process.kill()
+            .map_err(|e| format!("Failed to kill process: {}", e))?;
+        
+        // Clear PID from state
+        {
+            let state_guard = app_handle.state::<Mutex<RunningAppState>>();
+            let mut state = state_guard.lock().unwrap();
+            state.pid = None;
+        }
+        
+        log::info!("Process stopped successfully");
+        Ok(())
+    } else {
+        Err("No running app to stop".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -652,6 +769,12 @@ pub fn run() {
       // Initialize watcher state
       app.manage(Mutex::new(WatcherState {
         _watcher: None,
+      }));
+      
+      // Initialize running app state
+      app.manage(Mutex::new(RunningAppState {
+        process: None,
+        pid: None,
       }));
       
       // Start the copilot sidecar
@@ -733,14 +856,26 @@ pub fn run() {
       list_chat_sessions,
       load_chat_session_file,
       delete_chat_session,
-      watch_feature_files
+      watch_feature_files,
+      detect_runnable_app,
+      start_app,
+      stop_app
     ])
     .on_window_event(|_window, event| {
-      // Clean up sidecar on app exit
+      // Clean up processes on app exit
       if let tauri::WindowEvent::CloseRequested { .. } = event {
+        // Stop sidecar
         if let Some(mut state) = _window.state::<Mutex<SidecarState>>().try_lock().ok() {
           if let Some(mut process) = state.process.take() {
             println!("[Tauri] Stopping sidecar process...");
+            let _ = process.kill();
+          }
+        }
+        
+        // Stop running app
+        if let Some(mut state) = _window.state::<Mutex<RunningAppState>>().try_lock().ok() {
+          if let Some(mut process) = state.process.take() {
+            println!("[Tauri] Stopping running app process...");
             let _ = process.kill();
           }
         }
