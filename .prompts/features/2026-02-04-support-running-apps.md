@@ -149,6 +149,7 @@ By integrating app launching directly into Naide, users get immediate visual fee
 **Running:**
 1. User clicks Play
 2. Execute: `dotnet watch --non-interactive --project {first-web-project-path}`
+   - Environment variable set: `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` (prevents automatic browser opening)
 3. Capture stdout/stderr
 4. Detect app URL from output (e.g., "Now listening on: http://localhost:5000")
 5. Load URL in iframe in "Running App" panel
@@ -158,6 +159,7 @@ By integrating app launching directly into Naide, users get immediate visual fee
 - Enables hot reload (auto-restart on file changes)
 - `--non-interactive` prevents prompts that would block execution
 - Provides better development experience matching npm's dev servers
+- `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` prevents dotnet from opening default browser
 
 **Stopping:**
 1. User clicks Stop
@@ -185,11 +187,11 @@ By integrating app launching directly into Naide, users get immediate visual fee
 - Size: 32px clickable area, 20px icon
 - Hover: Lighter green (green-400)
 
-**Running state (red):**
-- Icon: Stop square (⏹) from Lucide `Square` icon
-- Color: Red (red-500)
-- Size: 32px clickable area, 20px icon
-- Hover: Lighter red (red-400)
+**Running state:**
+- **Stop button**: Stop square (⏹) from Lucide `Square` icon, red (red-500), hover: red-400
+- **Refresh button**: Refresh icon from Lucide `RefreshCw` icon, blue (blue-500), hover: blue-400
+- Size: 32px clickable area, 20px icon each
+- Positioned side-by-side (Refresh, then Stop)
 
 **Starting state:**
 - Icon: Spinner from Lucide `Loader2` icon (animated)
@@ -225,7 +227,7 @@ By integrating app launching directly into Naide, users get immediate visual fee
 **When running:**
 ```
 ┌────────────────────────────────────────┐
-│ Running App                    [⏹ Stop]│
+│ Running App           [🔄 Refresh][⏹ Stop]│
 ├────────────────────────────────────────┤
 │ Status: Running on http://localhost:5173│
 │ ┌────────────────────────────────────┐ │
@@ -321,6 +323,11 @@ const handleStopClick = async () => {
   // Update state to 'ready'
   // Call backend to kill process
 };
+
+const handleRefreshClick = () => {
+  // Reload the current page in iframe (preserves user's current location)
+  iframeRef.current?.contentWindow?.location.reload();
+};
 ```
 
 **UI rendering:**
@@ -352,6 +359,7 @@ const handleStopClick = async () => {
 
 2. **start_app**
    - Spawns process to run the app
+   - Sets environment variable `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` for .NET apps
    - Captures output to detect URL
    - Returns PID and detected URL
 
@@ -536,17 +544,18 @@ async fn stop_app(pid: u32) -> Result<(), String> {
 - [ ] Error messages are clear and actionable
 
 ### .NET Apps
-- [ ] Detects projects with .csproj or .sln
-- [ ] Identifies web projects (ASP.NET, Blazor)
-- [ ] Shows project picker for multiple projects
-- [ ] Remembers user's project selection
-- [ ] Play button appears when runnable app detected
-- [ ] Clicking Play runs dotnet run
-- [ ] URL is detected from stdout
-- [ ] Iframe loads the running app
-- [ ] Stop button kills the process
-- [ ] Status indicators update correctly
-- [ ] "Change project" option available
+- [x] Detects projects with .csproj or .sln
+- [x] Identifies web projects (ASP.NET, Blazor)
+- [x] Uses first web project found (simplified MVP)
+- [x] Play button appears when runnable app detected
+- [x] Clicking Play runs dotnet watch with --non-interactive
+- [x] Browser launch suppression via DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER
+- [x] URL is detected from stdout
+- [x] Iframe loads the running app
+- [x] Stop button kills the process
+- [x] Refresh button reloads current page in iframe
+- [x] Status indicators update correctly
+- [ ] "Change project" option available (future enhancement)
 
 ### General
 - [ ] No console errors or warnings

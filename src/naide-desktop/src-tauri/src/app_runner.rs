@@ -111,6 +111,7 @@ pub fn start_dotnet_app(
         .arg("--project")
         .arg(&full_project_path)
         .current_dir(project_path)
+        .env("DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER", "1")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

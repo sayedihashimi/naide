@@ -841,7 +841,8 @@ const GenerateAppScreen: React.FC = () => {
   const handleRefreshClick = () => {
     if (appRunState.status === 'running' && iframeRef.current) {
       logInfo('[AppRunner] Refreshing iframe');
-      iframeRef.current.src = iframeRef.current.src;
+      // Reload the current page in the iframe (preserves navigation state)
+      iframeRef.current.contentWindow?.location.reload();
     }
   };
 
