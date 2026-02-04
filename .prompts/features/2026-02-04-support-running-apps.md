@@ -17,6 +17,10 @@ The running apps feature has been implemented with .NET support. npm support is 
 - Play/Stop button with visual states (ready, starting, running, error)
 - Refresh button to reload the iframe when app is running
 - Uses `dotnet watch --non-interactive` for hot reload support
+- **Environment variables set**:
+  - `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` - Prevents automatic browser opening
+  - `HotReloadAutoRestart=true` - Enables automatic restart on hot reload
+- **Automatic browser refresh on hot reload**: Backend detects "Hot reload succeeded" messages and emits event to frontend to refresh iframe
 - URL detection from stdout with 30-second timeout
 - Running app displayed in iframe in right panel
 - Process management with automatic cleanup on app close
@@ -149,17 +153,30 @@ By integrating app launching directly into Naide, users get immediate visual fee
 **Running:**
 1. User clicks Play
 2. Execute: `dotnet watch --non-interactive --project {first-web-project-path}`
-   - Environment variable set: `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` (prevents automatic browser opening)
+   - Environment variables set:
+     - `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` - Prevents automatic browser opening
+     - `HotReloadAutoRestart=true` - Enables automatic restart on hot reload
 3. Capture stdout/stderr
 4. Detect app URL from output (e.g., "Now listening on: http://localhost:5000")
 5. Load URL in iframe in "Running App" panel
 6. Show status: "Running on http://localhost:5000"
+7. **Hot Reload Detection**: Backend monitors stderr for "Hot reload succeeded" messages
+8. **Automatic Refresh**: When hot reload succeeds, backend emits `hot-reload-success` event to frontend, triggering iframe refresh
 
 **Why `dotnet watch --non-interactive`:**
 - Enables hot reload (auto-restart on file changes)
 - `--non-interactive` prevents prompts that would block execution
 - Provides better development experience matching npm's dev servers
 - `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` prevents dotnet from opening default browser
+- `HotReloadAutoRestart=true` enables automatic hot reload without user confirmation
+
+**Hot Reload Workflow:**
+1. Developer makes code changes
+2. `dotnet watch` detects changes and applies hot reload
+3. Backend detects "Hot reload succeeded" in stderr output
+4. Backend emits `hot-reload-success` Tauri event
+5. Frontend receives event and refreshes iframe
+6. User sees updated app without manual refresh
 
 **Stopping:**
 1. User clicks Stop
@@ -330,6 +347,34 @@ const handleRefreshClick = () => {
 };
 ```
 
+**Hot Reload Event Listener:**
+```typescript
+// Listen for hot reload events from backend
+useEffect(() => {
+  let unlistenFn: (() => void) | null = null;
+  
+  const setupListener = async () => {
+    const { listen } = await import('@tauri-apps/api/event');
+    unlistenFn = await listen('hot-reload-success', () => {
+      logInfo('[AppRunner] Hot reload detected, refreshing iframe');
+      if (appRunState.status === 'running' && iframeRef.current) {
+        iframeRef.current.contentWindow?.location.reload();
+      }
+    });
+  };
+  
+  if (appRunState.status === 'running') {
+    setupListener();
+  }
+  
+  return () => {
+    if (unlistenFn) {
+      unlistenFn();
+    }
+  };
+}, [appRunState.status]);
+```
+
 **UI rendering:**
 ```tsx
 <div className="running-app-panel">
@@ -359,8 +404,12 @@ const handleRefreshClick = () => {
 
 2. **start_app**
    - Spawns process to run the app
-   - Sets environment variable `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` for .NET apps
+   - Sets environment variables for .NET apps:
+     - `DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1` - Prevents automatic browser opening
+     - `HotReloadAutoRestart=true` - Enables automatic hot reload
    - Captures output to detect URL
+   - Monitors stderr for hot reload success messages
+   - Emits `hot-reload-success` Tauri event when hot reload succeeds
    - Returns PID and detected URL
 
 3. **stop_app**

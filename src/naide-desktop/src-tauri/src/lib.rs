@@ -633,6 +633,7 @@ async fn detect_runnable_app(project_path: String) -> Result<Option<AppInfo>, St
 #[tauri::command]
 async fn start_app(
     app_handle: tauri::AppHandle,
+    window: tauri::Window,
     project_path: String,
     app_info: AppInfo,
 ) -> Result<RunningAppInfo, String> {
@@ -643,7 +644,7 @@ async fn start_app(
             let project_file = app_info.project_file
                 .ok_or_else(|| "No project file specified for .NET app".to_string())?;
             
-            let (child, rx) = start_dotnet_app(&project_path, &project_file)?;
+            let (child, rx) = start_dotnet_app(&project_path, &project_file, window)?;
             let pid = child.id();
             
             // Wait for URL with 30 second timeout

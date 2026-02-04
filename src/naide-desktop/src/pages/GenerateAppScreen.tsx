@@ -233,6 +233,31 @@ const GenerateAppScreen: React.FC = () => {
     detectApp();
   }, [state.projectPath]);
 
+  // Listen for hot reload events from backend
+  useEffect(() => {
+    let unlistenFn: (() => void) | null = null;
+    
+    const setupListener = async () => {
+      const { listen } = await import('@tauri-apps/api/event');
+      unlistenFn = await listen('hot-reload-success', () => {
+        logInfo('[AppRunner] Hot reload detected, refreshing iframe');
+        if (appRunState.status === 'running' && iframeRef.current) {
+          iframeRef.current.contentWindow?.location.reload();
+        }
+      });
+    };
+    
+    if (appRunState.status === 'running') {
+      setupListener();
+    }
+    
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
+  }, [appRunState.status]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
     if (transcriptRef.current) {

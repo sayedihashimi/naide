@@ -100,6 +100,7 @@ fn is_web_project(csproj_path: &Path) -> Result<bool, String> {
 pub fn start_dotnet_app(
     project_path: &str,
     project_file: &str,
+    window: tauri::Window,
 ) -> Result<(Child, Receiver<String>), String> {
     let full_project_path = Path::new(project_path).join(project_file);
     
@@ -112,6 +113,7 @@ pub fn start_dotnet_app(
         .arg(&full_project_path)
         .current_dir(project_path)
         .env("DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER", "1")
+        .env("HotReloadAutoRestart", "true")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -146,13 +148,23 @@ pub fn start_dotnet_app(
         });
     }
     
-    // Also read stderr to capture errors
+    // Also read stderr to capture errors and hot reload messages
     if let Some(stderr) = child.stderr.take() {
+        let window_clone = window.clone();
         thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines() {
                 if let Ok(line) = line {
                     log::error!("[dotnet stderr] {}", line);
+                    
+                    // Detect hot reload success message
+                    if line.contains("Hot reload succeeded") || line.contains("Hot reload of changes succeeded") {
+                        log::info!("Hot reload detected, emitting refresh event");
+                        // Emit event to frontend to refresh the browser
+                        if let Err(e) = window_clone.emit("hot-reload-success", ()) {
+                            log::error!("Failed to emit hot-reload-success event: {}", e);
+                        }
+                    }
                 }
             }
         });
