@@ -15,6 +15,7 @@ The running apps feature has been implemented with .NET support. npm support is 
 **Key Features Implemented:**
 - Automatic detection of .NET web projects (ASP.NET, Blazor)
 - Play/Stop button with visual states (ready, starting, running, error)
+- Refresh button to reload the iframe when app is running
 - Uses `dotnet watch --non-interactive` for hot reload support
 - URL detection from stdout with 30-second timeout
 - Running app displayed in iframe in right panel
@@ -36,6 +37,7 @@ The running apps feature has been implemented with .NET support. npm support is 
 **Frontend (React):**
 - App run state management (none, detecting, ready, starting, running, error)
 - Play button (green) when app detected
+- Refresh button (blue) next to Stop button when app running
 - Stop button (red) when app running
 - Spinner during startup
 - Iframe displays running app when URL detected

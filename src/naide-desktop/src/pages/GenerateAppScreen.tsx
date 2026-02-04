@@ -98,6 +98,7 @@ const GenerateAppScreen: React.FC = () => {
   // Chat history dropdown state
   const [showChatHistory, setShowChatHistory] = useState(false);
   // Feature file popup state
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [featureFilePopup, setFeatureFilePopup] = useState<{
     isOpen: boolean;
     filePath: string;
@@ -836,6 +837,14 @@ const GenerateAppScreen: React.FC = () => {
     }
   };
 
+  // Handle Refresh button click
+  const handleRefreshClick = () => {
+    if (appRunState.status === 'running' && iframeRef.current) {
+      logInfo('[AppRunner] Refreshing iframe');
+      iframeRef.current.src = iframeRef.current.src;
+    }
+  };
+
   return (
     <div className="h-screen bg-zinc-950 flex flex-col">
       {/* Header */}
@@ -1246,15 +1255,29 @@ const GenerateAppScreen: React.FC = () => {
               )}
               
               {appRunState.status === 'running' && (
-                <button
-                  onClick={handleStopClick}
-                  className="w-10 h-10 flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 transition-colors"
-                  title="Stop app"
-                >
-                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M6 6h12v12H6z" />
-                  </svg>
-                </button>
+                <div className="flex gap-2">
+                  {/* Refresh button */}
+                  <button
+                    onClick={handleRefreshClick}
+                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors"
+                    title="Refresh app"
+                  >
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                  
+                  {/* Stop button */}
+                  <button
+                    onClick={handleStopClick}
+                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 transition-colors"
+                    title="Stop app"
+                  >
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M6 6h12v12H6z" />
+                    </svg>
+                  </button>
+                </div>
               )}
               
               {appRunState.status === 'error' && (
@@ -1366,6 +1389,7 @@ const GenerateAppScreen: React.FC = () => {
                 {appRunState.url ? (
                   <div className="bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
                     <iframe
+                      ref={iframeRef}
                       src={appRunState.url}
                       className="w-full h-full"
                       title="Running App"
