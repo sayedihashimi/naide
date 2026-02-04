@@ -3,7 +3,6 @@ use std::sync::Mutex;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::thread;
 use tauri::{Manager, Emitter};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -644,33 +643,8 @@ async fn start_app(
             let project_file = app_info.project_file
                 .ok_or_else(|| "No project file specified for .NET app".to_string())?;
             
-            let (mut child, _stop_tx) = start_dotnet_app(&project_path, &project_file)?;
+            let (child, rx) = start_dotnet_app(&project_path, &project_file)?;
             let pid = child.id();
-            
-            // Create a channel to wait for URL
-            let (tx, rx) = channel();
-            
-            // Spawn thread to read stdout and detect URL
-            if let Some(stdout) = child.stdout.take() {
-                thread::spawn(move || {
-                    use std::io::{BufRead, BufReader};
-                    let reader = BufReader::new(stdout);
-                    let url_regex = regex::Regex::new(r"https?://[^\s]+").unwrap();
-                    
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            log::info!("[dotnet stdout] {}", line);
-                            
-                            if let Some(captures) = url_regex.find(&line) {
-                                let url = captures.as_str().to_string();
-                                log::info!("Detected URL: {}", url);
-                                let _ = tx.send(url);
-                                break;
-                            }
-                        }
-                    }
-                });
-            }
             
             // Wait for URL with 30 second timeout
             let url = wait_for_url(rx, 30);

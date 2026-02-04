@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::io::{BufRead, BufReader};
 use std::thread;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel, Receiver};
 use regex::Regex;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -100,7 +100,7 @@ fn is_web_project(csproj_path: &Path) -> Result<bool, String> {
 pub fn start_dotnet_app(
     project_path: &str,
     project_file: &str,
-) -> Result<(Child, Sender<()>), String> {
+) -> Result<(Child, Receiver<String>), String> {
     let full_project_path = Path::new(project_path).join(project_file);
     
     log::info!("Starting .NET app: dotnet watch --non-interactive --project {}", full_project_path.display());
@@ -120,7 +120,7 @@ pub fn start_dotnet_app(
     log::info!("Started dotnet watch with PID: {}", pid);
     
     // Create a channel to signal when URL is detected
-    let (tx, _rx) = channel();
+    let (tx, rx) = channel();
     
     // Spawn a thread to read stdout and detect URL
     if let Some(stdout) = child.stdout.take() {
@@ -157,10 +157,7 @@ pub fn start_dotnet_app(
         });
     }
     
-    // Create a sender for the stop signal (currently unused but kept for future use)
-    let (stop_tx, _stop_rx) = channel();
-    
-    Ok((child, stop_tx))
+    Ok((child, rx))
 }
 
 /// Extract URL from the receiver with timeout

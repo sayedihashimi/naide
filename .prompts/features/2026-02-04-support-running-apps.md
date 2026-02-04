@@ -8,9 +8,6 @@ LastUpdated: 2026-02-04
 # Feature: Support Running npm and .NET Apps
 **Status**: ✅ IMPLEMENTED (.NET support)
 
-# Feature: Support Running npm and .NET Apps
-**Status**: ✅ IMPLEMENTED (.NET support)
-
 ## Implementation Summary
 
 The running apps feature has been implemented with .NET support. npm support is deferred to a future enhancement.
@@ -47,6 +44,11 @@ The running apps feature has been implemented with .NET support. npm support is 
 **Simplified MVP Approach:**
 - Automatically uses first web project found (no picker dialog)
 - Future enhancement: Multi-project selection with "remember choice"
+
+**Bug Fixes:**
+- Fixed URL detection timeout issue where stdout reader thread wasn't communicating with main thread properly
+- Changed `start_dotnet_app` to return the URL receiver channel instead of a stop signal channel
+
 
 ---
 
