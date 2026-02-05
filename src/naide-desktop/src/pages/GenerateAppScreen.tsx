@@ -1172,7 +1172,11 @@ const GenerateAppScreen: React.FC = () => {
                         ? 'bg-zinc-900 border border-zinc-800'
                         : 'bg-blue-600'
                     }`}>
-                      <MessageContent content={message.content} role={message.role} />
+                      {message.role === 'assistant' && !message.content && isLoading ? (
+                        <p className="text-gray-400 animate-pulse">Copilot is working on your request...</p>
+                      ) : (
+                        <MessageContent content={message.content} role={message.role} />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1197,7 +1201,7 @@ const GenerateAppScreen: React.FC = () => {
                   </div>
                   <div className="flex-1">
                     <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-                      <p className="text-gray-400">Starting...</p>
+                      <p className="text-gray-400">Copilot is thinking...</p>
                     </div>
                   </div>
                 </div>
