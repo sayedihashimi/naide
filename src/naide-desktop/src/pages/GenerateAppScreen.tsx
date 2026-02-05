@@ -907,6 +907,7 @@ const GenerateAppScreen: React.FC = () => {
         status: 'running',
         type: appRunState.type,
         projectFile: appRunState.projectFile,
+        command: appRunState.command,
         url: result.url,
         proxyUrl,
         pid: result.pid,
@@ -921,6 +922,7 @@ const GenerateAppScreen: React.FC = () => {
         status: 'error',
         type: appRunState.type,
         projectFile: appRunState.projectFile,
+        command: appRunState.command,
         errorMessage: String(error),
       });
     }
@@ -954,6 +956,7 @@ const GenerateAppScreen: React.FC = () => {
         status: 'ready',
         type: appRunState.type,
         projectFile: appRunState.projectFile,
+        command: appRunState.command,
       });
       
       // Clear current URL tracking
@@ -965,6 +968,7 @@ const GenerateAppScreen: React.FC = () => {
         ...prev,
         status: 'error',
         errorMessage: String(error),
+        command: prev.command,
       }));
     }
   };
