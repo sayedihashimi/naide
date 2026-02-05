@@ -2,7 +2,7 @@
 Status: implemented
 Area: ui, build, infra
 Created: 2026-02-04
-LastUpdated: 2026-02-04
+LastUpdated: 2026-02-05
 ---
 
 # Feature: Support Running npm and .NET Apps
@@ -33,6 +33,7 @@ The running apps feature has been fully implemented for both npm and .NET apps w
   - Frontend tracks current URL and preserves it on hot reload
 - URL detection from stdout with 30-second timeout
 - Running app displayed in iframe in right panel (via proxy)
+- **Process tree termination** ✅ FIXED (2026-02-05) - Uses `taskkill /T /F` on Windows to kill entire process tree (npm + node + children)
 - Process management with automatic cleanup on app close
 - Status indicators for all app states
 
@@ -48,7 +49,9 @@ The running apps feature has been fully implemented for both npm and .NET apps w
 - `detect_npm_app` function - **NEW** (2026-02-04)
 - `start_npm_app` function - **NEW** (2026-02-04)
 - `start_app` command - Spawns `npm run {script}` or `dotnet watch --non-interactive`
-- `stop_app` command - Kills running process
+- `stop_app` command - Kills entire process tree using `taskkill /T /F` on Windows ✅ FIXED (2026-02-05)
+- `kill_process_tree(pid)` function - **NEW** (2026-02-05) - Platform-specific process tree termination
+- `is_process_running(pid)` function - **NEW** (2026-02-05) - Verifies process termination
 - URL extraction from stdout using regex
 - Process state tracking
 
@@ -85,6 +88,9 @@ The running apps feature has been fully implemented for both npm and .NET apps w
 - Changed `start_dotnet_app` to return the URL receiver channel instead of a stop signal channel
 - **Fixed npm app detection** - See `.prompts/features/bugs/2026-02-04-npm-app-detection-not-implemented.md`
 - **Fixed proxy URL escaping error** - See `.prompts/features/bugs/2026-02-04-proxy-url-escaping-error.md` (trailing slashes in URLs)
+- **Fixed Stop button not killing all processes** (2026-02-05) - See [bug report](./bugs/2026-02-05-npm-app-stop-not-killing-processes.md)
+  - Root cause: `process.kill()` only killed parent npm process, leaving node/Vite children orphaned
+  - Fix: Use `taskkill /T /F /PID` on Windows to kill entire process tree
 
 **Navigation Tracking Solution:**
 - Proxy runs on `localhost:3002` and proxies the running app (e.g., `localhost:5103`)

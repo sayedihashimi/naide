@@ -688,32 +688,126 @@ async fn start_app(
     }
 }
 
+/// Kill a process tree (the process and all its children)
+/// On Windows, uses taskkill /T /F to kill the entire tree
+/// On other platforms, uses process.kill() as fallback
+fn kill_process_tree(pid: u32) -> Result<(), String> {
+    log::info!("Killing process tree with PID: {}", pid);
+    
+    #[cfg(windows)]
+    {
+        // Use taskkill /T to kill the process tree, /F to force
+        let output = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .output()
+            .map_err(|e| format!("Failed to run taskkill: {}", e))?;
+        
+        if output.status.success() {
+            log::info!("taskkill succeeded for PID {}", pid);
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // taskkill returns error if process is already dead, which is fine
+            if stderr.contains("not found") || stderr.contains("Access is denied") {
+                log::warn!("taskkill warning for PID {}: {}", pid, stderr.trim());
+            } else {
+                log::info!("taskkill output for PID {}: {}", pid, stderr.trim());
+            }
+        }
+        Ok(())
+    }
+    
+    #[cfg(not(windows))]
+    {
+        // On Unix, try to kill the process group
+        // Note: This may need enhancement for full process tree kill on macOS/Linux
+        use std::process::Command;
+        let _ = Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .output();
+        Ok(())
+    }
+}
+
+/// Check if a process is still running
+#[cfg(windows)]
+fn is_process_running(pid: u32) -> bool {
+    let output = std::process::Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {}", pid), "/NH"])
+        .output();
+    
+    match output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // tasklist returns "INFO: No tasks are running..." if not found
+            !stdout.contains("No tasks") && stdout.contains(&pid.to_string())
+        }
+        Err(_) => false,
+    }
+}
+
+#[cfg(not(windows))]
+fn is_process_running(pid: u32) -> bool {
+    std::path::Path::new(&format!("/proc/{}", pid)).exists()
+}
+
 // Tauri command: Stop the running app
 #[tauri::command]
 async fn stop_app(app_handle: tauri::AppHandle) -> Result<(), String> {
     log::info!("Stopping app");
     
-    let process_opt = {
+    let (process_opt, pid_opt) = {
         let state_guard = app_handle.state::<Mutex<RunningAppState>>();
         let mut state = state_guard.lock().unwrap();
-        state.process.take()
+        (state.process.take(), state.pid.take())
     };
     
-    if let Some(mut process) = process_opt {
-        let pid = process.id();
-        log::info!("Killing process with PID: {}", pid);
+    // Get PID either from state or from the process
+    let pid = match (pid_opt, &process_opt) {
+        (Some(p), _) => Some(p),
+        (None, Some(proc)) => Some(proc.id()),
+        (None, None) => None,
+    };
+    
+    if let Some(pid) = pid {
+        log::info!("Killing process tree with PID: {}", pid);
         
-        process.kill()
-            .map_err(|e| format!("Failed to kill process: {}", e))?;
+        // Kill the entire process tree (npm + node + children)
+        kill_process_tree(pid)?;
         
-        // Clear PID from state
+        // Wait a moment and verify the process is actually dead
+        let start = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(5);
+        
+        while start.elapsed() < timeout {
+            if !is_process_running(pid) {
+                log::info!("Process {} confirmed dead", pid);
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        
+        // Final check
+        if is_process_running(pid) {
+            log::warn!("Process {} may still be running after kill attempt", pid);
+        }
+        
+        // Clear state
         {
             let state_guard = app_handle.state::<Mutex<RunningAppState>>();
             let mut state = state_guard.lock().unwrap();
+            state.process = None;
             state.pid = None;
         }
         
         log::info!("Process stopped successfully");
+        Ok(())
+    } else if process_opt.is_some() {
+        // We have a process but no PID (shouldn't happen, but handle it)
+        if let Some(process) = process_opt {
+            let pid = process.id();
+            log::info!("Falling back to process.kill() for PID: {}", pid);
+            kill_process_tree(pid)?;
+        }
         Ok(())
     } else {
         Err("No running app to stop".to_string())
@@ -866,16 +960,31 @@ pub fn run() {
         // Stop sidecar
         if let Some(mut state) = _window.state::<Mutex<SidecarState>>().try_lock().ok() {
           if let Some(mut process) = state.process.take() {
-            println!("[Tauri] Stopping sidecar process...");
-            let _ = process.kill();
+            let pid = process.id();
+            println!("[Tauri] Stopping sidecar process tree (PID {})...", pid);
+            // Kill the entire process tree to ensure all child processes are terminated
+            if let Err(e) = kill_process_tree(pid) {
+              eprintln!("[Tauri] Warning: Failed to kill sidecar process tree: {}", e);
+              // Fallback to simple kill
+              let _ = process.kill();
+            }
           }
         }
         
         // Stop running app
         if let Some(mut state) = _window.state::<Mutex<RunningAppState>>().try_lock().ok() {
-          if let Some(mut process) = state.process.take() {
-            println!("[Tauri] Stopping running app process...");
-            let _ = process.kill();
+          if let Some(pid) = state.pid.take() {
+            println!("[Tauri] Stopping running app process tree (PID {})...", pid);
+            // Kill the entire process tree (npm + node + children)
+            if let Err(e) = kill_process_tree(pid) {
+              eprintln!("[Tauri] Warning: Failed to kill app process tree: {}", e);
+            }
+          }
+          // Also try to kill any process reference we have
+          if let Some(process) = state.process.take() {
+            let pid = process.id();
+            println!("[Tauri] Also killing process via handle (PID {})...", pid);
+            let _ = kill_process_tree(pid);
           }
         }
       }
