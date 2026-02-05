@@ -1,5 +1,5 @@
 import express from 'express';
-import { createProxyMiddleware, responseInterceptor } from 'http-proxy-middleware';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { Server, IncomingMessage, ServerResponse } from 'http';
 import type { Socket } from 'net';
 
@@ -72,14 +72,19 @@ export class ProxyServer {
 
     // Middleware to encode URL path before proxy handles it
     // This fixes ERR_UNESCAPED_CHARACTERS errors for paths with special characters
+    // BUT we must preserve special characters that Vite uses (like @)
     this.app.use((req, res, next) => {
       try {
         // Split path and query string
         const [pathPart, queryPart] = req.url.split('?');
-        // Encode each path segment, preserving already-encoded parts
+        // Encode each path segment, preserving:
+        // - @ symbol (used by Vite for special modules like @react-refresh)
+        // - Already-encoded parts
         const encodedPath = pathPart.split('/').map(segment => {
-          // Check if segment contains characters that need encoding
-          // and isn't already encoded
+          // Don't encode Vite internal paths that start with @
+          if (segment.startsWith('@')) {
+            return segment;
+          }
           try {
             // Decode first to normalize, then re-encode
             const decoded = decodeURIComponent(segment);
@@ -97,42 +102,33 @@ export class ProxyServer {
       next();
     });
 
-    // Proxy middleware with response interception
+    // Proxy middleware - simple pass-through with header stripping for iframe
     const proxyMiddleware = createProxyMiddleware({
       target: cleanTargetUrl,
       changeOrigin: true,
       ws: true, // Proxy WebSocket connections (for hot reload)
-      selfHandleResponse: true, // We'll handle the response to inject script
       on: {
         proxyReq: (proxyReq, req, res) => {
           console.log(`[Proxy] ${req.method} ${req.url} -> ${cleanTargetUrl}${proxyReq.path}`);
+          // Remove cache-validation headers to prevent 304 responses
+          // This ensures we always get fresh content for script injection
+          proxyReq.removeHeader('if-none-match');
+          proxyReq.removeHeader('if-modified-since');
         },
-        proxyRes: responseInterceptor(
-          async (responseBuffer, proxyRes, req, res) => {
-            const contentType = proxyRes.headers['content-type'] || '';
-            
-            // Only inject script into HTML responses
-            if (contentType.includes('text/html')) {
-              let html = responseBuffer.toString('utf8');
-              
-              // Inject script before closing </body> tag if it exists
-              if (html.includes('</body>')) {
-                html = html.replace('</body>', `${TRACKING_SCRIPT}</body>`);
-              } else if (html.includes('</html>')) {
-                // Fallback: inject before closing </html> tag
-                html = html.replace('</html>', `${TRACKING_SCRIPT}</html>`);
-              } else {
-                // Fallback: append to end
-                html += TRACKING_SCRIPT;
-              }
-              
-              return Buffer.from(html, 'utf8');
-            }
-            
-            // Return other content types unchanged
-            return responseBuffer;
-          }
-        ),
+        proxyRes: (proxyRes, req, res) => {
+          // Strip headers that prevent iframe embedding
+          delete proxyRes.headers['x-frame-options'];
+          delete proxyRes.headers['X-Frame-Options'];
+          delete proxyRes.headers['content-security-policy'];
+          delete proxyRes.headers['Content-Security-Policy'];
+          delete proxyRes.headers['content-security-policy-report-only'];
+          
+          // Log all response headers for debugging
+          const contentType = proxyRes.headers['content-type'];
+          const contentLength = proxyRes.headers['content-length'];
+          console.log(`[Proxy] Response: ${proxyRes.statusCode} ${contentType} (${contentLength || 'chunked'} bytes)`);
+          console.log(`[Proxy] Response headers:`, JSON.stringify(proxyRes.headers, null, 2));
+        },
         error: (err: Error, req: IncomingMessage, res: ServerResponse | Socket) => {
           console.error('[Proxy] Error:', err.message);
           if (res instanceof ServerResponse && !res.headersSent) {
