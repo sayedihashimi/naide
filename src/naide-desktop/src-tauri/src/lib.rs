@@ -13,7 +13,7 @@ mod settings;
 use settings::{LastProject, read_settings, write_settings, add_recent_project, get_recent_projects as get_recent_projects_from_settings};
 
 mod app_runner;
-use app_runner::{detect_dotnet_app, start_dotnet_app, wait_for_url, AppInfo, RunningAppInfo};
+use app_runner::{detect_dotnet_app, detect_npm_app, start_dotnet_app, start_npm_app, wait_for_url, AppInfo, RunningAppInfo};
 
 // Global state to track the sidecar process
 struct SidecarState {
@@ -618,13 +618,17 @@ async fn watch_feature_files(window: tauri::Window, project_path: String) -> Res
 async fn detect_runnable_app(project_path: String) -> Result<Option<AppInfo>, String> {
     log::info!("Detecting runnable app in: {}", project_path);
     
-    // Try .NET first
+    // Try npm first (more common for web apps)
+    if let Some(app_info) = detect_npm_app(&project_path)? {
+        log::info!("Detected npm app: {:?}", app_info);
+        return Ok(Some(app_info));
+    }
+    
+    // Fall back to .NET
     if let Some(app_info) = detect_dotnet_app(&project_path)? {
         log::info!("Detected .NET app: {:?}", app_info);
         return Ok(Some(app_info));
     }
-    
-    // TODO: Add npm detection later
     
     Ok(None)
 }
@@ -640,6 +644,26 @@ async fn start_app(
     log::info!("Starting app: {:?}", app_info);
     
     match app_info.app_type.as_str() {
+        "npm" => {
+            let script = app_info.command
+                .ok_or_else(|| "No script specified for npm app".to_string())?;
+            
+            let (child, rx) = start_npm_app(&project_path, &script, window)?;
+            let pid = child.id();
+            
+            // Wait for URL with 30 second timeout
+            let url = wait_for_url(rx, 30);
+            
+            if url.is_none() {
+                log::warn!("URL not detected within timeout");
+            }
+            
+            // Store the process in state
+            app_handle.state::<Mutex<RunningAppState>>().lock().unwrap().process = Some(child);
+            app_handle.state::<Mutex<RunningAppState>>().lock().unwrap().pid = Some(pid);
+            
+            Ok(RunningAppInfo { pid, url })
+        }
         "dotnet" => {
             let project_file = app_info.project_file
                 .ok_or_else(|| "No project file specified for .NET app".to_string())?;

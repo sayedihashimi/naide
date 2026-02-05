@@ -7,6 +7,7 @@ use std::thread;
 use std::sync::mpsc::{channel, Receiver};
 use regex::Regex;
 use tauri::Emitter;
+use serde_json;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppInfo {
@@ -19,6 +20,41 @@ pub struct AppInfo {
 pub struct RunningAppInfo {
     pub pid: u32,
     pub url: Option<String>,
+}
+
+/// Detect if the project has a runnable npm app
+pub fn detect_npm_app(project_path: &str) -> Result<Option<AppInfo>, String> {
+    let project_dir = Path::new(project_path);
+    let package_json_path = project_dir.join("package.json");
+    
+    if !package_json_path.exists() {
+        return Ok(None);
+    }
+    
+    // Read and parse package.json
+    let content = fs::read_to_string(&package_json_path)
+        .map_err(|e| format!("Failed to read package.json: {}", e))?;
+    
+    let json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse package.json: {}", e))?;
+    
+    // Check for runnable scripts (priority order)
+    let script_priority = ["dev", "start", "serve", "preview"];
+    
+    if let Some(scripts) = json.get("scripts").and_then(|s| s.as_object()) {
+        for script_name in &script_priority {
+            if scripts.contains_key(*script_name) {
+                log::info!("Found npm script: {}", script_name);
+                return Ok(Some(AppInfo {
+                    app_type: "npm".to_string(),
+                    project_file: None,
+                    command: Some(script_name.to_string()),
+                }));
+            }
+        }
+    }
+    
+    Ok(None)
 }
 
 /// Detect if the project has a runnable .NET web app
@@ -115,6 +151,7 @@ pub fn start_dotnet_app(
         .current_dir(project_path)
         .env("DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER", "1")
         .env("HotReloadAutoRestart", "true")
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -182,4 +219,88 @@ pub fn wait_for_url(rx: std::sync::mpsc::Receiver<String>, timeout_secs: u64) ->
         Ok(url) => Some(url),
         Err(_) => None,
     }
+}
+
+/// Start an npm app
+pub fn start_npm_app(
+    project_path: &str,
+    script_name: &str,
+    _window: tauri::Window,
+) -> Result<(Child, Receiver<String>), String> {
+    let project_dir = Path::new(project_path);
+    
+    log::info!("Starting npm app: npm run {}", script_name);
+    
+    // Spawn npm run {script}
+    // Use stdin(Stdio::null()) to prevent terminal corruption when the process exits
+    // Without this, interactive dev servers can leave the terminal in raw mode
+    let mut child = Command::new("npm")
+        .arg("run")
+        .arg(script_name)
+        .current_dir(project_dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to start npm: {}", e))?;
+    
+    let pid = child.id();
+    log::info!("Started npm with PID: {}", pid);
+    
+    // Create a channel to signal when URL is detected
+    let (tx, rx) = channel();
+    
+    // Capture stdout for URL detection
+    if let Some(stdout) = child.stdout.take() {
+        let tx_clone = tx.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            // Common patterns for npm dev servers
+            // Vite: "Local:   http://localhost:5173/"
+            // CRA: "Local:            http://localhost:3000"
+            // webpack: "http://localhost:8080"
+            let url_regex = Regex::new(r"(?:Local:\s*|http://)(?:http://)?(?:localhost|127\.0\.0\.1):(\d+)").unwrap();
+            
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    log::info!("[npm stdout] {}", line);
+                    
+                    // Try to extract URL
+                    if let Some(captures) = url_regex.captures(&line) {
+                        if let Some(port) = captures.get(1) {
+                            let url = format!("http://localhost:{}", port.as_str());
+                            log::info!("Detected npm URL: {}", url);
+                            let _ = tx_clone.send(url);
+                            break;
+                        }
+                    }
+                    
+                    // Also check for direct URL patterns
+                    let direct_url_regex = Regex::new(r"https?://[^\s]+").unwrap();
+                    if let Some(url_match) = direct_url_regex.find(&line) {
+                        let url = url_match.as_str().to_string();
+                        if url.contains("localhost") || url.contains("127.0.0.1") {
+                            log::info!("Detected npm URL: {}", url);
+                            let _ = tx_clone.send(url);
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Also read stderr to capture errors
+    if let Some(stderr) = child.stderr.take() {
+        thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    log::error!("[npm stderr] {}", line);
+                }
+            }
+        });
+    }
+    
+    Ok((child, rx))
 }

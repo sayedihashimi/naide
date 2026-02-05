@@ -6,13 +6,18 @@ LastUpdated: 2026-02-04
 ---
 
 # Feature: Support Running npm and .NET Apps
-**Status**: ✅ FULLY IMPLEMENTED (.NET support with proxy and navigation tracking)
+**Status**: ✅ IMPLEMENTED (npm and .NET)
 
 ## Implementation Summary
 
-The running apps feature has been fully implemented with .NET support and proxy-based navigation tracking. npm support is deferred to a future enhancement.
+The running apps feature has been fully implemented for both npm and .NET apps with proxy-based navigation tracking.
 
 **Key Features Implemented:**
+- **npm app detection and running** ✅ ADDED (2026-02-04)
+  - Detects package.json and parses scripts
+  - Priority order: dev → start → serve → preview
+  - Runs `npm run {script}` with URL detection
+  - Supports Vite, CRA, and other npm dev servers
 - Automatic detection of .NET web projects (ASP.NET, Blazor)
 - Play/Stop button with visual states (ready, starting, running, error)
 - Refresh button to reload the iframe when app is running
@@ -32,23 +37,25 @@ The running apps feature has been fully implemented with .NET support and proxy-
 - Status indicators for all app states
 
 **Files Implemented:**
-- `src/naide-desktop/src-tauri/src/app_runner.rs` - App detection and process management
+- `src/naide-desktop/src-tauri/src/app_runner.rs` - App detection and process management (npm + .NET)
 - `src/naide-desktop/src-tauri/src/lib.rs` - Tauri commands and state management
 - `src/naide-desktop/src/pages/GenerateAppScreen.tsx` - UI, proxy integration, and navigation tracking
-- `src/copilot-sidecar/src/proxy.ts` - **NEW**: Proxy server with script injection
+- `src/copilot-sidecar/src/proxy.ts` - Proxy server with script injection
 - `src/copilot-sidecar/src/index.ts` - Proxy lifecycle management and API endpoints
 
 **Backend (Rust):**
-- `detect_runnable_app` command - Scans for .csproj files and identifies web projects
-- `start_app` command - Spawns `dotnet watch --non-interactive` process
+- `detect_runnable_app` command - Scans for package.json first, then .csproj files
+- `detect_npm_app` function - **NEW** (2026-02-04)
+- `start_npm_app` function - **NEW** (2026-02-04)
+- `start_app` command - Spawns `npm run {script}` or `dotnet watch --non-interactive`
 - `stop_app` command - Kills running process
 - URL extraction from stdout using regex
 - Process state tracking
 
 **Backend (Node.js Sidecar):**
-- **NEW**: `POST /api/proxy/start` - Starts proxy server for a target URL
-- **NEW**: `POST /api/proxy/stop` - Stops running proxy server
-- **NEW**: `GET /api/proxy/status` - Returns proxy status
+- `POST /api/proxy/start` - Starts proxy server for a target URL
+- `POST /api/proxy/stop` - Stops running proxy server
+- `GET /api/proxy/status` - Returns proxy status
 - Proxy forwards all requests to target app
 - Intercepts HTML responses and injects tracking script
 - Proxies WebSocket connections for hot reload
@@ -72,6 +79,8 @@ The running apps feature has been fully implemented with .NET support and proxy-
 **Bug Fixes:**
 - Fixed URL detection timeout issue where stdout reader thread wasn't communicating with main thread properly
 - Changed `start_dotnet_app` to return the URL receiver channel instead of a stop signal channel
+- **Fixed npm app detection** - See `.prompts/features/bugs/2026-02-04-npm-app-detection-not-implemented.md`
+- **Fixed proxy URL escaping error** - See `.prompts/features/bugs/2026-02-04-proxy-url-escaping-error.md` (trailing slashes in URLs)
 
 **Navigation Tracking Solution:**
 - Proxy runs on `localhost:3002` and proxies the running app (e.g., `localhost:5103`)

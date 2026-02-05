@@ -118,8 +118,9 @@ const GenerateAppScreen: React.FC = () => {
   // Running app state
   const [appRunState, setAppRunState] = useState<{
     status: 'none' | 'detecting' | 'ready' | 'starting' | 'running' | 'error';
-    type?: 'dotnet';
+    type?: 'dotnet' | 'npm';
     projectFile?: string;
+    command?: string;
     url?: string;
     errorMessage?: string;
     pid?: number;
@@ -241,8 +242,9 @@ const GenerateAppScreen: React.FC = () => {
           logInfo(`[AppRunner] Detected ${appInfo.app_type} app`);
           setAppRunState({
             status: 'ready',
-            type: appInfo.app_type as 'dotnet',
+            type: appInfo.app_type as 'dotnet' | 'npm',
             projectFile: appInfo.project_file,
+            command: appInfo.command,
           });
         } else {
           logInfo('[AppRunner] No runnable app detected');
@@ -871,7 +873,7 @@ const GenerateAppScreen: React.FC = () => {
           appInfo: {
             app_type: appRunState.type,
             project_file: appRunState.projectFile,
-            command: null,
+            command: appRunState.command,
           },
         }
       );

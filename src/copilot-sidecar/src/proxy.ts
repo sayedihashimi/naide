@@ -64,18 +64,42 @@ export class ProxyServer {
       await this.stop();
     }
 
-    this.targetUrl = targetUrl;
+    // Strip trailing slash to avoid URL escaping issues
+    const cleanTargetUrl = targetUrl.endsWith('/') ? targetUrl.slice(0, -1) : targetUrl;
+    
+    this.targetUrl = cleanTargetUrl;
     this.app = express();
+
+    // Helper function to encode URL path segments
+    const encodeUrlPath = (path: string): string => {
+      const [pathPart, queryPart] = path.split('?');
+      // Encode each path segment individually, preserving slashes
+      const encodedPath = pathPart
+        .split('/')
+        .map(segment => {
+          try {
+            // Decode first to avoid double-encoding, then encode
+            return encodeURIComponent(decodeURIComponent(segment));
+          } catch {
+            // If decode fails, just encode as-is
+            return encodeURIComponent(segment);
+          }
+        })
+        .join('/');
+      return queryPart ? `${encodedPath}?${queryPart}` : encodedPath;
+    };
 
     // Proxy middleware with response interception
     const proxyMiddleware = createProxyMiddleware({
-      target: targetUrl,
+      target: cleanTargetUrl,
       changeOrigin: true,
       ws: true, // Proxy WebSocket connections (for hot reload)
       selfHandleResponse: true, // We'll handle the response to inject script
+      // Encode path BEFORE http-proxy processes it to prevent ERR_UNESCAPED_CHARACTERS
+      pathRewrite: (path) => encodeUrlPath(path),
       on: {
         proxyReq: (proxyReq, req, res) => {
-          console.log(`[Proxy] ${req.method} ${req.url} -> ${targetUrl}${req.url}`);
+          console.log(`[Proxy] ${req.method} ${req.url} -> ${cleanTargetUrl}${proxyReq.path}`);
         },
         proxyRes: responseInterceptor(
           async (responseBuffer, proxyRes, req, res) => {
@@ -118,7 +142,7 @@ export class ProxyServer {
     return new Promise((resolve, reject) => {
       this.server = this.app!.listen(PROXY_PORT, () => {
         const proxyUrl = `http://localhost:${PROXY_PORT}`;
-        console.log(`[Proxy] Started on ${proxyUrl} -> ${targetUrl}`);
+        console.log(`[Proxy] Started on ${proxyUrl} -> ${cleanTargetUrl}`);
         resolve(proxyUrl);
       });
 
