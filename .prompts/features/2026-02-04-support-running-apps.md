@@ -78,6 +78,10 @@ The running apps feature has been fully implemented for both npm and .NET apps w
 
 **Bug Fixes:**
 - Fixed URL detection timeout issue where stdout reader thread wasn't communicating with main thread properly
+- **Fixed EPIPE crash on hot reload** (2026-02-05) - See [bug report](./bugs/2026-02-05-npm-app-epipe-on-hot-reload.md)
+  - Root cause: stdout reader thread was exiting after URL detection, closing the pipe
+  - When Vite tried to write HMR messages to stdout, it crashed with `EPIPE: broken pipe`
+  - Fix: Keep reading stdout indefinitely to keep the pipe open
 - Changed `start_dotnet_app` to return the URL receiver channel instead of a stop signal channel
 - **Fixed npm app detection** - See `.prompts/features/bugs/2026-02-04-npm-app-detection-not-implemented.md`
 - **Fixed proxy URL escaping error** - See `.prompts/features/bugs/2026-02-04-proxy-url-escaping-error.md` (trailing slashes in URLs)

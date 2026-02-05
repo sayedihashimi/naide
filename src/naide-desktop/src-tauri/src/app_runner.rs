@@ -173,11 +173,14 @@ pub fn start_dotnet_app(
     let (tx, rx) = channel();
     
     // Spawn a thread to read stdout and detect URL
+    // IMPORTANT: We must keep reading stdout even after detecting the URL,
+    // otherwise the pipe gets closed and the dev server may crash with EPIPE.
     if let Some(stdout) = child.stdout.take() {
         let tx_clone = tx.clone();
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
             let url_regex = Regex::new(r"https?://[^\s]+").unwrap();
+            let mut url_detected = false;
             
             for line in reader.lines() {
                 if let Ok(line) = line {
@@ -185,15 +188,21 @@ pub fn start_dotnet_app(
                     let clean_line = strip_ansi_codes(&line);
                     log::info!("[dotnet stdout] {}", clean_line);
                     
-                    // Look for URL in output
-                    if let Some(captures) = url_regex.find(&clean_line) {
-                        let url = captures.as_str().to_string();
-                        log::info!("Detected URL: {}", url);
-                        let _ = tx_clone.send(url);
-                        break;
+                    // Only try to detect URL if we haven't found one yet
+                    if !url_detected {
+                        // Look for URL in output
+                        if let Some(captures) = url_regex.find(&clean_line) {
+                            let url = captures.as_str().to_string();
+                            log::info!("Detected URL: {}", url);
+                            let _ = tx_clone.send(url);
+                            url_detected = true;
+                            // DON'T break - keep reading to prevent EPIPE
+                        }
                     }
+                    // Continue reading all output to keep the pipe open
                 }
             }
+            log::info!("[dotnet stdout] Stream ended");
         });
     }
     
@@ -262,44 +271,67 @@ pub fn start_npm_app(
     let (tx, rx) = channel();
     
     // Capture stdout for URL detection
+    // IMPORTANT: We must keep reading stdout even after detecting the URL,
+    // otherwise the pipe gets closed and Vite crashes with EPIPE when trying
+    // to write HMR messages to stdout.
     if let Some(stdout) = child.stdout.take() {
         let tx_clone = tx.clone();
         thread::spawn(move || {
+            log::info!("[npm stdout] Reader thread started");
             let reader = BufReader::new(stdout);
             // Common patterns for npm dev servers
             // Vite: "Local:   http://localhost:5173/"
             // CRA: "Local:            http://localhost:3000"
             // webpack: "http://localhost:8080"
             let url_regex = Regex::new(r"(?:Local:\s*|http://)(?:http://)?(?:localhost|127\.0\.0\.1):(\d+)").unwrap();
+            let direct_url_regex = Regex::new(r"https?://[^\s]+").unwrap();
+            let mut url_detected = false;
+            let mut line_count = 0u64;
             
             for line in reader.lines() {
-                if let Ok(line) = line {
-                    // Strip ANSI escape codes (terminal colorization from Vite, etc.)
-                    let clean_line = strip_ansi_codes(&line);
-                    log::info!("[npm stdout] {}", clean_line);
-                    
-                    // Try to extract URL
-                    if let Some(captures) = url_regex.captures(&clean_line) {
-                        if let Some(port) = captures.get(1) {
-                            let url = format!("http://localhost:{}", port.as_str());
-                            log::info!("Detected npm URL: {}", url);
-                            let _ = tx_clone.send(url);
-                            break;
+                line_count += 1;
+                match line {
+                    Ok(line) => {
+                        // Strip ANSI escape codes (terminal colorization from Vite, etc.)
+                        let clean_line = strip_ansi_codes(&line);
+                        log::info!("[npm stdout #{}] {}", line_count, clean_line);
+                        
+                        // Only try to detect URL if we haven't found one yet
+                        if !url_detected {
+                            // Try to extract URL
+                            if let Some(captures) = url_regex.captures(&clean_line) {
+                                if let Some(port) = captures.get(1) {
+                                    let url = format!("http://localhost:{}", port.as_str());
+                                    log::info!("Detected npm URL: {}", url);
+                                    let _ = tx_clone.send(url);
+                                    url_detected = true;
+                                    log::info!("[npm stdout] URL detected, continuing to read to keep pipe open");
+                                    // DON'T break - keep reading to prevent EPIPE
+                                }
+                            }
+                            
+                            // Also check for direct URL patterns
+                            if !url_detected {
+                                if let Some(url_match) = direct_url_regex.find(&clean_line) {
+                                    let url = url_match.as_str().to_string();
+                                    if url.contains("localhost") || url.contains("127.0.0.1") {
+                                        log::info!("Detected npm URL: {}", url);
+                                        let _ = tx_clone.send(url);
+                                        url_detected = true;
+                                        log::info!("[npm stdout] URL detected, continuing to read to keep pipe open");
+                                        // DON'T break - keep reading to prevent EPIPE
+                                    }
+                                }
+                            }
                         }
+                        // Continue reading all output to keep the pipe open
                     }
-                    
-                    // Also check for direct URL patterns
-                    let direct_url_regex = Regex::new(r"https?://[^\s]+").unwrap();
-                    if let Some(url_match) = direct_url_regex.find(&clean_line) {
-                        let url = url_match.as_str().to_string();
-                        if url.contains("localhost") || url.contains("127.0.0.1") {
-                            log::info!("Detected npm URL: {}", url);
-                            let _ = tx_clone.send(url);
-                            break;
-                        }
+                    Err(e) => {
+                        log::error!("[npm stdout] Error reading line {}: {}", line_count, e);
                     }
                 }
             }
+            log::info!("[npm stdout] Stream ended after {} lines (reader loop exited)", line_count);
         });
     }
     
