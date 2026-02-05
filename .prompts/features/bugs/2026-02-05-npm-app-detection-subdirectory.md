@@ -2,7 +2,7 @@
 
 **Type:** Bug Fix  
 **Priority:** High  
-**Status:** Open
+**Status:** Fixed (2026-02-05)
 
 ---
 
@@ -145,3 +145,22 @@ When searching recursively, skip directories that are unlikely to contain the ma
 
 - Related feature: `.prompts/features/2026-02-04-support-running-apps.md`
 - Similar pattern: `detect_dotnet_app()` already does recursive search correctly
+
+---
+
+## Fix Implementation (2026-02-05)
+
+### Changes Made
+
+**`src/naide-desktop/src-tauri/src/app_runner.rs`:**
+- Extracted script detection into `find_npm_script()` helper for reuse
+- Updated `detect_npm_app()` to search recursively:
+  - Fast path: checks project root first (no regression)
+  - Recursive path: uses new `find_files_by_name()` to find `package.json` in subdirectories
+  - Stores relative subdirectory path in `AppInfo.project_file`
+- Added `find_files_by_name()` helper (skips `node_modules`, `.git`, `dist`, `build`, `out`, `bin`, `obj`, `.naide`)
+
+**`src/naide-desktop/src-tauri/src/lib.rs`:**
+- Updated `start_app` command to compute the correct working directory for npm apps
+- When `project_file` (subdirectory) is set, joins it with `project_path` for the npm working directory
+- Backward compatible: `project_file: None` still uses project root

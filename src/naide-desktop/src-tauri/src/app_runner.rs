@@ -31,35 +31,62 @@ pub struct RunningAppInfo {
     pub url: Option<String>,
 }
 
-/// Detect if the project has a runnable npm app
-pub fn detect_npm_app(project_path: &str) -> Result<Option<AppInfo>, String> {
-    let project_dir = Path::new(project_path);
-    let package_json_path = project_dir.join("package.json");
-    
-    if !package_json_path.exists() {
-        return Ok(None);
-    }
-    
-    // Read and parse package.json
-    let content = fs::read_to_string(&package_json_path)
-        .map_err(|e| format!("Failed to read package.json: {}", e))?;
+/// Try to find a runnable npm script in a specific package.json file.
+/// Returns the script name if found, None otherwise.
+fn find_npm_script(package_json_path: &Path) -> Result<Option<String>, String> {
+    let content = fs::read_to_string(package_json_path)
+        .map_err(|e| format!("Failed to read {}: {}", package_json_path.display(), e))?;
     
     let json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse package.json: {}", e))?;
+        .map_err(|e| format!("Failed to parse {}: {}", package_json_path.display(), e))?;
     
-    // Check for runnable scripts (priority order)
     let script_priority = ["dev", "start", "serve", "preview"];
     
     if let Some(scripts) = json.get("scripts").and_then(|s| s.as_object()) {
         for script_name in &script_priority {
             if scripts.contains_key(*script_name) {
-                log::info!("Found npm script: {}", script_name);
-                return Ok(Some(AppInfo {
-                    app_type: "npm".to_string(),
-                    project_file: None,
-                    command: Some(script_name.to_string()),
-                }));
+                return Ok(Some(script_name.to_string()));
             }
+        }
+    }
+    
+    Ok(None)
+}
+
+/// Detect if the project has a runnable npm app.
+/// Checks the project root first, then searches subdirectories recursively.
+pub fn detect_npm_app(project_path: &str) -> Result<Option<AppInfo>, String> {
+    let project_dir = Path::new(project_path);
+    
+    // Fast path: check project root first
+    let root_package_json = project_dir.join("package.json");
+    if root_package_json.exists() {
+        if let Some(script) = find_npm_script(&root_package_json)? {
+            log::info!("Found npm script '{}' in project root", script);
+            return Ok(Some(AppInfo {
+                app_type: "npm".to_string(),
+                project_file: None,
+                command: Some(script),
+            }));
+        }
+    }
+    
+    // Recursive search: find package.json in subdirectories
+    let package_files = find_files_by_name(project_dir, "package.json")?;
+    for pkg_path in package_files {
+        if let Some(script) = find_npm_script(&pkg_path)? {
+            let pkg_dir = pkg_path.parent().unwrap_or(project_dir);
+            let relative_dir = pkg_dir
+                .strip_prefix(project_dir)
+                .unwrap_or(pkg_dir)
+                .to_string_lossy()
+                .to_string();
+            log::info!("Found npm script '{}' in subdirectory: {}", script, relative_dir);
+            return Ok(Some(AppInfo {
+                app_type: "npm".to_string(),
+                project_file: Some(relative_dir),
+                command: Some(script),
+            }));
         }
     }
     
@@ -126,6 +153,44 @@ fn find_files_with_extension(dir: &Path, extension: &str) -> Result<Vec<PathBuf>
     }
     
     walk_dir(dir, extension, &mut files)?;
+    Ok(files)
+}
+
+/// Find all files with a given name recursively (skipping common irrelevant directories)
+fn find_files_by_name(dir: &Path, filename: &str) -> Result<Vec<PathBuf>, String> {
+    let mut files = Vec::new();
+    
+    if !dir.is_dir() {
+        return Ok(files);
+    }
+    
+    fn walk_dir(dir: &Path, filename: &str, files: &mut Vec<PathBuf>) -> Result<(), String> {
+        for entry in fs::read_dir(dir).map_err(|e| format!("Failed to read dir: {}", e))? {
+            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+            let path = entry.path();
+            
+            // Skip irrelevant directories
+            if let Some(name) = path.file_name() {
+                let name_str = name.to_string_lossy();
+                if name_str == "node_modules" || name_str == ".git" || name_str == "bin" 
+                    || name_str == "obj" || name_str == "dist" || name_str == "build" 
+                    || name_str == "out" || name_str == ".naide" {
+                    continue;
+                }
+            }
+            
+            if path.is_dir() {
+                walk_dir(&path, filename, files)?;
+            } else if let Some(name) = path.file_name() {
+                if name == filename {
+                    files.push(path);
+                }
+            }
+        }
+        Ok(())
+    }
+    
+    walk_dir(dir, filename, &mut files)?;
     Ok(files)
 }
 

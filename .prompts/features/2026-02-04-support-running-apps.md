@@ -92,9 +92,11 @@ The running apps feature has been fully implemented for both npm and .NET apps w
   - Root cause: `process.kill()` only killed parent npm process, leaving node/Vite children orphaned
   - Fix: Use `taskkill /T /F /PID` on Windows to kill entire process tree
 - **Known bug: npm detection only checks project root** (2026-02-05) - See [bug report](./bugs/2026-02-05-npm-app-detection-subdirectory.md)
-  - `detect_npm_app()` only looks for `package.json` in the project root directory
-  - Projects with `package.json` in a subdirectory (e.g., `src/frontend/`) are not detected
-  - `.NET detection` correctly searches recursively but npm does not
+  - ✅ **FIXED**: `detect_npm_app()` now searches recursively for `package.json`
+  - Checks project root first (fast path), then searches subdirectories
+  - Stores relative subdirectory path in `AppInfo.project_file` for npm apps
+  - `start_app` computes correct working directory from `project_path + project_file`
+  - `.NET detection` correctly searches recursively (unchanged)
 
 **Navigation Tracking Solution:**
 - Proxy runs on `localhost:3002` and proxies the running app (e.g., `localhost:5103`)

@@ -648,7 +648,16 @@ async fn start_app(
             let script = app_info.command
                 .ok_or_else(|| "No script specified for npm app".to_string())?;
             
-            let (child, rx) = start_npm_app(&project_path, &script, window)?;
+            // If project_file is set, it's the subdirectory containing package.json
+            let working_dir = match &app_info.project_file {
+                Some(subdir) => {
+                    let full = std::path::Path::new(&project_path).join(subdir);
+                    full.to_string_lossy().to_string()
+                }
+                None => project_path.clone(),
+            };
+            
+            let (child, rx) = start_npm_app(&working_dir, &script, window)?;
             let pid = child.id();
             
             // Wait for URL with 30 second timeout
