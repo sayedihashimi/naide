@@ -9,6 +9,15 @@ use regex::Regex;
 use tauri::Emitter;
 use serde_json;
 
+/// Strip ANSI escape codes from a string
+/// These codes are used for terminal colorization (e.g., Vite colorizes URLs)
+fn strip_ansi_codes(s: &str) -> String {
+    // Match ANSI escape sequences: ESC[ followed by parameters and a command letter
+    // Also handles OSC sequences (ESC]) and other common patterns
+    let ansi_regex = Regex::new(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]").unwrap();
+    ansi_regex.replace_all(s, "").to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppInfo {
     pub app_type: String, // "dotnet" or "npm"
@@ -172,10 +181,12 @@ pub fn start_dotnet_app(
             
             for line in reader.lines() {
                 if let Ok(line) = line {
-                    log::info!("[dotnet stdout] {}", line);
+                    // Strip ANSI escape codes (terminal colorization)
+                    let clean_line = strip_ansi_codes(&line);
+                    log::info!("[dotnet stdout] {}", clean_line);
                     
                     // Look for URL in output
-                    if let Some(captures) = url_regex.find(&line) {
+                    if let Some(captures) = url_regex.find(&clean_line) {
                         let url = captures.as_str().to_string();
                         log::info!("Detected URL: {}", url);
                         let _ = tx_clone.send(url);
@@ -263,10 +274,12 @@ pub fn start_npm_app(
             
             for line in reader.lines() {
                 if let Ok(line) = line {
-                    log::info!("[npm stdout] {}", line);
+                    // Strip ANSI escape codes (terminal colorization from Vite, etc.)
+                    let clean_line = strip_ansi_codes(&line);
+                    log::info!("[npm stdout] {}", clean_line);
                     
                     // Try to extract URL
-                    if let Some(captures) = url_regex.captures(&line) {
+                    if let Some(captures) = url_regex.captures(&clean_line) {
                         if let Some(port) = captures.get(1) {
                             let url = format!("http://localhost:{}", port.as_str());
                             log::info!("Detected npm URL: {}", url);
@@ -277,7 +290,7 @@ pub fn start_npm_app(
                     
                     // Also check for direct URL patterns
                     let direct_url_regex = Regex::new(r"https?://[^\s]+").unwrap();
-                    if let Some(url_match) = direct_url_regex.find(&line) {
+                    if let Some(url_match) = direct_url_regex.find(&clean_line) {
                         let url = url_match.as_str().to_string();
                         if url.contains("localhost") || url.contains("127.0.0.1") {
                             log::info!("Detected npm URL: {}", url);

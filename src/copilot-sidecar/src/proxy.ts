@@ -70,24 +70,32 @@ export class ProxyServer {
     this.targetUrl = cleanTargetUrl;
     this.app = express();
 
-    // Helper function to encode URL path segments
-    const encodeUrlPath = (path: string): string => {
-      const [pathPart, queryPart] = path.split('?');
-      // Encode each path segment individually, preserving slashes
-      const encodedPath = pathPart
-        .split('/')
-        .map(segment => {
+    // Middleware to encode URL path before proxy handles it
+    // This fixes ERR_UNESCAPED_CHARACTERS errors for paths with special characters
+    this.app.use((req, res, next) => {
+      try {
+        // Split path and query string
+        const [pathPart, queryPart] = req.url.split('?');
+        // Encode each path segment, preserving already-encoded parts
+        const encodedPath = pathPart.split('/').map(segment => {
+          // Check if segment contains characters that need encoding
+          // and isn't already encoded
           try {
-            // Decode first to avoid double-encoding, then encode
-            return encodeURIComponent(decodeURIComponent(segment));
+            // Decode first to normalize, then re-encode
+            const decoded = decodeURIComponent(segment);
+            return encodeURIComponent(decoded);
           } catch {
-            // If decode fails, just encode as-is
+            // If decoding fails, it might have invalid sequences - encode as-is
             return encodeURIComponent(segment);
           }
-        })
-        .join('/');
-      return queryPart ? `${encodedPath}?${queryPart}` : encodedPath;
-    };
+        }).join('/');
+        // Reconstruct full URL
+        req.url = queryPart ? `${encodedPath}?${queryPart}` : encodedPath;
+      } catch (e) {
+        console.error('[Proxy] Error encoding URL:', e);
+      }
+      next();
+    });
 
     // Proxy middleware with response interception
     const proxyMiddleware = createProxyMiddleware({
@@ -95,8 +103,6 @@ export class ProxyServer {
       changeOrigin: true,
       ws: true, // Proxy WebSocket connections (for hot reload)
       selfHandleResponse: true, // We'll handle the response to inject script
-      // Encode path BEFORE http-proxy processes it to prevent ERR_UNESCAPED_CHARACTERS
-      pathRewrite: (path) => encodeUrlPath(path),
       on: {
         proxyReq: (proxyReq, req, res) => {
           console.log(`[Proxy] ${req.method} ${req.url} -> ${cleanTargetUrl}${proxyReq.path}`);

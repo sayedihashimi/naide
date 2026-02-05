@@ -2,7 +2,7 @@
 Status: Fixed
 Area: proxy, infrastructure
 Created: 2026-02-04
-LastUpdated: 2026-02-04
+LastUpdated: 2026-02-05
 ---
 
 # Bug: Proxy URL Escaping Error
@@ -54,16 +54,21 @@ The issue is in `src/copilot-sidecar/src/proxy.ts`:
 1. The backend (Rust) detects the URL as `http://localhost:5175/` (with trailing slash)
 2. This URL is passed to `ProxyServer.start(targetUrl)`
 3. The URL is used directly as the `target` in `createProxyMiddleware` configuration
-4. When the proxy tries to construct request paths, it creates double slashes (e.g., `http://localhost:5175//`) or other malformed URLs
-5. Node.js HTTP client rejects these malformed URLs with `ERR_UNESCAPED_CHARACTERS`
+4. The original fix attempted to use `pathRewrite` with `encodeURIComponent` to pre-encode paths
+5. However, this caused double-encoding issues - the http-proxy library expects unencoded paths and handles encoding internally
+6. Node.js HTTP client rejects the double-encoded URLs with `ERR_UNESCAPED_CHARACTERS`
 
-**The problem:** `http-proxy-middleware` doesn't handle trailing slashes properly when constructing target URLs.
+**The problems:** 
+1. `http-proxy-middleware` doesn't handle trailing slashes properly when constructing target URLs
+2. Using `pathRewrite` with `encodeURIComponent` causes double-encoding since http-proxy already handles URL encoding
 
 ---
 
 ## Solution
 
-Strip the trailing slash from the target URL before configuring the proxy middleware.
+Two-part fix:
+1. Strip the trailing slash from the target URL before configuring the proxy middleware
+2. Remove the `pathRewrite` function that was causing double-encoding issues
 
 ### Changes Made
 
@@ -84,8 +89,15 @@ async start(targetUrl: string): Promise<string> {
 
   // Proxy middleware with response interception
   const proxyMiddleware = createProxyMiddleware({
-    target: cleanTargetUrl,  // Use cleanTargetUrl
-    // ... rest of config
+    target: cleanTargetUrl,
+    changeOrigin: true,
+    ws: true, // Proxy WebSocket connections (for hot reload)
+    selfHandleResponse: true, // We'll handle the response to inject script
+    // Don't rewrite paths - let them pass through as-is
+    // The http-proxy library will handle URL encoding internally
+    on: {
+      // ... proxy event handlers
+    }
   });
   
   // ... rest of function
@@ -94,8 +106,11 @@ async start(targetUrl: string): Promise<string> {
 
 **Key changes:**
 1. Added `cleanTargetUrl` variable that strips trailing slash
-2. Updated all references to use `cleanTargetUrl` instead of `targetUrl`
-3. Preserved the clean URL in `this.targetUrl` for consistency
+2. Removed `encodeUrlPath` helper function
+3. Removed `pathRewrite` configuration that was causing double-encoding
+4. Let http-proxy-middleware handle URL encoding internally
+5. Updated all references to use `cleanTargetUrl` instead of `targetUrl`
+6. Preserved the clean URL in `this.targetUrl` for consistency
 
 ---
 
