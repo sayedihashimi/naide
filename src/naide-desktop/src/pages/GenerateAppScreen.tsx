@@ -950,53 +950,73 @@ const GenerateAppScreen: React.FC = () => {
   };
 
   const handleCloseTab = (tabId: string) => {
-    const tab = tabs.find(t => t.id === tabId);
-    if (!tab || tab.type === 'chat') {
-      return; // Don't close chat tab
-    }
-    
-    // Check for unsaved changes
-    if (tab.hasUnsavedChanges) {
-      if (!confirm('You have unsaved changes. Discard?')) {
-        return;
+    setTabs((currentTabs) => {
+      const tab = currentTabs.find(t => t.id === tabId);
+      if (!tab || tab.type === 'chat') {
+        return currentTabs; // Don't close chat tab
       }
-    }
-    
-    // Remove the tab
-    const newTabs = tabs.filter(t => t.id !== tabId);
-    setTabs(newTabs);
-    
-    // If closing the active tab, switch to another tab
-    if (activeTabId === tabId) {
-      // Find the tab to activate (prefer the one to the left, or the first one)
-      const closedIndex = tabs.findIndex(t => t.id === tabId);
-      const newActiveTab = newTabs[Math.max(0, closedIndex - 1)] || newTabs[0];
-      setActiveTabId(newActiveTab.id);
-      if (newActiveTab.type === 'feature-file') {
-        setSelectedFeaturePath(newActiveTab.filePath || null);
-      } else {
-        setSelectedFeaturePath(null);
+      
+      // Check for unsaved changes
+      if (tab.hasUnsavedChanges) {
+        if (!confirm('You have unsaved changes. Discard?')) {
+          return currentTabs;
+        }
       }
-    }
+      
+      // Remove the tab
+      const newTabs = currentTabs.filter(t => t.id !== tabId);
+      
+      // If closing the active tab, switch to another tab
+      if (activeTabId === tabId) {
+        // Find the tab to activate (prefer the one to the left, or the first one)
+        const closedIndex = currentTabs.findIndex(t => t.id === tabId);
+        const newActiveTab = newTabs[Math.max(0, closedIndex - 1)] || newTabs[0];
+        setActiveTabId(newActiveTab.id);
+        if (newActiveTab.type === 'feature-file') {
+          setSelectedFeaturePath(newActiveTab.filePath || null);
+        } else {
+          setSelectedFeaturePath(null);
+        }
+      }
+      
+      return newTabs;
+    });
   };
 
   const handleCloseAllTabs = () => {
-    // Check if any tabs have unsaved changes
-    const tabsWithChanges = tabs.filter(t => t.type === 'feature-file' && t.hasUnsavedChanges);
-    if (tabsWithChanges.length > 0) {
-      const fileNames = tabsWithChanges.map(t => t.label).join(', ');
-      if (!confirm(`You have unsaved changes in: ${fileNames}. Discard all?`)) {
-        return;
+    setTabs((currentTabs) => {
+      // Check if any tabs have unsaved changes
+      const tabsWithChanges = currentTabs.filter(t => t.type === 'feature-file' && t.hasUnsavedChanges);
+      if (tabsWithChanges.length > 0) {
+        const fileNames = tabsWithChanges.map(t => t.label).join(', ');
+        if (!confirm(`You have unsaved changes in: ${fileNames}. Discard all?`)) {
+          return currentTabs;
+        }
       }
-    }
-    
-    // Close all feature file tabs, keep only chat tab
-    const chatTab = tabs.find(t => t.type === 'chat');
-    if (chatTab) {
-      setTabs([chatTab]);
-      setActiveTabId(chatTab.id);
-      setSelectedFeaturePath(null);
-    }
+      
+      // Close all feature file tabs, keep only chat tab
+      const chatTab = currentTabs.find(t => t.type === 'chat');
+      if (chatTab) {
+        setActiveTabId(chatTab.id);
+        setSelectedFeaturePath(null);
+        return [chatTab];
+      }
+      
+      return currentTabs;
+    });
+  };
+
+  // Helper function to reset tabs to just the chat tab (used when switching projects)
+  const resetTabsToChat = () => {
+    setTabs((currentTabs) => {
+      const chatTab = currentTabs.find(t => t.type === 'chat');
+      if (chatTab) {
+        setActiveTabId(chatTab.id);
+        setSelectedFeaturePath(null);
+        return [chatTab];
+      }
+      return currentTabs;
+    });
   };
 
   const handleTabContentChange = (tabId: string, hasChanges: boolean) => {
