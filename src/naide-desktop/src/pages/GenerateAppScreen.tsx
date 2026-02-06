@@ -975,16 +975,7 @@ const GenerateAppScreen: React.FC = () => {
 
   const handleCloseTab = (tabId: string) => {
     // Step 1: Check if we can close the tab (synchronous checks)
-    let shouldClose = false;
-    let tabToClose = null;
-    
-    // Use current tabs to check
-    for (const tab of tabs) {
-      if (tab.id === tabId) {
-        tabToClose = tab;
-        break;
-      }
-    }
+    const tabToClose = tabs.find(t => t.id === tabId);
     
     if (!tabToClose || tabToClose.type === 'chat') {
       return; // Don't close chat tab
