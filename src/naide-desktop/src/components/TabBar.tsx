@@ -79,11 +79,13 @@ const TabBar: React.FC<TabBarProps> = ({
   };
 
   const handleCloseTab = (tabId: string) => {
+    console.log('[TabBar] handleCloseTab called with tabId:', tabId);
     onTabClose(tabId);
     setContextMenu(null);
   };
 
   const handleCloseAll = () => {
+    console.log('[TabBar] handleCloseAll called');
     onTabCloseAll();
     setContextMenu(null);
   };
@@ -131,6 +133,7 @@ const TabBar: React.FC<TabBarProps> = ({
               {canClose && (isHovered || isActive) && (
                 <button
                   onClick={(e) => {
+                    console.log('[TabBar] Close button clicked for tab:', tab.id);
                     e.stopPropagation();
                     handleCloseTab(tab.id);
                   }}
