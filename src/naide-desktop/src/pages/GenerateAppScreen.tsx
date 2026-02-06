@@ -20,6 +20,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, type LastProject } from '../utils/globalSettings';
 import { logInfo, logError } from '../utils/logger';
+import { loadOpenTabs, saveOpenTabs, type PersistedTab } from '../utils/tabPersistence';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -274,6 +275,30 @@ const GenerateAppScreen: React.FC = () => {
       };
     }
   }, [showAppSelector]);
+
+  // Save tabs to project config when they change (debounced)
+  useEffect(() => {
+    if (!state.projectPath || tabs.length === 0) {
+      return;
+    }
+
+    // Debounce saving to avoid too many writes
+    const timer = setTimeout(() => {
+      saveTabsToProject(state.projectPath!);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [tabs, activeTabId, state.projectPath]);
+
+  // Save tabs on component unmount
+  useEffect(() => {
+    return () => {
+      if (state.projectPath && tabs.length > 0) {
+        // Note: This is best effort - might not complete if app closes quickly
+        saveTabsToProject(state.projectPath);
+      }
+    };
+  }, [state.projectPath, tabs]);
 
   // Detect runnable app on project load
   useEffect(() => {
@@ -791,6 +816,11 @@ const GenerateAppScreen: React.FC = () => {
       // Get the current project path
       const projectPath = state.projectPath || await getProjectPath(state.projectName);
       
+      // Save current tabs before switching
+      if (state.projectPath) {
+        await saveTabsToProject(state.projectPath);
+      }
+      
       // Open folder selection dialog
       const selectedPath = await open({
         title: 'Select Project Folder',
@@ -813,6 +843,9 @@ const GenerateAppScreen: React.FC = () => {
         // Clear conversation summary for new project
         setConversationSummary(null);
         
+        // Reset tabs to just chat tab
+        resetTabsToChat();
+        
         // Update project name and path (this will trigger the loadChat useEffect)
         setProjectName(newProjectName);
         setProjectPath(selectedPath);
@@ -822,6 +855,9 @@ const GenerateAppScreen: React.FC = () => {
         if (loaded) {
           console.log('[GenerateApp] Successfully loaded project:', newProjectName);
           // The loadChat useEffect will automatically load the last chat session
+          
+          // Load saved tabs for this project
+          await loadTabsFromProject(selectedPath);
           
           // Reload recent projects to include the newly opened project
           const projects = await getRecentProjects();
@@ -843,6 +879,11 @@ const GenerateAppScreen: React.FC = () => {
     try {
       console.log('[GenerateApp] Selected recent project:', projectPath);
       
+      // Save current tabs before switching
+      if (state.projectPath) {
+        await saveTabsToProject(state.projectPath);
+      }
+      
       // Save the selected path to settings (this updates last accessed time)
       await saveLastProject(projectPath);
       console.log('[GenerateApp] Updated project in settings');
@@ -854,6 +895,9 @@ const GenerateAppScreen: React.FC = () => {
       // Clear conversation summary for new project
       setConversationSummary(null);
       
+      // Reset tabs to just chat tab
+      resetTabsToChat();
+      
       // Update project name and path (this will trigger the loadChat useEffect)
       setProjectName(newProjectName);
       setProjectPath(projectPath);
@@ -863,6 +907,9 @@ const GenerateAppScreen: React.FC = () => {
       if (loaded) {
         console.log('[GenerateApp] Successfully loaded project:', newProjectName);
         // The loadChat useEffect will automatically load the last chat session
+        
+        // Load saved tabs for this project
+        await loadTabsFromProject(projectPath);
       } else {
         console.log('[GenerateApp] Project not found at path:', projectPath);
         console.log('[GenerateApp] A new project structure will be created on first interaction');
@@ -1017,6 +1064,79 @@ const GenerateAppScreen: React.FC = () => {
       }
       return currentTabs;
     });
+  };
+
+  // Save current tabs to project config
+  const saveTabsToProject = async (projectPath: string) => {
+    try {
+      // Convert tabs to persisted format (exclude hasUnsavedChanges)
+      const persistedTabs: PersistedTab[] = tabs.map(tab => ({
+        id: tab.id,
+        type: tab.type,
+        label: tab.label,
+        filePath: tab.filePath,
+        isPinned: tab.isPinned,
+        isTemporary: tab.isTemporary,
+      }));
+      
+      await saveOpenTabs(projectPath, {
+        tabs: persistedTabs,
+        activeTabId,
+      });
+      
+      logInfo(`[TabPersistence] Saved ${persistedTabs.length} tabs for project`);
+    } catch (error) {
+      logError(`[TabPersistence] Error saving tabs: ${error}`);
+    }
+  };
+
+  // Load tabs from project config
+  const loadTabsFromProject = async (projectPath: string) => {
+    try {
+      const savedState = await loadOpenTabs(projectPath);
+      
+      if (!savedState || !savedState.tabs || savedState.tabs.length === 0) {
+        logInfo('[TabPersistence] No saved tabs found');
+        return;
+      }
+      
+      // Validate that files still exist by checking if they're feature files
+      // Convert persisted tabs back to full Tab format
+      const restoredTabs: Tab[] = savedState.tabs.map(tab => ({
+        ...tab,
+        hasUnsavedChanges: false, // Always start with no unsaved changes
+      }));
+      
+      // Filter out any tabs for files that might have been deleted
+      // Keep chat tab and any feature file tabs (we'll let the component handle missing files)
+      const validTabs = restoredTabs.filter(tab => 
+        tab.type === 'chat' || (tab.type === 'feature-file' && tab.filePath)
+      );
+      
+      if (validTabs.length > 0) {
+        setTabs(validTabs);
+        
+        // Restore active tab if it still exists, otherwise default to chat
+        const activeTab = validTabs.find(t => t.id === savedState.activeTabId);
+        if (activeTab) {
+          setActiveTabId(savedState.activeTabId);
+          if (activeTab.type === 'feature-file') {
+            setSelectedFeaturePath(activeTab.filePath || null);
+          }
+        } else {
+          // Active tab no longer exists, default to chat
+          const chatTab = validTabs.find(t => t.type === 'chat');
+          if (chatTab) {
+            setActiveTabId(chatTab.id);
+            setSelectedFeaturePath(null);
+          }
+        }
+        
+        logInfo(`[TabPersistence] Restored ${validTabs.length} tabs`);
+      }
+    } catch (error) {
+      logError(`[TabPersistence] Error loading tabs: ${error}`);
+    }
   };
 
   const handleTabContentChange = (tabId: string, hasChanges: boolean) => {
