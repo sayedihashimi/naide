@@ -82,6 +82,14 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
   }
 };
 
+// Helper function to compute pulsing blue shade based on intensity
+const computePulsingBlueColor = (intensity: number): string => {
+  const r = Math.floor(37 + (59 - 37) * intensity);
+  const g = Math.floor(99 + (130 - 99) * intensity);
+  const b = Math.floor(235 + (246 - 235) * intensity);
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 const GenerateAppScreen: React.FC = () => {
   const { state, setProjectName, setProjectPath, loadProject } = useAppContext();
   const [messageInput, setMessageInput] = useState('');
@@ -109,7 +117,7 @@ const GenerateAppScreen: React.FC = () => {
     
     let phaseCounter = 0;
     const timerId = setInterval(() => {
-      phaseCounter += 0.08;
+      phaseCounter = (phaseCounter + 0.08) % 2;
       const waveValue = Math.sin(phaseCounter * Math.PI) * 0.35 + 0.65;
       setVisualIntensity(waveValue);
     }, 180);
@@ -1170,7 +1178,7 @@ const GenerateAppScreen: React.FC = () => {
                 const applyWorkingVisual = message.role === 'assistant' && isLoading && finalMessageInList;
                 
                 const computedBlueShade = applyWorkingVisual 
-                  ? `rgb(${Math.floor(37 + (59 - 37) * visualIntensity)}, ${Math.floor(99 + (130 - 99) * visualIntensity)}, ${Math.floor(235 + (246 - 235) * visualIntensity)})`
+                  ? computePulsingBlueColor(visualIntensity)
                   : 'rgb(37, 99, 235)';
                 
                 return (
@@ -1220,7 +1228,7 @@ const GenerateAppScreen: React.FC = () => {
                   <div 
                     className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
                     style={{
-                      backgroundColor: `rgb(${Math.floor(37 + (59 - 37) * visualIntensity)}, ${Math.floor(99 + (130 - 99) * visualIntensity)}, ${Math.floor(235 + (246 - 235) * visualIntensity)})`,
+                      backgroundColor: computePulsingBlueColor(visualIntensity),
                       opacity: visualIntensity,
                     }}
                   >
