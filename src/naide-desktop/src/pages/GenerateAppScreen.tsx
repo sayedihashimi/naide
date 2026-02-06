@@ -13,6 +13,7 @@ import FeatureFilesViewer from '../components/FeatureFilesViewer';
 import FeatureFilePopup from '../components/FeatureFilePopup';
 import ChatHistoryDropdown from '../components/ChatHistoryDropdown';
 import ActivityStatusBar from '../components/ActivityStatusBar';
+import AppSelectorDropdown from '../components/AppSelectorDropdown';
 import type { FeatureFileNode } from '../utils/featureFiles';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
@@ -153,6 +154,15 @@ const GenerateAppScreen: React.FC = () => {
     proxyUrl?: string; // Proxied URL that includes script injection
   }>({ status: 'none' });
   
+  // App selector state
+  const [detectedApps, setDetectedApps] = useState<Array<{
+    app_type: string;
+    project_file?: string;
+    command?: string;
+  }>>([]);
+  const [showAppSelector, setShowAppSelector] = useState(false);
+  const appSelectorRef = useRef<HTMLDivElement>(null);
+  
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -249,28 +259,67 @@ const GenerateAppScreen: React.FC = () => {
     }
   }, [showRecentProjects]);
 
+  // Click outside handler to close app selector dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (appSelectorRef.current && !appSelectorRef.current.contains(event.target as Node)) {
+        setShowAppSelector(false);
+      }
+    };
+
+    if (showAppSelector) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showAppSelector]);
+
   // Detect runnable app on project load
   useEffect(() => {
     const detectApp = async () => {
       if (!state.projectPath) return;
       
       setAppRunState({ status: 'detecting' });
-      logInfo(`[AppRunner] Detecting runnable app in: ${state.projectPath}`);
+      logInfo(`[AppRunner] Detecting runnable apps in: ${state.projectPath}`);
       
       try {
         const { invoke } = await import('@tauri-apps/api/core');
-        const appInfo = await invoke<{ app_type: string; project_file?: string; command?: string } | null>(
-          'detect_runnable_app',
+        const { loadSelectedApp } = await import('../utils/appSelection');
+        
+        // Detect all runnable apps
+        const apps = await invoke<Array<{ app_type: string; project_file?: string; command?: string }>>(
+          'detect_all_runnable_apps_command',
           { projectPath: state.projectPath }
         );
         
-        if (appInfo) {
-          logInfo(`[AppRunner] Detected ${appInfo.app_type} app`);
+        setDetectedApps(apps);
+        
+        if (apps.length > 0) {
+          logInfo(`[AppRunner] Detected ${apps.length} runnable app(s)`);
+          
+          // Try to load previously selected app
+          const savedApp = await loadSelectedApp(state.projectPath);
+          let selectedApp = apps[0]; // Default to first app
+          
+          // Check if saved app still exists in detected apps
+          if (savedApp) {
+            const matchingApp = apps.find(
+              a => a.app_type === savedApp.app_type && a.project_file === savedApp.project_file
+            );
+            if (matchingApp) {
+              selectedApp = matchingApp;
+              logInfo('[AppRunner] Restored previously selected app');
+            } else {
+              logInfo('[AppRunner] Previously selected app no longer available, using first detected app');
+            }
+          }
+          
           setAppRunState({
             status: 'ready',
-            type: appInfo.app_type as 'dotnet' | 'npm',
-            projectFile: appInfo.project_file,
-            command: appInfo.command,
+            type: selectedApp.app_type as 'dotnet' | 'npm',
+            projectFile: selectedApp.project_file,
+            command: selectedApp.command,
           });
         } else {
           logInfo('[AppRunner] No runnable app detected');
@@ -882,6 +931,30 @@ const GenerateAppScreen: React.FC = () => {
       };
     }
   }, [isResizingRight]);
+
+  // Handle app selection from dropdown
+  const handleSelectApp = async (app: { app_type: string; project_file?: string; command?: string }) => {
+    if (!state.projectPath) return;
+    
+    logInfo(`[AppRunner] User selected app: ${app.app_type} ${app.project_file || 'root'}`);
+    
+    setAppRunState({
+      status: 'ready',
+      type: app.app_type as 'dotnet' | 'npm',
+      projectFile: app.project_file,
+      command: app.command,
+    });
+    setShowAppSelector(false);
+    
+    // Persist selection
+    try {
+      const { saveSelectedApp } = await import('../utils/appSelection');
+      await saveSelectedApp(state.projectPath, app);
+    } catch (error) {
+      logError(`[AppRunner] Failed to save app selection: ${error}`);
+      // Non-fatal, continue without persistence
+    }
+  };
 
   // Handle Play button click
   const handlePlayClick = async () => {
@@ -1549,12 +1622,25 @@ const GenerateAppScreen: React.FC = () => {
                   </svg>
                 </div>
                 <p className="text-gray-300 mb-2">Ready to run</p>
-                <p className="text-sm text-gray-500">
+                
+                {/* App info with dropdown if multiple apps */}
+                <div className="text-sm text-gray-500">
                   Detected: {appRunState.type} app
                   {appRunState.projectFile && (
                     <><br /><span className="text-xs">{appRunState.projectFile}</span></>
                   )}
-                </p>
+                  
+                  {/* Dropdown for multiple apps */}
+                  <AppSelectorDropdown
+                    apps={detectedApps}
+                    selectedApp={{ type: appRunState.type, projectFile: appRunState.projectFile }}
+                    isOpen={showAppSelector}
+                    onToggle={() => setShowAppSelector(!showAppSelector)}
+                    onSelect={handleSelectApp}
+                    buttonText="Switch app"
+                    dropdownRef={appSelectorRef}
+                  />
+                </div>
               </div>
             )}
 
@@ -1631,6 +1717,17 @@ const GenerateAppScreen: React.FC = () => {
                     {appRunState.errorMessage}
                   </p>
                 )}
+                
+                {/* Dropdown for multiple apps - allow switching after error */}
+                <AppSelectorDropdown
+                  apps={detectedApps}
+                  selectedApp={{ type: appRunState.type, projectFile: appRunState.projectFile }}
+                  isOpen={showAppSelector}
+                  onToggle={() => setShowAppSelector(!showAppSelector)}
+                  onSelect={handleSelectApp}
+                  buttonText="Try different app"
+                  dropdownRef={appSelectorRef}
+                />
               </div>
             )}
           </div>

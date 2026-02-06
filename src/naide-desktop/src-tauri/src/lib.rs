@@ -13,7 +13,7 @@ mod settings;
 use settings::{LastProject, read_settings, write_settings, add_recent_project, get_recent_projects as get_recent_projects_from_settings};
 
 mod app_runner;
-use app_runner::{detect_dotnet_app, detect_npm_app, start_dotnet_app, start_npm_app, wait_for_url, AppInfo, RunningAppInfo};
+use app_runner::{detect_dotnet_app, detect_npm_app, detect_all_runnable_apps, start_dotnet_app, start_npm_app, wait_for_url, AppInfo, RunningAppInfo};
 
 // Global state to track the sidecar process
 struct SidecarState {
@@ -633,6 +633,15 @@ async fn detect_runnable_app(project_path: String) -> Result<Option<AppInfo>, St
     Ok(None)
 }
 
+// Tauri command: Detect all runnable apps in the project
+#[tauri::command]
+async fn detect_all_runnable_apps_command(project_path: String) -> Result<Vec<AppInfo>, String> {
+    log::info!("Detecting all runnable apps in: {}", project_path);
+    let apps = detect_all_runnable_apps(&project_path)?;
+    log::info!("Found {} apps", apps.len());
+    Ok(apps)
+}
+
 // Tauri command: Start the app
 #[tauri::command]
 async fn start_app(
@@ -964,6 +973,7 @@ pub fn run() {
       delete_chat_session,
       watch_feature_files,
       detect_runnable_app,
+      detect_all_runnable_apps_command,
       start_app,
       stop_app
     ])
