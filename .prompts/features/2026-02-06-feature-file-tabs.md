@@ -470,4 +470,45 @@ These errors existed before the tabbed feature implementation.
 
 ---
 
+## Bug Fixes - 2026-02-06
+
+### Issues Fixed
+1. **Tab Closing Not Working** (High Severity)
+   - **Problem**: Close button, context menu, and middle-click didn't close tabs
+   - **Cause**: Stale closure in `handleCloseTab` and `handleCloseAllTabs`
+   - **Fix**: Used functional setState pattern: `setTabs((currentTabs) => ...)`
+
+2. **Tabs Not Cleared on Project Switch** (Medium Severity)
+   - **Problem**: Old tabs remained when switching projects
+   - **Fix**: Added `resetTabsToChat()` called on project switch
+
+3. **Missing Tab Persistence** (New Feature)
+   - **Problem**: Tabs not restored when reopening project
+   - **Fix**: Created `tabPersistence.ts` utility
+   - **Storage**: `.naide/project-config.json`
+   - **Structure**:
+     ```json
+     {
+       "openTabs": {
+         "tabs": [...],
+         "activeTabId": "..."
+       }
+     }
+     ```
+   - **Save triggers**: Tab changes (debounced 1s), project switch, unmount
+   - **Restore triggers**: After project load
+   - **Edge cases**: Handles missing files, invalid config gracefully
+
+### Additional Files
+- `src/naide-desktop/src/utils/tabPersistence.ts` - Tab save/load utilities
+- `.prompts/features/bugs/2026-02-06-tab-closing-and-persistence.md` - Detailed bug report
+
+### Testing Status
+- ✅ Build compiles successfully
+- ✅ Code review passed
+- ✅ Security scan passed
+- ⏳ Manual UI testing pending
+
+---
+
 created by naide
