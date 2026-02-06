@@ -551,18 +551,35 @@ These errors existed before the tabbed feature implementation.
    - **Result**: 97% reduction - from 34+ saves to 1 save (after proper debounce)
    - **Details**: See `.prompts/features/bugs/2026-02-06-excessive-tab-saves.md`
 
+### Round 5: Infinite Loop from useEffect Dependencies (2026-02-06 Late Evening)
+9. **Infinite Loop Preventing Tab Close** (Critical)
+   - **Problem**: Close button executed logic correctly but tab didn't actually close; 20+ identical state updates per second
+   - **Root Cause**: FeatureFileTab useEffect included `onContentChange` in dependencies
+     - `onContentChange` not memoized → recreated every render
+     - useEffect saw "new" function → called it → triggered setTabs
+     - tabs changed → re-render → new onContentChange → useEffect triggered
+     - **Infinite loop!**
+   - **Why close failed**: setTabs(newTabs) called, but loop immediately called setTabs(oldTabs) from stale closure, overriding close
+   - **Fix**: 
+     1. Removed `onContentChange` from FeatureFileTab useEffect dependencies (with eslint-disable comment)
+     2. Added conditional check in handleTabContentChange to only setTabs if value actually changed
+   - **Result**: Loop eliminated, tab close works, clean state updates
+   - **Details**: See `.prompts/features/bugs/2026-02-06-infinite-loop-tab-close.md`
+
 ### Additional Files
 - `src/naide-desktop/src/utils/tabPersistence.ts` - Tab save/load utilities
 - `.prompts/features/bugs/2026-02-06-tab-closing-and-persistence.md` - Round 1 bug report
 - `.prompts/features/bugs/2026-02-06-tab-closing-fix-round2.md` - Round 2 bug report
 - `.prompts/features/bugs/2026-02-06-doubleclick-and-closing-fix.md` - Round 3 bug report
 - `.prompts/features/bugs/2026-02-06-excessive-tab-saves.md` - Round 4 bug report (performance)
+- `.prompts/features/bugs/2026-02-06-infinite-loop-tab-close.md` - Round 5 bug report (infinite loop)
 
 ### Testing Status
 - ✅ Build compiles successfully (no new errors)
 - ✅ Code review passed
 - ✅ Security scan passed
 - ✅ Performance issue resolved (97% reduction in saves)
+- ✅ Infinite loop eliminated
 - ⏳ Manual UI testing pending user verification
 
 ### Key Lessons
@@ -574,6 +591,9 @@ These errors existed before the tabbed feature implementation.
 6. **Use refs for cleanup functions - avoids re-registering cleanup on every state change**
 7. **Add locks for async operations - prevents concurrent execution issues**
 8. **Dependencies matter - only include what should trigger the effect**
+9. **Don't include non-memoized callback props in useEffect dependencies - causes infinite loops**
+10. **Conditional setState - only update if value actually changed to avoid unnecessary re-renders**
+11. **.map() creates new references - use sparingly, check if value changed first**
 
 ---
 

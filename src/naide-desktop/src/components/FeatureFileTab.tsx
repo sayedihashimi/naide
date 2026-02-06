@@ -52,11 +52,11 @@ const FeatureFileTab: React.FC<FeatureFileTabProps> = ({
   }, [isActive, filePath, projectPath, isEditing]);
 
   // Notify parent of unsaved changes
-  // Note: Removed onContentChange from dependencies to avoid infinite loop
-  // since the parent function is recreated on every render
   useEffect(() => {
     onContentChange(hasUnsavedChanges);
-  }, [hasUnsavedChanges]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Note: onContentChange excluded from deps to avoid infinite loop (parent recreates function every render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasUnsavedChanges]);
 
   const handleToggleEdit = () => {
     if (isEditing) {
