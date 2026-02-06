@@ -3,13 +3,13 @@ import type { FeatureFileNode } from '../utils/featureFiles';
 
 interface FeatureFilesListProps {
   nodes: FeatureFileNode[];
-  onFileSelect: (node: FeatureFileNode) => void;
+  onFileSelect: (node: FeatureFileNode, clickType: 'single' | 'double') => void;
   selectedPath: string | null;
 }
 
 interface FileTreeNodeProps {
   node: FeatureFileNode;
-  onFileSelect: (node: FeatureFileNode) => void;
+  onFileSelect: (node: FeatureFileNode, clickType: 'single' | 'double') => void;
   selectedPath: string | null;
   expandedFolders: Set<string>;
   onToggleFolder: (path: string) => void;
@@ -80,7 +80,8 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
   
   return (
     <button
-      onClick={() => onFileSelect(node)}
+      onClick={() => onFileSelect(node, 'single')}
+      onDoubleClick={() => onFileSelect(node, 'double')}
       className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded transition-colors ${
         isSelected
           ? 'bg-blue-600 text-white'

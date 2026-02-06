@@ -10,7 +10,7 @@ import { listen } from '@tauri-apps/api/event';
 const STORAGE_KEY_VIEW_OPTIONS = 'naide-feature-viewer-options';
 
 interface FeatureFilesViewerProps {
-  onFileSelect?: (file: FeatureFileNode) => void;
+  onFileSelect?: (file: FeatureFileNode, clickType: 'single' | 'double') => void;
   selectedPath?: string | null;
 }
 
@@ -149,9 +149,9 @@ const FeatureFilesViewer: React.FC<FeatureFilesViewerProps> = ({
     setFilteredFiles(filtered);
   }, [files, filterQuery]);
   
-  const handleFileSelect = (node: FeatureFileNode) => {
+  const handleFileSelect = (node: FeatureFileNode, clickType: 'single' | 'double') => {
     if (!node.is_folder && onFileSelect) {
-      onFileSelect(node);
+      onFileSelect(node, clickType);
     }
   };
   
