@@ -26,6 +26,14 @@ const TabBar: React.FC<TabBarProps> = ({
   onTabClose,
   onTabCloseAll,
 }) => {
+  // Log component mount
+  useEffect(() => {
+    logInfo('[TabBar] TabBar component mounted');
+    return () => {
+      logInfo('[TabBar] TabBar component unmounting');
+    };
+  }, []);
+  
   const [contextMenu, setContextMenu] = useState<{
     tabId: string;
     x: number;
@@ -110,11 +118,20 @@ const TabBar: React.FC<TabBarProps> = ({
                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                 }
               `}
-              onClick={() => handleTabClick(tab.id)}
+              onClick={() => {
+                logInfo(`[TabBar] Tab div clicked for tab: ${tab.id}`);
+                handleTabClick(tab.id);
+              }}
               onMouseDown={(e) => handleTabMiddleClick(e, tab.id)}
               onContextMenu={(e) => handleTabRightClick(e, tab.id)}
-              onMouseEnter={() => setHoveredTabId(tab.id)}
-              onMouseLeave={() => setHoveredTabId(null)}
+              onMouseEnter={() => {
+                logInfo(`[TabBar] Mouse entered tab: ${tab.id}`);
+                setHoveredTabId(tab.id);
+              }}
+              onMouseLeave={() => {
+                logInfo(`[TabBar] Mouse left tab: ${tab.id}`);
+                setHoveredTabId(null);
+              }}
               style={{ height: '36px' }}
             >
               {/* Tab label */}
