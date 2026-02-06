@@ -59,13 +59,15 @@ A tab-based approach integrates feature files directly into the center column, m
 ### Feature File Tabs
 
 #### Opening Tabs
-**Update 2026-02-06 PM**: Simplified to single behavior after user feedback.
+**Update 2026-02-06 Late**: Changed to double-click based on user feedback.
 
-- **Click** on a file in the left panel → opens a **pinned tab**
-  - ~~Previous behavior: Single-click for preview, double-click to pin~~ (removed due to UX issues)
-  - All tabs are now persistent and must be manually closed
+- **Double-click** on a file in the left panel → opens a **pinned tab**
+  - Single-click does nothing (no action)
+  - ~~Previous behavior: Single-click for preview, double-click to pin~~ (removed)
+  - ~~Previous behavior: Single-click to open~~ (changed to double-click)
+  - All tabs are persistent and must be manually closed
   - Tabs have normal (non-italic) text
-  - If the file is already open, clicking switches to that tab
+  - If the file is already open, double-clicking switches to that tab
 
 #### Tab Label
 - Display the feature file name **without date prefix** (consistent with left panel default)
@@ -518,10 +520,42 @@ These errors existed before the tabbed feature implementation.
 - ✅ Tab closing verified working (moved confirm outside setState)
 - ⏳ Manual UI testing pending user verification
 
+### Round 3: Double-Click & Tab Closing Consistency (2026-02-06 Late)
+6. **Changed to Double-Click to Open** (UX Change)
+   - **User Request**: "On single click don't do anything. On double click open the file."
+   - **Fix**: Changed `onClick` to `onDoubleClick` in FeatureFilesList.tsx
+   - **Result**: Single-click does nothing, double-click opens file
+
+7. **Tab Closing Still Had Issues** (Critical)
+   - **Problem**: After first file close worked, subsequent files couldn't be closed
+   - **Root Cause**: Code complexity made it hard to maintain correct behavior
+   - **Fix**: Simplified to clearest possible pattern:
+     1. Check with current scope (function recreated each render)
+     2. Blocking ops BEFORE setState
+     3. Single clear setState call
+     4. Sequential related updates (not nested)
+   - **Key Insight**: Non-memoized functions are OK - they get fresh closures each render
+   - **Details**: See `.prompts/features/bugs/2026-02-06-doubleclick-and-closing-fix.md`
+
+### Additional Files
+- `src/naide-desktop/src/utils/tabPersistence.ts` - Tab save/load utilities
+- `.prompts/features/bugs/2026-02-06-tab-closing-and-persistence.md` - Round 1 bug report
+- `.prompts/features/bugs/2026-02-06-tab-closing-fix-round2.md` - Round 2 bug report
+- `.prompts/features/bugs/2026-02-06-doubleclick-and-closing-fix.md` - Round 3 bug report
+
+### Testing Status
+- ✅ Build compiles successfully (no new errors)
+- ✅ Code review passed
+- ✅ Security scan passed
+- ✅ Code simplified and more maintainable
+- ⏳ Manual UI testing pending user verification
+
 ### Key Lessons
 1. **Never call blocking operations (confirm, alert) inside setState callbacks**
 2. **Don't call other setState functions from within setState callbacks**
-3. **Listen to user feedback - simpler is often better**
+3. **Listen to user feedback - behavior preferences change based on usage**
+4. **Simpler is better - after 3 iterations, the clearest solution won**
+5. **Non-memoized functions are OK - fresh closures each render avoid stale state**
 
 ---
 
