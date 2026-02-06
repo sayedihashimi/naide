@@ -2,21 +2,22 @@
 Status: shipped
 Area: infra
 Created: 2026-02-01
-LastUpdated: 2026-02-03
+LastUpdated: 2026-02-06
 ---
 
 # File Logging Feature
 
-## Status: ✅ IMPLEMENTED
+## Status: ✅ IMPLEMENTED (Bug Fixed 2026-02-06)
 
 ## Problem Statement
 The app currently only logs to the console, which means logs are lost when the app closes or the console buffer clears. We need persistent file logging for debugging and tracking.
 
 ## Requirements
 - Log files location: `%temp%/com.naide.desktop/logs` ✅
-- Create new log file each app run ✅
+- Create **single** log file per app run (not multiple) ✅
 - File naming: `naide-{TIMESTAMP}.log` (e.g., `naide-2026-02-01T03-30-28.log`) ✅
 - Apply to both Rust backend and Node.js sidecar ✅
+- Both components write to the **same** log file ✅
 
 ## Implementation Summary
 
@@ -27,14 +28,17 @@ The app currently only logs to the console, which means logs are lost when the a
 - Dual output: both file and stdout
 - Automatic directory creation on startup
 - Comprehensive error handling with full path context
+- **Passes log file path to sidecar via `NAIDE_LOG_FILE` environment variable** ✅
 - Location: `src/naide-desktop/src-tauri/src/lib.rs`
 
 ### Node.js Sidecar ✅
 - Created custom logger module: `src/copilot-sidecar/src/logger.ts`
 - Intercepts console.log/error/warn to write to both console and file
-- Same log directory and naming convention as Rust backend
+- **Reads log file path from `NAIDE_LOG_FILE` environment variable** ✅
+- **Appends to existing Tauri log file instead of creating new one** ✅
+- Fallback to standalone log creation if env var not set (for development)
 - Cross-platform temp path resolution using `os.tmpdir()`
-- Automatic directory creation
+- Automatic directory creation (fallback mode only)
 - Format: `[timestamp] [level] message`
 - Error handling to prevent infinite loops
 
@@ -138,9 +142,42 @@ console.error('[Sidecar] Error');         // Logged as ERROR
 - No external dependencies
 
 ### Files Changed
-- `src/naide-desktop/src-tauri/src/lib.rs` - Rust logging configuration
-- `src/copilot-sidecar/src/logger.ts` - New logger module (created)
+- `src/naide-desktop/src-tauri/src/lib.rs` - Rust logging configuration, sidecar spawn with env var
+- `src/copilot-sidecar/src/logger.ts` - Logger module with shared log file support
 - `src/copilot-sidecar/src/index.ts` - Logger initialization
+
+## Bug Fix (2026-02-06): Duplicate Log Files
+
+### Problem
+The original implementation created TWO log files on each app run:
+1. Tauri backend created `naide-{timestamp1}.log`
+2. Sidecar created `naide-{timestamp2}.log` (slightly different timestamp)
+
+This violated the "single log file per run" requirement.
+
+### Root Cause
+Both components independently initialized their own log files with timestamps generated at slightly different times during startup, resulting in separate files.
+
+### Solution
+1. **Tauri** now passes its log file path to the sidecar via `NAIDE_LOG_FILE` environment variable
+2. **Sidecar** checks for this environment variable and appends to the existing log file instead of creating a new one
+3. Maintains backward compatibility: sidecar falls back to creating its own log if env var is not set (for standalone development)
+
+### Technical Details
+- Tauri constructs log file path: `{log_dir}/{log_filename}`
+- Passes to sidecar: `.env("NAIDE_LOG_FILE", log_file_path)`
+- Sidecar reads: `process.env.NAIDE_LOG_FILE`
+- Uses `appendFileSync` instead of `writeFileSync` to preserve Tauri's initial log entries
+- **Important**: `log_dir` and `log_filename` are cloned before being moved into the logging configuration to allow reuse
+
+This ensures both components write to a single unified log file, making debugging easier.
+
+### Follow-up Fix: Rust Compilation Error
+The initial implementation caused Rust E0382 borrow-after-move errors because `log_dir` and `log_filename` were moved into the logging config then used again. Fixed by adding `.clone()` calls:
+```rust
+path: log_dir.clone(),
+file_name: Some(log_filename.clone()),
+```
 
 ## Future Considerations
 - Log rotation/cleanup (delete old logs after N days?)

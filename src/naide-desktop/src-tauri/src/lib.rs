@@ -854,8 +854,8 @@ pub fn run() {
           .targets([
             tauri_plugin_log::Target::new(
               tauri_plugin_log::TargetKind::Folder {
-                path: log_dir,
-                file_name: Some(log_filename),
+                path: log_dir.clone(),
+                file_name: Some(log_filename.clone()),
               }
             ),
             tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
@@ -913,8 +913,12 @@ pub fn run() {
         log::info!("Starting copilot sidecar from: {:?}", path);
         println!("[Tauri] Starting copilot sidecar from: {:?}", path);
         
+        // Pass log file path to sidecar via environment variable
+        let log_file_path = log_dir.join(&log_filename);
+        
         match Command::new("node")
           .arg(path)
+          .env("NAIDE_LOG_FILE", log_file_path.to_string_lossy().to_string())
           .stdout(Stdio::piped())
           .stderr(Stdio::piped())
           .spawn() {
