@@ -1,0 +1,405 @@
+---
+Status: planned
+Area: ui, features
+Created: 2026-02-06
+LastUpdated: 2026-02-06
+---
+
+# Feature: Tabbed Feature File Viewer (Replace Popup Modal)
+**Status**: 🟡 PLANNED
+
+## Summary
+Replace the current draggable modal popup for viewing/editing feature files with a **tab system in the center column**. Feature files open as tabs alongside the Generate App (chat) tab. This follows a VS Code–inspired model: single-click opens a temporary preview tab, double-click pins the tab.
+
+---
+
+## Goals
+- Replace the modal/popup with inline tabs for a more integrated experience
+- Allow users to switch between chat and feature files without losing state
+- Support preview (temporary) and pinned tab behavior like VS Code
+- Maintain view and edit capabilities for feature files within tabs
+- Keep the left panel file list unchanged
+
+---
+
+## Non-Goals
+- Drag-and-drop tab reordering (future enhancement)
+- Split view / side-by-side tabs (future enhancement)
+- Tabs for non-feature files (e.g., code files, plan specs)
+- Keyboard-only tab navigation (future enhancement)
+- Tab persistence across sessions (tabs reset on app restart)
+
+---
+
+## Problem Statement
+The current draggable modal popup for feature files:
+- Floats over the chat, obscuring content
+- Requires manual positioning and resizing
+- Feels disconnected from the main workflow
+- Cannot show multiple files for quick reference
+
+A tab-based approach integrates feature files directly into the center column, making navigation seamless and familiar.
+
+---
+
+## Core Behavior
+
+### Tab Bar
+- **Location**: Top of the center column, above the content area
+- **Always visible**: When at least one tab is open (Generate App is always open)
+- **Max tabs**: 10 (including Generate App). Attempting to open an 11th tab replaces the oldest temporary/preview tab, or shows a message if all are pinned.
+
+### Generate App Tab (Chat)
+- **Always the first tab** (leftmost position)
+- **Never closable** — no close button, no right-click close option
+- **Label**: "Generate App" (or a chat icon + text)
+- **Content**: The existing chat interface (messages, input area, activity status bar)
+- **State preservation**: Chat messages, conversation summary, loading state, mode selection — all preserved when switching away and back
+
+### Feature File Tabs
+
+#### Opening Tabs
+- **Single-click** on a file in the left panel → opens a **temporary preview tab**
+  - Temporary tabs are shown with *italic text* in the tab label
+  - Only one temporary tab exists at a time — single-clicking another file replaces the current temporary tab
+  - If the user edits the file, the tab automatically becomes pinned
+- **Double-click** on a file in the left panel → opens a **pinned tab**
+  - Pinned tabs have normal (non-italic) text
+  - Pinned tabs persist until explicitly closed
+  - If the file is already open as a temporary tab, double-click promotes it to pinned
+
+#### Tab Label
+- Display the feature file name **without date prefix** (consistent with left panel default)
+- If "Show raw filenames" view option is enabled in the left panel, show the full filename
+- Truncate long names with ellipsis if needed
+
+#### Tab Close Behavior
+- **Hover**: Shows an × close button on the right side of the tab
+- **Click ×**: Closes the tab
+  - If file has unsaved edits, show a confirmation: "You have unsaved changes. Discard?"
+  - Buttons: "Discard" / "Cancel"
+- **Middle-click** on tab: Same as clicking × (close the tab)
+
+#### Right-Click Context Menu
+Right-clicking any feature file tab shows:
+- **Close** — closes this tab
+- **Close All** — closes all tabs **except** Generate App
+
+Right-clicking the Generate App tab shows nothing (or a disabled menu).
+
+### Tab Content: Feature File Viewer
+When a feature file tab is active, the center column displays:
+- **Toolbar** (top of content area):
+  - File path breadcrumb (e.g., `.prompts/features/2026-02-06-feature-file-tabs.md`)
+  - Edit button (pencil icon) — toggles edit mode
+- **View mode** (default):
+  - Rendered markdown preview (reuse existing `MarkdownPreview` component)
+  - Full height, scrollable
+- **Edit mode** (toggled by edit button):
+  - Raw markdown in a textarea
+  - Save button (also Ctrl+S / Cmd+S)
+  - Cancel button (also ESC returns to view mode)
+  - Saving writes to disk and returns to view mode
+  - Saving also promotes a temporary tab to pinned
+  - Starting to edit also promotes a temporary tab to pinned
+
+### Tab Switching & State
+- **Chat state is fully preserved** when switching tabs — messages, input text, scroll position, conversation summary, loading state, mode selection all remain intact
+- **Feature file tabs** reload content from disk when activated (to catch external changes), unless the tab is in edit mode
+- Switching away from a tab in edit mode **keeps the unsaved edits** in memory (user can switch back and continue editing)
+
+---
+
+## Tab Overflow (Max 10)
+
+When the user tries to open an 11th tab:
+1. If a temporary/preview tab exists → replace it with the new file
+2. If all tabs are pinned and at max → show a subtle toast: "Maximum tabs reached. Close a tab to open another."
+3. Generate App tab does NOT count toward the closable limit (it's always present)
+
+So effectively: 1 Generate App tab + up to 9 feature file tabs.
+
+---
+
+## UI/UX Details
+
+### Tab Bar Styling
+- **Background**: zinc-800 (match left panel)
+- **Active tab**: zinc-900 background, white text, bottom border accent (blue-500)
+- **Inactive tab**: zinc-800 background, zinc-400 text
+- **Hover (inactive)**: zinc-700 background
+- **Close button**: Hidden by default, visible on hover (zinc-400, hover: zinc-200)
+- **Temporary tab text**: Italic styling to distinguish from pinned
+- **Tab height**: ~36px
+- **Tab min-width**: 120px
+- **Tab max-width**: 200px
+- **Overflow**: If tabs exceed available width, show scroll arrows or compress tabs
+
+### Context Menu Styling
+- Dark theme (zinc-800 background, zinc-700 border)
+- Items: "Close", "Close All"
+- Hover: zinc-700 background
+- Appears at right-click position
+
+### Content Area
+- Fills remaining center column height below the tab bar
+- Smooth transition when switching tabs (no flicker)
+
+---
+
+## Technical Implementation
+
+### New Components
+
+#### `TabBar.tsx`
+Renders the tab bar with all open tabs.
+```typescript
+interface Tab {
+  id: string;                    // Unique ID (e.g., file path or 'generate-app')
+  type: 'chat' | 'feature-file';
+  label: string;                 // Display name
+  filePath?: string;             // For feature file tabs
+  isPinned: boolean;             // false = temporary/preview
+  isTemporary: boolean;          // true = italic, replaceable
+  hasUnsavedChanges?: boolean;   // Show dot indicator
+}
+
+interface TabBarProps {
+  tabs: Tab[];
+  activeTabId: string;
+  onTabSelect: (tabId: string) => void;
+  onTabClose: (tabId: string) => void;
+  onTabCloseAll: () => void;
+  onTabPin: (tabId: string) => void;  // Promote temporary → pinned
+}
+```
+
+#### `FeatureFileTab.tsx`
+Content component for feature file tabs (replaces FeatureFilePopup).
+```typescript
+interface FeatureFileTabProps {
+  filePath: string;
+  fileName: string;
+  projectPath: string;
+  isActive: boolean;           // Whether this tab is currently displayed
+  onContentChange: () => void; // Notify parent of unsaved changes
+  onSave: () => void;          // Notify parent that file was saved
+}
+```
+
+### State Management (GenerateAppScreen.tsx)
+
+**New state:**
+```typescript
+const [tabs, setTabs] = useState<Tab[]>([
+  { id: 'generate-app', type: 'chat', label: 'Generate App', isPinned: true, isTemporary: false }
+]);
+const [activeTabId, setActiveTabId] = useState('generate-app');
+```
+
+**Key handlers:**
+- `handleOpenFeatureTab(node, isPinned)` — open/focus a feature file tab
+- `handleCloseTab(tabId)` — close a tab (with unsaved changes check)
+- `handleCloseAllTabs()` — close all except Generate App
+- `handleTabSelect(tabId)` — switch active tab
+
+### Modifications to Existing Components
+
+#### `GenerateAppScreen.tsx`
+- **Remove**: `featureFilePopup` state, `FeatureFilePopup` rendering, `DraggableModal` usage
+- **Add**: Tab state, `TabBar` component above content area
+- **Modify**: Center column renders content conditionally based on `activeTabId`:
+  - If `activeTabId === 'generate-app'` → render existing chat UI
+  - If `activeTabId` matches a feature file → render `FeatureFileTab`
+- **Preserve**: All chat state remains in GenerateAppScreen (not unmounted)
+- **Chat visibility**: Use CSS `display: none` / `display: flex` to hide/show chat vs feature content (avoids unmounting and losing state)
+
+#### `FeatureFilesViewer.tsx`
+- **Modify `onFileSelect` callback** to include click type information:
+  - Single-click → `onFileSelect(node, 'preview')`
+  - Double-click → `onFileSelect(node, 'pin')`
+- **Add double-click handler** on file items in `FeatureFilesList.tsx`
+
+### Components to Remove
+- `FeatureFilePopup.tsx` — replaced by `FeatureFileTab.tsx`
+- `DraggableModal.tsx` — no longer needed (unless used elsewhere)
+- `Modal.tsx` — evaluate if still needed
+
+### Components to Reuse
+- `MarkdownPreview.tsx` — used inside `FeatureFileTab` for view mode
+- `ViewOptionsMenu.tsx` — unchanged, stays in left panel
+
+---
+
+## User Flows
+
+### Opening a Feature File (Single-Click Preview)
+1. User single-clicks "add-copilot-integration" in left panel
+2. A temporary tab appears: "*add-copilot-integration*" (italic)
+3. Center column shows the markdown-rendered content
+4. User single-clicks "building-mode" in left panel
+5. The temporary tab is **replaced** with "*building-mode*"
+6. Previous file is gone (not pinned, so no loss)
+
+### Pinning a Tab (Double-Click)
+1. User double-clicks "building-mode" in left panel
+2. A pinned tab appears: "building-mode" (normal text)
+3. User single-clicks "conversation-memory" in left panel
+4. A new temporary tab appears alongside the pinned one
+5. Both tabs are visible in the tab bar
+
+### Editing a File
+1. User opens a feature file tab
+2. Clicks the pencil/edit icon in the toolbar
+3. Tab automatically becomes pinned (if it was temporary)
+4. Textarea appears with raw markdown
+5. User makes edits
+6. User presses Ctrl+S → file saves, returns to view mode
+7. Dot indicator on tab clears
+
+### Switching Between Chat and Files
+1. User is chatting with Copilot (Generate App tab active)
+2. User double-clicks a feature file → new tab opens and activates
+3. User reads the file, then clicks "Generate App" tab
+4. Chat is exactly as they left it (messages, input, scroll position)
+5. User continues chatting seamlessly
+
+### Closing Tabs
+1. User hovers over a tab → × button appears
+2. Clicks × → tab closes, adjacent tab activates
+3. OR: User right-clicks a tab → "Close" / "Close All"
+4. "Close All" removes all feature tabs, Generate App tab remains and activates
+
+---
+
+## Edge Cases
+
+### Unsaved Changes on Close
+- If tab has unsaved edits and user clicks ×:
+  - Show confirmation: "You have unsaved changes. Discard?"
+  - "Discard" → close tab, lose changes
+  - "Cancel" → keep tab open
+
+### Unsaved Changes on Close All
+- If any tabs have unsaved changes:
+  - Show confirmation listing affected files
+  - "Discard All" → close all, lose changes
+  - "Cancel" → keep all open
+
+### File Deleted Externally
+- If a feature file is deleted while its tab is open:
+  - Show message in tab content: "This file has been deleted."
+  - Tab remains open but content is not editable
+  - Close tab normally
+
+### Same File Opened Twice
+- If user clicks a file that already has an open tab:
+  - Switch to the existing tab (don't open a duplicate)
+  - If it was temporary and user double-clicks, promote to pinned
+
+### Maximum Tabs Reached
+- 10 total tabs (1 Generate App + 9 feature files)
+- If at max and user opens new file:
+  - Replace temporary tab if one exists
+  - If all pinned, show toast: "Close a tab to open more files"
+
+---
+
+## Acceptance Criteria
+
+- [ ] Tab bar appears at top of center column
+- [ ] Generate App tab is always first, always visible, never closable
+- [ ] Single-click on file in left panel opens temporary (italic) preview tab
+- [ ] Double-click on file in left panel opens pinned tab
+- [ ] Only one temporary tab exists at a time (single-click replaces it)
+- [ ] Editing a file automatically pins the tab
+- [ ] Hover on tab shows × close button
+- [ ] Click × closes tab (with unsaved changes confirmation if needed)
+- [ ] Right-click shows context menu: "Close" and "Close All"
+- [ ] "Close All" closes everything except Generate App
+- [ ] Chat state is fully preserved when switching between tabs
+- [ ] Feature file content renders with markdown preview (view mode)
+- [ ] Edit mode works with textarea, save (Ctrl+S), and cancel (ESC)
+- [ ] Maximum 10 tabs enforced
+- [ ] Tab for already-open file switches to it instead of duplicating
+- [ ] Middle-click closes a tab
+- [ ] DraggableModal/FeatureFilePopup components are removed
+- [ ] App builds and runs successfully
+- [ ] All existing tests pass (or are updated to reflect new structure)
+
+---
+
+## Migration Notes
+
+### Components Removed
+- `FeatureFilePopup.tsx` → replaced by `FeatureFileTab.tsx`
+- `DraggableModal.tsx` → no longer needed
+- Possibly `Modal.tsx` if not used elsewhere
+
+### State Changes in GenerateAppScreen
+- **Remove**: `featureFilePopup` state object
+- **Add**: `tabs` array and `activeTabId` string
+- **Preserve**: All chat-related state (messages, conversationSummary, isLoading, copilotMode, etc.)
+
+### CSS Strategy for State Preservation
+Chat UI must **not be unmounted** when switching to a feature tab. Use:
+```tsx
+<div style={{ display: activeTabId === 'generate-app' ? 'flex' : 'none' }}>
+  {/* Existing chat UI */}
+</div>
+{tabs.filter(t => t.type === 'feature-file').map(tab => (
+  <div key={tab.id} style={{ display: activeTabId === tab.id ? 'flex' : 'none' }}>
+    <FeatureFileTab ... />
+  </div>
+))}
+```
+
+This keeps all tab content in the DOM, preserving state without re-renders.
+
+---
+
+## Files to Create
+- `src/naide-desktop/src/components/TabBar.tsx`
+- `src/naide-desktop/src/components/FeatureFileTab.tsx`
+
+## Files to Modify
+- `src/naide-desktop/src/pages/GenerateAppScreen.tsx` — major: add tabs, remove popup
+- `src/naide-desktop/src/components/FeatureFilesViewer.tsx` — add double-click support
+- `src/naide-desktop/src/components/FeatureFilesList.tsx` — add double-click handler
+
+## Files to Remove (Evaluate)
+- `src/naide-desktop/src/components/FeatureFilePopup.tsx`
+- `src/naide-desktop/src/components/DraggableModal.tsx`
+- `src/naide-desktop/src/components/Modal.tsx` (if unused elsewhere)
+
+---
+
+## Future Enhancements
+
+### Drag-and-Drop Tab Reordering
+- Allow users to rearrange tabs by dragging
+
+### Tab State Persistence
+- Save open tabs to `.naide/` and restore on app restart
+
+### Split View
+- Drag a tab to the side to create a split editor view
+
+### Keyboard Navigation
+- Ctrl+Tab / Ctrl+Shift+Tab to cycle tabs
+- Ctrl+W to close active tab
+- Ctrl+1-9 to jump to specific tab
+
+### Dirty File Indicators
+- Show dot on tab label when file has been modified externally
+
+---
+
+## Related Features
+- [2026-02-01-feature-files-viewer.md](./2026-02-01-feature-files-viewer.md) — Left panel file list (unchanged)
+- [2026-02-03-feature-files-popup-viewer.md](./2026-02-03-feature-files-popup-viewer.md) — Being replaced by this feature
+- [2026-02-01-generate-app-screen.md](./2026-02-01-generate-app-screen.md) — Center column layout changes
+
+---
+
+created by naide

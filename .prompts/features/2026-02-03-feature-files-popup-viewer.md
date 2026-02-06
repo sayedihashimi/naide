@@ -1,8 +1,9 @@
 ---
-Status: partially-implemented
+Status: superseded
 Area: ui, features
 Created: 2026-02-03
-LastUpdated: 2026-02-03
+LastUpdated: 2026-02-06
+SupersededBy: 2026-02-06-feature-file-tabs.md
 ---
 
 # Feature: Popup Window for Feature Files Viewer
