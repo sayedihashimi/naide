@@ -82,6 +82,14 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
   }
 };
 
+// Helper function to compute pulsing blue shade based on intensity
+const computePulsingBlueColor = (intensity: number): string => {
+  const r = Math.floor(37 + (59 - 37) * intensity);
+  const g = Math.floor(99 + (130 - 99) * intensity);
+  const b = Math.floor(235 + (246 - 235) * intensity);
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 const GenerateAppScreen: React.FC = () => {
   const { state, setProjectName, setProjectPath, loadProject } = useAppContext();
   const [messageInput, setMessageInput] = useState('');
@@ -98,6 +106,24 @@ const GenerateAppScreen: React.FC = () => {
   // Chat history dropdown state
   const [showChatHistory, setShowChatHistory] = useState(false);
   // Feature file popup state
+  const [visualIntensity, setVisualIntensity] = useState<number>(1.0);
+  
+  // Cyclical brightness modulation for assistant icon during processing
+  useEffect(() => {
+    if (!isLoading) {
+      setVisualIntensity(1.0);
+      return;
+    }
+    
+    let phaseCounter = 0;
+    const timerId = setInterval(() => {
+      phaseCounter = (phaseCounter + 0.08) % 2;
+      const waveValue = Math.sin(phaseCounter * Math.PI) * 0.35 + 0.65;
+      setVisualIntensity(waveValue);
+    }, 180);
+    
+    return () => clearInterval(timerId);
+  }, [isLoading]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   // Ref to track current iframe URL (for immediate access in click handlers)
   const currentIframeUrlRef = useRef<string | null>(null);
@@ -1147,10 +1173,24 @@ const GenerateAppScreen: React.FC = () => {
           {/* Transcript area */}
           <div ref={transcriptRef} className="flex-1 overflow-y-auto p-6">
             <div className="max-w-3xl mx-auto space-y-4">
-              {messages.map((message) => (
+              {messages.map((message, idx) => {
+                const finalMessageInList = idx === messages.length - 1;
+                const applyWorkingVisual = message.role === 'assistant' && isLoading && finalMessageInList;
+                
+                const computedBlueShade = applyWorkingVisual 
+                  ? computePulsingBlueColor(visualIntensity)
+                  : 'rgb(37, 99, 235)';
+                
+                return (
                 <div key={message.id} className="flex gap-3">
                   {message.role === 'assistant' && (
-                    <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                    <div 
+                      className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                      style={{
+                        backgroundColor: computedBlueShade,
+                        opacity: applyWorkingVisual ? visualIntensity : 1.0,
+                      }}
+                    >
                       <svg
                         className="w-5 h-5 text-white"
                         fill="none"
@@ -1180,13 +1220,20 @@ const GenerateAppScreen: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {/* Loading indicator - only shown before assistant placeholder is added */}
               {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                 <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                  <div 
+                    className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                    style={{
+                      backgroundColor: computePulsingBlueColor(visualIntensity),
+                      opacity: visualIntensity,
+                    }}
+                  >
                     <svg
-                      className="w-5 h-5 text-white animate-pulse"
+                      className="w-5 h-5 text-white"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
