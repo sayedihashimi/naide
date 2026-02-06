@@ -1168,11 +1168,18 @@ const GenerateAppScreen: React.FC = () => {
 
   const handleTabContentChange = (tabId: string, hasChanges: boolean) => {
     logInfo(`[TabUpdate] handleTabContentChange called: tabId=${tabId}, hasChanges=${hasChanges}`);
-    setTabs(tabs.map(t => 
-      t.id === tabId 
-        ? { ...t, hasUnsavedChanges: hasChanges }
-        : t
-    ));
+    
+    // Only update if the value actually changed (avoid unnecessary re-renders)
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab && tab.hasUnsavedChanges !== hasChanges) {
+      setTabs(tabs.map(t => 
+        t.id === tabId 
+          ? { ...t, hasUnsavedChanges: hasChanges }
+          : t
+      ));
+    } else {
+      logInfo(`[TabUpdate] Skipping setTabs - hasUnsavedChanges already ${hasChanges}`);
+    }
   };
 
   const handleTabSave = (tabId: string) => {
