@@ -974,26 +974,35 @@ const GenerateAppScreen: React.FC = () => {
   };
 
   const handleCloseTab = (tabId: string) => {
-    // Find the tab first to check for unsaved changes
-    const tab = tabs.find(t => t.id === tabId);
-    if (!tab || tab.type === 'chat') {
-      return; // Don't close chat tab
-    }
+    // Step 1: Check if we can close the tab (synchronous checks)
+    let shouldClose = false;
+    let tabToClose = null;
     
-    // Check for unsaved changes (do this BEFORE setState)
-    if (tab.hasUnsavedChanges) {
-      if (!confirm('You have unsaved changes. Discard?')) {
-        return;
+    // Use current tabs to check
+    for (const tab of tabs) {
+      if (tab.id === tabId) {
+        tabToClose = tab;
+        break;
       }
     }
     
-    // Now update state
+    if (!tabToClose || tabToClose.type === 'chat') {
+      return; // Don't close chat tab
+    }
+    
+    // Check for unsaved changes
+    if (tabToClose.hasUnsavedChanges) {
+      if (!confirm('You have unsaved changes. Discard?')) {
+        return; // User cancelled
+      }
+    }
+    
+    // Step 2: Remove the tab
     const newTabs = tabs.filter(t => t.id !== tabId);
     setTabs(newTabs);
     
-    // If closing the active tab, switch to another tab
+    // Step 3: Handle active tab switching if needed
     if (activeTabId === tabId) {
-      // Find the tab to activate (prefer the one to the left, or the first one)
       const closedIndex = tabs.findIndex(t => t.id === tabId);
       const newActiveTab = newTabs[Math.max(0, closedIndex - 1)] || newTabs[0];
       if (newActiveTab) {
