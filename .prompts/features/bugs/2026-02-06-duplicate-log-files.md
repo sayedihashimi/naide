@@ -94,6 +94,29 @@ After the fix:
 - ✅ Chronological ordering is maintained
 - ✅ Fallback mode still works for standalone sidecar development
 
+## Follow-up Fix (2026-02-06): Rust Compilation Error
+
+### Problem
+The initial fix caused Rust compilation errors:
+```
+error[E0382]: borrow of moved value: `log_dir`
+error[E0382]: borrow of moved value: `log_filename`
+```
+
+### Root Cause
+The `log_dir` and `log_filename` values were moved into the logging configuration struct, then attempted to be used again to construct the sidecar's log file path.
+
+### Solution
+Added `.clone()` calls before moving the values into the struct:
+```rust
+tauri_plugin_log::TargetKind::Folder {
+  path: log_dir.clone(),           // Clone before move
+  file_name: Some(log_filename.clone()),  // Clone before move
+}
+```
+
+This allows the original values to remain available for constructing the `NAIDE_LOG_FILE` environment variable.
+
 ## Related
 - Original feature: `.prompts/features/2026-02-01-add-file-logger.md`
 - Issue tracker: GitHub issue about duplicate log files

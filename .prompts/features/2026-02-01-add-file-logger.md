@@ -168,8 +168,16 @@ Both components independently initialized their own log files with timestamps ge
 - Passes to sidecar: `.env("NAIDE_LOG_FILE", log_file_path)`
 - Sidecar reads: `process.env.NAIDE_LOG_FILE`
 - Uses `appendFileSync` instead of `writeFileSync` to preserve Tauri's initial log entries
+- **Important**: `log_dir` and `log_filename` are cloned before being moved into the logging configuration to allow reuse
 
 This ensures both components write to a single unified log file, making debugging easier.
+
+### Follow-up Fix: Rust Compilation Error
+The initial implementation caused Rust E0382 borrow-after-move errors because `log_dir` and `log_filename` were moved into the logging config then used again. Fixed by adding `.clone()` calls:
+```rust
+path: log_dir.clone(),
+file_name: Some(log_filename.clone()),
+```
 
 ## Future Considerations
 - Log rotation/cleanup (delete old logs after N days?)
