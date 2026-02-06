@@ -138,6 +138,20 @@ const GenerateAppScreen: React.FC = () => {
   const [activeTabId, setActiveTabId] = useState('generate-app');
   const [selectedFeaturePath, setSelectedFeaturePath] = useState<string | null>(null);
   
+  // Refs to track current tab state for persistence (avoids excessive saves)
+  const tabsRef = useRef(tabs);
+  const activeTabIdRef = useRef(activeTabId);
+  const savingRef = useRef(false); // Track if save is in progress
+  
+  // Update refs when state changes
+  useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+  
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  }, [activeTabId]);
+  
   // Right column resize state
   const [rightColumnWidth, setRightColumnWidth] = useState(600); // Default: 600px (larger for running app)
   const [isResizingRight, setIsResizingRight] = useState(false);
@@ -293,12 +307,13 @@ const GenerateAppScreen: React.FC = () => {
   // Save tabs on component unmount
   useEffect(() => {
     return () => {
-      if (state.projectPath && tabs.length > 0) {
+      // Use refs to get current values at unmount time
+      if (state.projectPath && tabsRef.current.length > 0) {
         // Note: This is best effort - might not complete if app closes quickly
         saveTabsToProject(state.projectPath);
       }
     };
-  }, [state.projectPath, tabs]);
+  }, [state.projectPath]); // Only depend on projectPath, not tabs
 
   // Detect runnable app on project load
   useEffect(() => {
@@ -1041,9 +1056,20 @@ const GenerateAppScreen: React.FC = () => {
 
   // Save current tabs to project config
   const saveTabsToProject = async (projectPath: string) => {
+    // Prevent concurrent saves
+    if (savingRef.current) {
+      return;
+    }
+    
     try {
+      savingRef.current = true;
+      
+      // Use refs to get current values (avoids closure issues)
+      const currentTabs = tabsRef.current;
+      const currentActiveTabId = activeTabIdRef.current;
+      
       // Convert tabs to persisted format (exclude hasUnsavedChanges)
-      const persistedTabs: PersistedTab[] = tabs.map(tab => ({
+      const persistedTabs: PersistedTab[] = currentTabs.map(tab => ({
         id: tab.id,
         type: tab.type,
         label: tab.label,
@@ -1054,12 +1080,14 @@ const GenerateAppScreen: React.FC = () => {
       
       await saveOpenTabs(projectPath, {
         tabs: persistedTabs,
-        activeTabId,
+        activeTabId: currentActiveTabId,
       });
       
       logInfo(`[TabPersistence] Saved ${persistedTabs.length} tabs for project`);
     } catch (error) {
       logError(`[TabPersistence] Error saving tabs: ${error}`);
+    } finally {
+      savingRef.current = false;
     }
   };
 
