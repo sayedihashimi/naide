@@ -153,6 +153,15 @@ const GenerateAppScreen: React.FC = () => {
     proxyUrl?: string; // Proxied URL that includes script injection
   }>({ status: 'none' });
   
+  // App selector state
+  const [detectedApps, setDetectedApps] = useState<Array<{
+    app_type: string;
+    project_file?: string;
+    command?: string;
+  }>>([]);
+  const [showAppSelector, setShowAppSelector] = useState(false);
+  const appSelectorRef = useRef<HTMLDivElement>(null);
+  
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -249,28 +258,67 @@ const GenerateAppScreen: React.FC = () => {
     }
   }, [showRecentProjects]);
 
+  // Click outside handler to close app selector dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (appSelectorRef.current && !appSelectorRef.current.contains(event.target as Node)) {
+        setShowAppSelector(false);
+      }
+    };
+
+    if (showAppSelector) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showAppSelector]);
+
   // Detect runnable app on project load
   useEffect(() => {
     const detectApp = async () => {
       if (!state.projectPath) return;
       
       setAppRunState({ status: 'detecting' });
-      logInfo(`[AppRunner] Detecting runnable app in: ${state.projectPath}`);
+      logInfo(`[AppRunner] Detecting runnable apps in: ${state.projectPath}`);
       
       try {
         const { invoke } = await import('@tauri-apps/api/core');
-        const appInfo = await invoke<{ app_type: string; project_file?: string; command?: string } | null>(
-          'detect_runnable_app',
+        const { loadSelectedApp } = await import('../utils/appSelection');
+        
+        // Detect all runnable apps
+        const apps = await invoke<Array<{ app_type: string; project_file?: string; command?: string }>>(
+          'detect_all_runnable_apps_command',
           { projectPath: state.projectPath }
         );
         
-        if (appInfo) {
-          logInfo(`[AppRunner] Detected ${appInfo.app_type} app`);
+        setDetectedApps(apps);
+        
+        if (apps.length > 0) {
+          logInfo(`[AppRunner] Detected ${apps.length} runnable app(s)`);
+          
+          // Try to load previously selected app
+          const savedApp = await loadSelectedApp(state.projectPath);
+          let selectedApp = apps[0]; // Default to first app
+          
+          // Check if saved app still exists in detected apps
+          if (savedApp) {
+            const matchingApp = apps.find(
+              a => a.app_type === savedApp.app_type && a.project_file === savedApp.project_file
+            );
+            if (matchingApp) {
+              selectedApp = matchingApp;
+              logInfo('[AppRunner] Restored previously selected app');
+            } else {
+              logInfo('[AppRunner] Previously selected app no longer available, using first detected app');
+            }
+          }
+          
           setAppRunState({
             status: 'ready',
-            type: appInfo.app_type as 'dotnet' | 'npm',
-            projectFile: appInfo.project_file,
-            command: appInfo.command,
+            type: selectedApp.app_type as 'dotnet' | 'npm',
+            projectFile: selectedApp.project_file,
+            command: selectedApp.command,
           });
         } else {
           logInfo('[AppRunner] No runnable app detected');
@@ -882,6 +930,30 @@ const GenerateAppScreen: React.FC = () => {
       };
     }
   }, [isResizingRight]);
+
+  // Handle app selection from dropdown
+  const handleSelectApp = async (app: { app_type: string; project_file?: string; command?: string }) => {
+    if (!state.projectPath) return;
+    
+    logInfo(`[AppRunner] User selected app: ${app.app_type} ${app.project_file || 'root'}`);
+    
+    setAppRunState({
+      status: 'ready',
+      type: app.app_type as 'dotnet' | 'npm',
+      projectFile: app.project_file,
+      command: app.command,
+    });
+    setShowAppSelector(false);
+    
+    // Persist selection
+    try {
+      const { saveSelectedApp } = await import('../utils/appSelection');
+      await saveSelectedApp(state.projectPath, app);
+    } catch (error) {
+      logError(`[AppRunner] Failed to save app selection: ${error}`);
+      // Non-fatal, continue without persistence
+    }
+  };
 
   // Handle Play button click
   const handlePlayClick = async () => {
@@ -1549,12 +1621,62 @@ const GenerateAppScreen: React.FC = () => {
                   </svg>
                 </div>
                 <p className="text-gray-300 mb-2">Ready to run</p>
-                <p className="text-sm text-gray-500">
+                
+                {/* App info with dropdown if multiple apps */}
+                <div className="text-sm text-gray-500">
                   Detected: {appRunState.type} app
                   {appRunState.projectFile && (
                     <><br /><span className="text-xs">{appRunState.projectFile}</span></>
                   )}
-                </p>
+                  
+                  {/* Dropdown for multiple apps */}
+                  {detectedApps.length > 1 && (
+                    <div className="relative inline-block mt-3" ref={appSelectorRef}>
+                      <button
+                        onClick={() => setShowAppSelector(!showAppSelector)}
+                        className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded text-xs transition-colors flex items-center gap-1"
+                      >
+                        <span>Switch app</span>
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      
+                      {showAppSelector && (
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg z-20 min-w-[280px] max-w-[400px]">
+                          {detectedApps.map((app, i) => {
+                            const isSelected = app.app_type === appRunState.type && app.project_file === appRunState.projectFile;
+                            const displayName = app.project_file || 'root';
+                            const commandHint = app.command || (app.app_type === 'dotnet' ? 'dotnet watch' : '');
+                            
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => handleSelectApp(app)}
+                                className={`w-full text-left px-4 py-3 hover:bg-zinc-700 transition-colors border-b border-zinc-700 last:border-b-0 first:rounded-t-lg last:rounded-b-lg ${
+                                  isSelected ? 'bg-zinc-700/50' : ''
+                                }`}
+                              >
+                                <div className={`font-medium text-sm ${isSelected ? 'text-blue-400' : 'text-zinc-200'}`}>
+                                  {displayName}
+                                  {isSelected && (
+                                    <svg className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <div className="text-xs text-zinc-500 mt-0.5">
+                                  {app.app_type}
+                                  {commandHint && ` • ${commandHint}`}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1630,6 +1752,54 @@ const GenerateAppScreen: React.FC = () => {
                   <p className="text-sm text-gray-400 font-mono mt-4 text-left bg-zinc-900 p-3 rounded">
                     {appRunState.errorMessage}
                   </p>
+                )}
+                
+                {/* Dropdown for multiple apps - allow switching after error */}
+                {detectedApps.length > 1 && (
+                  <div className="relative inline-block mt-4" ref={appSelectorRef}>
+                    <button
+                      onClick={() => setShowAppSelector(!showAppSelector)}
+                      className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded text-xs transition-colors flex items-center gap-1"
+                    >
+                      <span>Try different app</span>
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    
+                    {showAppSelector && (
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg z-20 min-w-[280px] max-w-[400px]">
+                        {detectedApps.map((app, i) => {
+                          const isSelected = app.app_type === appRunState.type && app.project_file === appRunState.projectFile;
+                          const displayName = app.project_file || 'root';
+                          const commandHint = app.command || (app.app_type === 'dotnet' ? 'dotnet watch' : '');
+                          
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => handleSelectApp(app)}
+                              className={`w-full text-left px-4 py-3 hover:bg-zinc-700 transition-colors border-b border-zinc-700 last:border-b-0 first:rounded-t-lg last:rounded-b-lg ${
+                                isSelected ? 'bg-zinc-700/50' : ''
+                              }`}
+                            >
+                              <div className={`font-medium text-sm ${isSelected ? 'text-blue-400' : 'text-zinc-200'}`}>
+                                {displayName}
+                                {isSelected && (
+                                  <svg className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                              <div className="text-xs text-zinc-500 mt-0.5">
+                                {app.app_type}
+                                {commandHint && ` • ${commandHint}`}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}

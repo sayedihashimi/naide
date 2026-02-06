@@ -93,6 +93,47 @@ pub fn detect_npm_app(project_path: &str) -> Result<Option<AppInfo>, String> {
     Ok(None)
 }
 
+/// Detect all runnable npm apps in the project.
+/// Returns a vector of all npm apps found (root and subdirectories).
+pub fn detect_all_npm_apps(project_path: &str) -> Result<Vec<AppInfo>, String> {
+    let project_dir = Path::new(project_path);
+    let mut apps = Vec::new();
+    
+    // Check project root first
+    let root_package_json = project_dir.join("package.json");
+    if root_package_json.exists() {
+        if let Some(script) = find_npm_script(&root_package_json)? {
+            log::info!("Found npm script '{}' in project root", script);
+            apps.push(AppInfo {
+                app_type: "npm".to_string(),
+                project_file: None,
+                command: Some(script),
+            });
+        }
+    }
+    
+    // Recursive search: find all package.json in subdirectories
+    let package_files = find_files_by_name(project_dir, "package.json")?;
+    for pkg_path in package_files {
+        if let Some(script) = find_npm_script(&pkg_path)? {
+            let pkg_dir = pkg_path.parent().unwrap_or(project_dir);
+            let relative_dir = pkg_dir
+                .strip_prefix(project_dir)
+                .unwrap_or(pkg_dir)
+                .to_string_lossy()
+                .to_string();
+            log::info!("Found npm script '{}' in subdirectory: {}", script, relative_dir);
+            apps.push(AppInfo {
+                app_type: "npm".to_string(),
+                project_file: Some(relative_dir),
+                command: Some(script),
+            });
+        }
+    }
+    
+    Ok(apps)
+}
+
 /// Detect if the project has a runnable .NET web app
 pub fn detect_dotnet_app(project_path: &str) -> Result<Option<AppInfo>, String> {
     let project_dir = Path::new(project_path);
@@ -118,6 +159,73 @@ pub fn detect_dotnet_app(project_path: &str) -> Result<Option<AppInfo>, String> 
     }
     
     Ok(None)
+}
+
+/// Detect all runnable .NET web apps in the project.
+/// Returns a vector of all .NET web apps found.
+pub fn detect_all_dotnet_apps(project_path: &str) -> Result<Vec<AppInfo>, String> {
+    let project_dir = Path::new(project_path);
+    let mut apps = Vec::new();
+    
+    // Look for .csproj files recursively
+    let csproj_files = find_files_with_extension(project_dir, "csproj")?;
+    
+    for csproj_path in csproj_files {
+        if is_web_project(&csproj_path)? {
+            let relative_path = csproj_path
+                .strip_prefix(project_dir)
+                .unwrap_or(&csproj_path)
+                .to_string_lossy()
+                .to_string();
+            
+            log::info!("Found .NET web app: {}", relative_path);
+            apps.push(AppInfo {
+                app_type: "dotnet".to_string(),
+                project_file: Some(relative_path),
+                command: None,
+            });
+        }
+    }
+    
+    Ok(apps)
+}
+
+/// Detect all runnable apps in the project (both npm and .NET).
+/// Returns a combined list sorted by type (npm first) and then by path depth.
+pub fn detect_all_runnable_apps(project_path: &str) -> Result<Vec<AppInfo>, String> {
+    let mut all_apps = Vec::new();
+    
+    // Collect all npm apps
+    let npm_apps = detect_all_npm_apps(project_path)?;
+    all_apps.extend(npm_apps);
+    
+    // Collect all .NET apps
+    let dotnet_apps = detect_all_dotnet_apps(project_path)?;
+    all_apps.extend(dotnet_apps);
+    
+    // Sort by type (npm first) and then by path depth (shallower first)
+    all_apps.sort_by(|a, b| {
+        // First compare by type (npm before dotnet)
+        let type_cmp = a.app_type.cmp(&b.app_type).reverse(); // npm > dotnet alphabetically
+        if type_cmp != std::cmp::Ordering::Equal {
+            return type_cmp;
+        }
+        
+        // Then by path depth (None first, then shorter paths)
+        match (&a.project_file, &b.project_file) {
+            (None, None) => std::cmp::Ordering::Equal,
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (Some(a_path), Some(b_path)) => {
+                let a_depth = a_path.matches(std::path::MAIN_SEPARATOR).count();
+                let b_depth = b_path.matches(std::path::MAIN_SEPARATOR).count();
+                a_depth.cmp(&b_depth)
+            }
+        }
+    });
+    
+    log::info!("Detected {} runnable apps total", all_apps.len());
+    Ok(all_apps)
 }
 
 /// Find all files with a given extension recursively
