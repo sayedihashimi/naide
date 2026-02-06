@@ -1,12 +1,12 @@
 ---
-Status: planned
+Status: implemented
 Area: ui, infra
 Created: 2026-02-06
 LastUpdated: 2026-02-06
 ---
 
 # Feature: App Selector Dropdown in Running App Panel
-**Status**: 🟡 PLANNED
+**Status**: ✅ IMPLEMENTED
 
 ## Summary
 When the project folder contains more than one runnable app (npm or .NET), display a dropdown selector in the "Running App" panel header so users can choose which app to run. The selected app is persisted in `.naide/project-config.json` and restored on next project load. The dropdown is only interactive when no app is running.

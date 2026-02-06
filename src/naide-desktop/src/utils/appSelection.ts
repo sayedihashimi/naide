@@ -1,6 +1,9 @@
 import { join } from '@tauri-apps/api/path';
 import { exists, readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
 
+// JSON indentation for consistency
+const JSON_INDENT = 2;
+
 // AppInfo interface matching the Rust backend
 export interface AppInfo {
   app_type: string;
@@ -73,7 +76,7 @@ export async function saveSelectedApp(projectPath: string, app: AppInfo): Promis
     // Update selectedApp field
     config.selectedApp = app;
     
-    const content = JSON.stringify(config, null, 2);
+    const content = JSON.stringify(config, null, JSON_INDENT);
     await writeTextFile(configPath, content);
     console.log('[AppSelection] Saved selected app:', app);
   } catch (error) {

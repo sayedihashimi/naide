@@ -217,8 +217,9 @@ pub fn detect_all_runnable_apps(project_path: &str) -> Result<Vec<AppInfo>, Stri
             (None, Some(_)) => std::cmp::Ordering::Less,
             (Some(_), None) => std::cmp::Ordering::Greater,
             (Some(a_path), Some(b_path)) => {
-                let a_depth = a_path.chars().filter(|&c| c == std::path::MAIN_SEPARATOR).count();
-                let b_depth = b_path.chars().filter(|&c| c == std::path::MAIN_SEPARATOR).count();
+                // Count both forward and back slashes for cross-platform compatibility
+                let a_depth = a_path.chars().filter(|&c| c == '/' || c == '\\').count();
+                let b_depth = b_path.chars().filter(|&c| c == '/' || c == '\\').count();
                 a_depth.cmp(&b_depth)
             }
         }
