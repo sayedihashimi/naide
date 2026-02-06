@@ -854,8 +854,8 @@ pub fn run() {
           .targets([
             tauri_plugin_log::Target::new(
               tauri_plugin_log::TargetKind::Folder {
-                path: log_dir,
-                file_name: Some(log_filename),
+                path: log_dir.clone(),
+                file_name: Some(log_filename.clone()),
               }
             ),
             tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
