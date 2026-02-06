@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
-import { saveLastProject, loadLastProject, clearLastProject, getSettingsFilePath, getRecentProjects, addRecentProject } from './globalSettings'
+import { saveLastProject, loadLastProject, clearLastProject, getSettingsFilePath, getRecentProjects, addRecentProject, removeRecentProject } from './globalSettings'
 
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
@@ -147,6 +147,27 @@ describe('globalSettings utilities', () => {
       
       // Should not throw
       await expect(addRecentProject('/path/to/project')).resolves.not.toThrow()
+      
+      expect(consoleError).toHaveBeenCalled()
+      consoleError.mockRestore()
+    })
+  })
+
+  describe('removeRecentProject', () => {
+    it('should invoke remove_recent_project_cmd command with path', async () => {
+      vi.mocked(invoke).mockResolvedValue(undefined)
+      
+      await removeRecentProject('/path/to/project')
+      
+      expect(invoke).toHaveBeenCalledWith('remove_recent_project_cmd', { path: '/path/to/project' })
+    })
+
+    it('should handle errors gracefully', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(invoke).mockRejectedValue(new Error('Remove failed'))
+      
+      // Should not throw
+      await expect(removeRecentProject('/path/to/project')).resolves.not.toThrow()
       
       expect(consoleError).toHaveBeenCalled()
       consoleError.mockRestore()

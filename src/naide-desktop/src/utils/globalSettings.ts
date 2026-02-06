@@ -103,3 +103,17 @@ export async function addRecentProject(path: string): Promise<void> {
     // Non-fatal: log but don't throw to allow app to continue
   }
 }
+
+/**
+ * Remove a project from the recent projects list.
+ * Does NOT modify the project folder on disk.
+ * @param path - Absolute path of the project to remove
+ */
+export async function removeRecentProject(path: string): Promise<void> {
+  try {
+    await invoke('remove_recent_project_cmd', { path });
+    console.log('[GlobalSettings] Removed from recent projects:', path);
+  } catch (error) {
+    console.error('[GlobalSettings] Error removing from recent projects:', error);
+  }
+}

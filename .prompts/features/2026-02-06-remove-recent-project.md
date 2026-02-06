@@ -1,12 +1,12 @@
 ---
-Status: planned
+Status: implemented
 Area: ui, settings
 Created: 2026-02-06
 LastUpdated: 2026-02-06
 ---
 
 # Feature: Remove Project from Recent Projects List
-**Status**: 🟡 PLANNED
+**Status**: ✅ IMPLEMENTED
 
 ## Summary
 Add a trash can icon to each entry in the Recent Projects dropdown so users can remove projects from the list. Removal only affects the stored list—it does **not** modify the project folder on disk. The trash icon is hidden for the currently loaded project.

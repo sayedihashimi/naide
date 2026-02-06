@@ -10,7 +10,7 @@ use notify::{Watcher, RecursiveMode, recommended_watcher, Event, EventKind};
 use std::sync::mpsc::channel;
 
 mod settings;
-use settings::{LastProject, read_settings, write_settings, add_recent_project, get_recent_projects as get_recent_projects_from_settings};
+use settings::{LastProject, read_settings, write_settings, add_recent_project, remove_recent_project, get_recent_projects as get_recent_projects_from_settings};
 
 mod app_runner;
 use app_runner::{detect_dotnet_app, detect_npm_app, detect_all_runnable_apps, start_dotnet_app, start_npm_app, wait_for_url, AppInfo, RunningAppInfo};
@@ -152,6 +152,17 @@ async fn add_recent_project_cmd(app: tauri::AppHandle, path: String) -> Result<(
     write_settings(&app, &settings)?;
     
     println!("[Settings] Added to recent projects: {}", path);
+    Ok(())
+}
+
+// Tauri command: Remove a project from recent projects
+#[tauri::command]
+async fn remove_recent_project_cmd(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    println!("[Settings] remove_recent_project called with path: {}", path);
+    let mut settings = read_settings(&app)?;
+    remove_recent_project(&mut settings, &path);
+    write_settings(&app, &settings)?;
+    println!("[Settings] Removed from recent projects: {}", path);
     Ok(())
 }
 
@@ -964,6 +975,7 @@ pub fn run() {
       get_settings_file_path,
       get_recent_projects,
       add_recent_project_cmd,
+      remove_recent_project_cmd,
       log_to_file,
       list_feature_files,
       read_feature_file,

@@ -104,6 +104,26 @@ pub fn add_recent_project(settings: &mut GlobalSettings, path: String, timestamp
     }
 }
 
+/// Remove a project from the recent projects list.
+/// Also clears last_used_project if it matches the removed path.
+pub fn remove_recent_project(settings: &mut GlobalSettings, path: &str) {
+    #[cfg(target_os = "windows")]
+    settings.recent_projects.retain(|p| !p.path.eq_ignore_ascii_case(path));
+    #[cfg(not(target_os = "windows"))]
+    settings.recent_projects.retain(|p| p.path != path);
+
+    if let Some(ref last) = settings.last_used_project {
+        #[cfg(target_os = "windows")]
+        let matches = last.path.eq_ignore_ascii_case(path);
+        #[cfg(not(target_os = "windows"))]
+        let matches = last.path == path;
+
+        if matches {
+            settings.last_used_project = None;
+        }
+    }
+}
+
 /// Get recent projects sorted by last_accessed (most recent first)
 pub fn get_recent_projects(settings: &GlobalSettings) -> Vec<LastProject> {
     settings.recent_projects.clone()
@@ -184,5 +204,42 @@ mod tests {
         assert_eq!(recent.len(), 2);
         assert_eq!(recent[0].path, "/path/to/project2");
         assert_eq!(recent[1].path, "/path/to/project1");
+    }
+
+    #[test]
+    fn test_remove_recent_project() {
+        let mut settings = GlobalSettings::default();
+        add_recent_project(&mut settings, "/path/to/project1".to_string(), "2026-01-31T10:00:00Z".to_string());
+        add_recent_project(&mut settings, "/path/to/project2".to_string(), "2026-01-31T11:00:00Z".to_string());
+        add_recent_project(&mut settings, "/path/to/project3".to_string(), "2026-01-31T12:00:00Z".to_string());
+        assert_eq!(settings.recent_projects.len(), 3);
+
+        remove_recent_project(&mut settings, "/path/to/project2");
+        assert_eq!(settings.recent_projects.len(), 2);
+        assert_eq!(settings.recent_projects[0].path, "/path/to/project3");
+        assert_eq!(settings.recent_projects[1].path, "/path/to/project1");
+    }
+
+    #[test]
+    fn test_remove_recent_project_clears_last_used() {
+        let mut settings = GlobalSettings::default();
+        settings.last_used_project = Some(LastProject {
+            path: "/path/to/project1".to_string(),
+            last_accessed: "2026-01-31T10:00:00Z".to_string(),
+        });
+        add_recent_project(&mut settings, "/path/to/project1".to_string(), "2026-01-31T10:00:00Z".to_string());
+
+        remove_recent_project(&mut settings, "/path/to/project1");
+        assert_eq!(settings.recent_projects.len(), 0);
+        assert!(settings.last_used_project.is_none());
+    }
+
+    #[test]
+    fn test_remove_recent_project_not_in_list() {
+        let mut settings = GlobalSettings::default();
+        add_recent_project(&mut settings, "/path/to/project1".to_string(), "2026-01-31T10:00:00Z".to_string());
+
+        remove_recent_project(&mut settings, "/path/to/nonexistent");
+        assert_eq!(settings.recent_projects.len(), 1);
     }
 }

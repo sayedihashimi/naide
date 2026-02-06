@@ -17,7 +17,7 @@ import AppSelectorDropdown from '../components/AppSelectorDropdown';
 import type { FeatureFileNode } from '../utils/featureFiles';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
-import { getRecentProjects, saveLastProject, type LastProject } from '../utils/globalSettings';
+import { getRecentProjects, saveLastProject, removeRecentProject, type LastProject } from '../utils/globalSettings';
 import { logInfo, logError } from '../utils/logger';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
@@ -1165,15 +1165,37 @@ const GenerateAppScreen: React.FC = () => {
                 <div className="py-2">
                   {recentProjects.map((project, index) => {
                     const projectName = project.path.split(/[/\\]/).pop() || project.path;
+                    const isCurrentProject = state.projectPath === project.path;
                     return (
-                      <button
+                      <div
                         key={index}
-                        onClick={() => handleSelectRecentProject(project.path)}
-                        className="w-full px-4 py-2 text-left hover:bg-zinc-700 transition-colors text-gray-100 flex flex-col"
+                        className="flex items-center hover:bg-zinc-700 transition-colors group"
                       >
-                        <span className="text-sm font-medium">{projectName}</span>
-                        <span className="text-xs text-gray-400 truncate">{project.path}</span>
-                      </button>
+                        <button
+                          onClick={() => handleSelectRecentProject(project.path)}
+                          className="flex-1 px-4 py-2 text-left text-gray-100 flex flex-col min-w-0"
+                        >
+                          <span className="text-sm font-medium">{projectName}</span>
+                          <span className="text-xs text-gray-400 truncate">{project.path}</span>
+                        </button>
+                        {!isCurrentProject && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await removeRecentProject(project.path);
+                              setRecentProjects(prev => prev.filter(p => p.path !== project.path));
+                            }}
+                            className="px-3 py-2 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Remove from recent projects"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18"/>
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
