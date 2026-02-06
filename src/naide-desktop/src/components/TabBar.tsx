@@ -116,7 +116,7 @@ const TabBar: React.FC<TabBarProps> = ({
             >
               {/* Tab label */}
               <span 
-                className={`flex-1 truncate text-sm ${tab.isTemporary ? 'italic' : ''}`}
+                className="flex-1 truncate text-sm"
                 title={tab.label}
               >
                 {tab.label}

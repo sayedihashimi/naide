@@ -922,9 +922,9 @@ const GenerateAppScreen: React.FC = () => {
     }
   };
 
-  const handleFeatureFileSelect = (file: FeatureFileNode, clickType: 'single' | 'double') => {
-    const isPinned = clickType === 'double';
-    handleOpenFeatureTab(file, isPinned);
+  const handleFeatureFileSelect = (file: FeatureFileNode) => {
+    // Always open as pinned tab (no more temporary/preview tabs)
+    handleOpenFeatureTab(file, true);
   };
 
   const handleOpenFeatureTab = (file: FeatureFileNode, isPinned: boolean) => {
@@ -933,15 +933,7 @@ const GenerateAppScreen: React.FC = () => {
     // Check if tab already exists
     const existingTab = tabs.find(t => t.id === tabId);
     if (existingTab) {
-      // If double-clicking an existing temporary tab, promote it to pinned
-      if (isPinned && existingTab.isTemporary) {
-        setTabs(tabs.map(t => 
-          t.id === tabId 
-            ? { ...t, isPinned: true, isTemporary: false }
-            : t
-        ));
-      }
-      // Switch to the existing tab
+      // Just switch to the existing tab
       setActiveTabId(tabId);
       setSelectedFeaturePath(file.path);
       return;
@@ -949,38 +941,23 @@ const GenerateAppScreen: React.FC = () => {
     
     // Check if we're at max tabs (10 total)
     const MAX_TABS = 10;
-    let newTabs = [...tabs];
-    
-    if (newTabs.length >= MAX_TABS) {
-      // Try to replace a temporary tab
-      const tempTabIndex = newTabs.findIndex(t => t.type === 'feature-file' && t.isTemporary);
-      if (tempTabIndex >= 0) {
-        // Replace the temporary tab
-        newTabs.splice(tempTabIndex, 1);
-      } else {
-        // All tabs are pinned, show warning
-        alert('Maximum tabs reached. Close a tab to open another file.');
-        return;
-      }
+    if (tabs.length >= MAX_TABS) {
+      alert('Maximum tabs reached. Close a tab to open another file.');
+      return;
     }
     
-    // If opening a new temporary tab, close existing temporary tab
-    if (!isPinned) {
-      newTabs = newTabs.filter(t => !t.isTemporary);
-    }
-    
-    // Create new tab
+    // Create new tab (always pinned, no more temporary tabs)
     const newTab: Tab = {
       id: tabId,
       type: 'feature-file',
       label: file.name,
       filePath: file.path,
-      isPinned,
-      isTemporary: !isPinned,
+      isPinned: true,
+      isTemporary: false,
       hasUnsavedChanges: false,
     };
     
-    newTabs.push(newTab);
+    const newTabs = [...tabs, newTab];
     setTabs(newTabs);
     setActiveTabId(tabId);
     setSelectedFeaturePath(file.path);
@@ -997,27 +974,29 @@ const GenerateAppScreen: React.FC = () => {
   };
 
   const handleCloseTab = (tabId: string) => {
-    setTabs((currentTabs) => {
-      const tab = currentTabs.find(t => t.id === tabId);
-      if (!tab || tab.type === 'chat') {
-        return currentTabs; // Don't close chat tab
+    // Find the tab first to check for unsaved changes
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab || tab.type === 'chat') {
+      return; // Don't close chat tab
+    }
+    
+    // Check for unsaved changes (do this BEFORE setState)
+    if (tab.hasUnsavedChanges) {
+      if (!confirm('You have unsaved changes. Discard?')) {
+        return;
       }
-      
-      // Check for unsaved changes
-      if (tab.hasUnsavedChanges) {
-        if (!confirm('You have unsaved changes. Discard?')) {
-          return currentTabs;
-        }
-      }
-      
-      // Remove the tab
-      const newTabs = currentTabs.filter(t => t.id !== tabId);
-      
-      // If closing the active tab, switch to another tab
-      if (activeTabId === tabId) {
-        // Find the tab to activate (prefer the one to the left, or the first one)
-        const closedIndex = currentTabs.findIndex(t => t.id === tabId);
-        const newActiveTab = newTabs[Math.max(0, closedIndex - 1)] || newTabs[0];
+    }
+    
+    // Now update state
+    const newTabs = tabs.filter(t => t.id !== tabId);
+    setTabs(newTabs);
+    
+    // If closing the active tab, switch to another tab
+    if (activeTabId === tabId) {
+      // Find the tab to activate (prefer the one to the left, or the first one)
+      const closedIndex = tabs.findIndex(t => t.id === tabId);
+      const newActiveTab = newTabs[Math.max(0, closedIndex - 1)] || newTabs[0];
+      if (newActiveTab) {
         setActiveTabId(newActiveTab.id);
         if (newActiveTab.type === 'feature-file') {
           setSelectedFeaturePath(newActiveTab.filePath || null);
@@ -1025,32 +1004,26 @@ const GenerateAppScreen: React.FC = () => {
           setSelectedFeaturePath(null);
         }
       }
-      
-      return newTabs;
-    });
+    }
   };
 
   const handleCloseAllTabs = () => {
-    setTabs((currentTabs) => {
-      // Check if any tabs have unsaved changes
-      const tabsWithChanges = currentTabs.filter(t => t.type === 'feature-file' && t.hasUnsavedChanges);
-      if (tabsWithChanges.length > 0) {
-        const fileNames = tabsWithChanges.map(t => t.label).join(', ');
-        if (!confirm(`You have unsaved changes in: ${fileNames}. Discard all?`)) {
-          return currentTabs;
-        }
+    // Check if any tabs have unsaved changes (do this BEFORE setState)
+    const tabsWithChanges = tabs.filter(t => t.type === 'feature-file' && t.hasUnsavedChanges);
+    if (tabsWithChanges.length > 0) {
+      const fileNames = tabsWithChanges.map(t => t.label).join(', ');
+      if (!confirm(`You have unsaved changes in: ${fileNames}. Discard all?`)) {
+        return;
       }
-      
-      // Close all feature file tabs, keep only chat tab
-      const chatTab = currentTabs.find(t => t.type === 'chat');
-      if (chatTab) {
-        setActiveTabId(chatTab.id);
-        setSelectedFeaturePath(null);
-        return [chatTab];
-      }
-      
-      return currentTabs;
-    });
+    }
+    
+    // Close all feature file tabs, keep only chat tab
+    const chatTab = tabs.find(t => t.type === 'chat');
+    if (chatTab) {
+      setTabs([chatTab]);
+      setActiveTabId(chatTab.id);
+      setSelectedFeaturePath(null);
+    }
   };
 
   // Helper function to reset tabs to just the chat tab (used when switching projects)
