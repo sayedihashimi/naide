@@ -1115,6 +1115,7 @@ const GenerateAppScreen: React.FC = () => {
 
   // Load tabs from project config
   const loadTabsFromProject = async (projectPath: string) => {
+    logInfo(`[TabLoad] loadTabsFromProject called for: ${projectPath}`);
     try {
       const savedState = await loadOpenTabs(projectPath);
       
@@ -1122,6 +1123,8 @@ const GenerateAppScreen: React.FC = () => {
         logInfo('[TabPersistence] No saved tabs found');
         return;
       }
+      
+      logInfo(`[TabLoad] Found saved tabs: ${JSON.stringify(savedState.tabs.map(t => ({ id: t.id, label: t.label })))}`);
       
       // Validate that files still exist by checking if they're feature files
       // Convert persisted tabs back to full Tab format
@@ -1137,6 +1140,7 @@ const GenerateAppScreen: React.FC = () => {
       );
       
       if (validTabs.length > 0) {
+        logInfo(`[TabLoad] Setting tabs to ${validTabs.length} restored tabs`);
         setTabs(validTabs);
         
         // Restore active tab if it still exists, otherwise default to chat
@@ -1163,6 +1167,7 @@ const GenerateAppScreen: React.FC = () => {
   };
 
   const handleTabContentChange = (tabId: string, hasChanges: boolean) => {
+    logInfo(`[TabUpdate] handleTabContentChange called: tabId=${tabId}, hasChanges=${hasChanges}`);
     setTabs(tabs.map(t => 
       t.id === tabId 
         ? { ...t, hasUnsavedChanges: hasChanges }
@@ -1171,6 +1176,7 @@ const GenerateAppScreen: React.FC = () => {
   };
 
   const handleTabSave = (tabId: string) => {
+    logInfo(`[TabUpdate] handleTabSave called: tabId=${tabId}`);
     // Promote to pinned if temporary
     setTabs(tabs.map(t => 
       t.id === tabId 
@@ -1180,6 +1186,7 @@ const GenerateAppScreen: React.FC = () => {
   };
 
   const handleTabStartEdit = (tabId: string) => {
+    logInfo(`[TabUpdate] handleTabStartEdit called: tabId=${tabId}`);
     // Promote to pinned if temporary
     setTabs(tabs.map(t => 
       t.id === tabId 
