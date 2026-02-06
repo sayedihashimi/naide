@@ -146,12 +146,12 @@ const GenerateAppScreen: React.FC = () => {
   // Update refs when state changes
   useEffect(() => {
     tabsRef.current = tabs;
-    console.log('[TabState] Tabs updated:', tabs.map(t => ({ id: t.id, label: t.label, type: t.type })));
+    logInfo(`[TabState] Tabs updated: ${JSON.stringify(tabs.map(t => ({ id: t.id, label: t.label, type: t.type })))}`);
   }, [tabs]);
   
   useEffect(() => {
     activeTabIdRef.current = activeTabId;
-    console.log('[TabState] Active tab updated:', activeTabId);
+    logInfo(`[TabState] Active tab updated: ${activeTabId}`);
   }, [activeTabId]);
   
   // Right column resize state
@@ -991,45 +991,45 @@ const GenerateAppScreen: React.FC = () => {
   };
 
   const handleCloseTab = (tabId: string) => {
-    console.log('[TabClose] ========== handleCloseTab called ==========');
-    console.log('[TabClose] tabId:', tabId);
-    console.log('[TabClose] Current tabs array:', tabs.map(t => ({ id: t.id, label: t.label, type: t.type })));
-    console.log('[TabClose] activeTabId:', activeTabId);
+    logInfo('[TabClose] ========== handleCloseTab called ==========');
+    logInfo(`[TabClose] tabId: ${tabId}`);
+    logInfo(`[TabClose] Current tabs array: ${JSON.stringify(tabs.map(t => ({ id: t.id, label: t.label, type: t.type })))}`);
+    logInfo(`[TabClose] activeTabId: ${activeTabId}`);
     
     // Step 1: Check if we can close the tab (synchronous checks)
     const tabToClose = tabs.find(t => t.id === tabId);
-    console.log('[TabClose] Found tab to close:', tabToClose ? { id: tabToClose.id, label: tabToClose.label, type: tabToClose.type } : 'NULL');
+    logInfo(`[TabClose] Found tab to close: ${tabToClose ? JSON.stringify({ id: tabToClose.id, label: tabToClose.label, type: tabToClose.type }) : 'NULL'}`);
     
     if (!tabToClose || tabToClose.type === 'chat') {
-      console.log('[TabClose] ABORT: Tab not found or is chat tab');
+      logInfo('[TabClose] ABORT: Tab not found or is chat tab');
       return; // Don't close chat tab
     }
     
     // Check for unsaved changes
     if (tabToClose.hasUnsavedChanges) {
-      console.log('[TabClose] Tab has unsaved changes, showing confirm dialog');
+      logInfo('[TabClose] Tab has unsaved changes, showing confirm dialog');
       if (!confirm('You have unsaved changes. Discard?')) {
-        console.log('[TabClose] ABORT: User cancelled');
+        logInfo('[TabClose] ABORT: User cancelled');
         return; // User cancelled
       }
     }
     
     // Step 2: Remove the tab
     const newTabs = tabs.filter(t => t.id !== tabId);
-    console.log('[TabClose] newTabs after filter:', newTabs.map(t => ({ id: t.id, label: t.label })));
-    console.log('[TabClose] Calling setTabs with', newTabs.length, 'tabs');
+    logInfo(`[TabClose] newTabs after filter: ${JSON.stringify(newTabs.map(t => ({ id: t.id, label: t.label })))}`);
+    logInfo(`[TabClose] Calling setTabs with ${newTabs.length} tabs`);
     setTabs(newTabs);
-    console.log('[TabClose] setTabs called');
+    logInfo('[TabClose] setTabs called');
     
     // Step 3: Handle active tab switching if needed
     if (activeTabId === tabId) {
-      console.log('[TabClose] Closing active tab, need to switch');
+      logInfo('[TabClose] Closing active tab, need to switch');
       const closedIndex = tabs.findIndex(t => t.id === tabId);
-      console.log('[TabClose] closedIndex:', closedIndex);
+      logInfo(`[TabClose] closedIndex: ${closedIndex}`);
       const newActiveTab = newTabs[Math.max(0, closedIndex - 1)] || newTabs[0];
-      console.log('[TabClose] newActiveTab:', newActiveTab ? { id: newActiveTab.id, label: newActiveTab.label } : 'NULL');
+      logInfo(`[TabClose] newActiveTab: ${newActiveTab ? JSON.stringify({ id: newActiveTab.id, label: newActiveTab.label }) : 'NULL'}`);
       if (newActiveTab) {
-        console.log('[TabClose] Setting active tab to:', newActiveTab.id);
+        logInfo(`[TabClose] Setting active tab to: ${newActiveTab.id}`);
         setActiveTabId(newActiveTab.id);
         if (newActiveTab.type === 'feature-file') {
           setSelectedFeaturePath(newActiveTab.filePath || null);
@@ -1038,10 +1038,10 @@ const GenerateAppScreen: React.FC = () => {
         }
       }
     } else {
-      console.log('[TabClose] Not closing active tab, no need to switch');
+      logInfo('[TabClose] Not closing active tab, no need to switch');
     }
     
-    console.log('[TabClose] ========== handleCloseTab completed ==========');
+    logInfo('[TabClose] ========== handleCloseTab completed ==========');
   };
 
   const handleCloseAllTabs = () => {

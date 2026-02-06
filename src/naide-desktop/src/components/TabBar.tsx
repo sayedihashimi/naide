@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { logInfo } from '../utils/logger';
 
 export interface Tab {
   id: string;                    // Unique ID (e.g., file path or 'generate-app')
@@ -79,13 +80,13 @@ const TabBar: React.FC<TabBarProps> = ({
   };
 
   const handleCloseTab = (tabId: string) => {
-    console.log('[TabBar] handleCloseTab called with tabId:', tabId);
+    logInfo(`[TabBar] handleCloseTab called with tabId: ${tabId}`);
     onTabClose(tabId);
     setContextMenu(null);
   };
 
   const handleCloseAll = () => {
-    console.log('[TabBar] handleCloseAll called');
+    logInfo('[TabBar] handleCloseAll called');
     onTabCloseAll();
     setContextMenu(null);
   };
@@ -133,7 +134,7 @@ const TabBar: React.FC<TabBarProps> = ({
               {canClose && (isHovered || isActive) && (
                 <button
                   onClick={(e) => {
-                    console.log('[TabBar] Close button clicked for tab:', tab.id);
+                    logInfo(`[TabBar] Close button clicked for tab: ${tab.id}`);
                     e.stopPropagation();
                     handleCloseTab(tab.id);
                   }}
