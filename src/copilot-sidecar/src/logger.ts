@@ -6,29 +6,44 @@ let logFilePath: string | null = null;
 
 /**
  * Initialize the file logger
- * Creates log directory and file with timestamp
+ * Reuses log file from Tauri if NAIDE_LOG_FILE env var is set,
+ * otherwise creates a new log file with timestamp
  */
 export function initializeLogger(): void {
   try {
-    // Get log directory: %temp%/com.naide.desktop/logs
-    const tempDir = tmpdir();
-    const logDir = join(tempDir, 'com.naide.desktop', 'logs');
+    // Check if Tauri passed us a log file path via environment variable
+    const tauriLogFile = process.env.NAIDE_LOG_FILE;
     
-    // Create log directory if it doesn't exist
-    if (!existsSync(logDir)) {
-      mkdirSync(logDir, { recursive: true });
+    if (tauriLogFile) {
+      // Reuse the log file created by Tauri
+      logFilePath = tauriLogFile;
+      
+      // Append initial log entry
+      const initMessage = `[${new Date().toISOString()}] [Sidecar] Log initialized (shared with Tauri): ${logFilePath}\n`;
+      appendFileSync(logFilePath, initMessage, 'utf-8');
+      
+      console.log(`[Sidecar] File logging initialized (shared): ${logFilePath}`);
+    } else {
+      // Fallback: Create our own log file (for standalone sidecar runs)
+      const tempDir = tmpdir();
+      const logDir = join(tempDir, 'com.naide.desktop', 'logs');
+      
+      // Create log directory if it doesn't exist
+      if (!existsSync(logDir)) {
+        mkdirSync(logDir, { recursive: true });
+      }
+      
+      // Generate timestamped log filename: naide-2026-02-01T03-30-28.log
+      const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+      const logFilename = `naide-${timestamp}.log`;
+      logFilePath = join(logDir, logFilename);
+      
+      // Write initial log entry
+      const initMessage = `[${new Date().toISOString()}] [Sidecar] Log initialized (standalone): ${logFilePath}\n`;
+      writeFileSync(logFilePath, initMessage, 'utf-8');
+      
+      console.log(`[Sidecar] File logging initialized (standalone): ${logFilePath}`);
     }
-    
-    // Generate timestamped log filename: naide-2026-02-01T03-30-28.log
-    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
-    const logFilename = `naide-${timestamp}.log`;
-    logFilePath = join(logDir, logFilename);
-    
-    // Write initial log entry
-    const initMessage = `[${new Date().toISOString()}] [Sidecar] Log initialized: ${logFilePath}\n`;
-    writeFileSync(logFilePath, initMessage, 'utf-8');
-    
-    console.log(`[Sidecar] File logging initialized: ${logFilePath}`);
   } catch (error) {
     console.error('[Sidecar] Failed to initialize file logger:', error);
     logFilePath = null;
