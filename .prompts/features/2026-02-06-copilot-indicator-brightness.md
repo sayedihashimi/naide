@@ -31,7 +31,7 @@ useEffect(() => {
   
   let phaseCounter = 0;
   const timerId = setInterval(() => {
-    phaseCounter += 0.08;
+    phaseCounter = (phaseCounter + 0.08) % 2;
     const waveValue = Math.sin(phaseCounter * Math.PI) * 0.35 + 0.65;
     setVisualIntensity(waveValue);
   }, 180);
@@ -42,17 +42,27 @@ useEffect(() => {
 
 **Approach**:
 - Uses `Math.sin()` with a phase counter to create smooth cycling
+- Phase counter uses modulo `% 2` to prevent unbounded growth during long operations
 - Value oscillates between 0.65 and 1.0 (65% to 100% intensity)
 - Updates every 180ms for smooth visual effect
 - Automatically stops when `isLoading` becomes false
 
 #### Visual Application
 
-The brightness effect is applied through inline styles using computed RGB values:
+The brightness effect is applied through inline styles using a helper function for RGB computation:
 
 ```typescript
+// Helper function to compute pulsing blue shade based on intensity
+const computePulsingBlueColor = (intensity: number): string => {
+  const r = Math.floor(37 + (59 - 37) * intensity);
+  const g = Math.floor(99 + (130 - 99) * intensity);
+  const b = Math.floor(235 + (246 - 235) * intensity);
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
+// Usage in component
 const computedBlueShade = applyWorkingVisual 
-  ? `rgb(${Math.floor(37 + (59 - 37) * visualIntensity)}, ${Math.floor(99 + (130 - 99) * visualIntensity)}, ${Math.floor(235 + (246 - 235) * visualIntensity)})`
+  ? computePulsingBlueColor(visualIntensity)
   : 'rgb(37, 99, 235)';
 ```
 
@@ -60,6 +70,7 @@ const computedBlueShade = applyWorkingVisual
 - Base: `rgb(37, 99, 235)` (blue-600)
 - Peak: `rgb(59, 130, 246)` (blue-500)
 - Interpolates between these shades based on `visualIntensity`
+- Helper function prevents duplication and improves maintainability
 
 Both the `backgroundColor` and `opacity` properties are modulated to create the pulsing effect.
 
