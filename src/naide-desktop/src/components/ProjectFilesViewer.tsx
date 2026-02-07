@@ -222,10 +222,15 @@ const ProjectFilesViewer: React.FC<ProjectFilesViewerProps> = ({ onFileSelect })
                     !node.is_folder ? 'hover:text-gray-200' : ''
                   }`}
                   style={{ paddingLeft: `${depth * 12 + 8}px` }}
-                  onClick={() => {
+                  onClick={(e) => {
                     if (node.is_folder) {
                       handleFolderToggle(node.path);
-                    } else {
+                    }
+                    // Single click on files does nothing (double-click opens them)
+                  }}
+                  onDoubleClick={(e) => {
+                    if (!node.is_folder) {
+                      e.stopPropagation();
                       handleFileClick(node);
                     }
                   }}

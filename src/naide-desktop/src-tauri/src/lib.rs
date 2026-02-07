@@ -401,6 +401,38 @@ async fn write_feature_file(project_path: String, file_path: String, content: St
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
+// Tauri command: Write project file content
+#[tauri::command]
+async fn write_project_file(project_path: String, file_path: String, content: String) -> Result<(), String> {
+    let full_path = PathBuf::from(&project_path).join(&file_path);
+    
+    // Security check: ensure the path is within the project directory
+    let base_dir = PathBuf::from(&project_path);
+    
+    // For write operations, we need to handle paths that might not exist yet
+    // So we'll check the parent directory instead
+    let parent = full_path.parent()
+        .ok_or_else(|| "Invalid file path: no parent directory".to_string())?;
+    
+    // Ensure parent directory exists
+    if !parent.exists() {
+        return Err("Parent directory does not exist".to_string());
+    }
+    
+    let canonical_parent = parent.canonicalize()
+        .map_err(|e| format!("Invalid parent directory: {}", e))?;
+    let canonical_base_dir = base_dir.canonicalize()
+        .map_err(|e| format!("Invalid base directory: {}", e))?;
+    
+    if !canonical_parent.starts_with(&canonical_base_dir) {
+        return Err("Access denied: path outside of project directory".to_string());
+    }
+    
+    // Write the file
+    fs::write(&full_path, content)
+        .map_err(|e| format!("Failed to write file: {}", e))
+}
+
 // Chat session metadata structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ChatSessionMetadata {
@@ -983,6 +1015,8 @@ pub fn run() {
       list_feature_files,
       read_feature_file,
       write_feature_file,
+      read_project_file,
+      write_project_file,
       list_chat_sessions,
       load_chat_session_file,
       delete_chat_session,

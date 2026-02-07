@@ -13,10 +13,12 @@ import FeatureFilesViewer from '../components/FeatureFilesViewer';
 import ProjectFilesViewer from '../components/ProjectFilesViewer';
 import TabBar, { type Tab } from '../components/TabBar';
 import FeatureFileTab from '../components/FeatureFileTab';
+import ProjectFileTab from '../components/ProjectFileTab';
 import ChatHistoryDropdown from '../components/ChatHistoryDropdown';
 import ActivityStatusBar from '../components/ActivityStatusBar';
 import AppSelectorDropdown from '../components/AppSelectorDropdown';
 import type { FeatureFileNode } from '../utils/featureFiles';
+import type { ProjectFileNode } from '../utils/projectFiles';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, removeRecentProject, type LastProject } from '../utils/globalSettings';
@@ -949,6 +951,11 @@ const GenerateAppScreen: React.FC = () => {
     handleOpenFeatureTab(file, true);
   };
 
+  const handleProjectFileSelect = (file: ProjectFileNode) => {
+    // Always open as pinned tab
+    handleOpenProjectTab(file, true);
+  };
+
   const handleOpenFeatureTab = (file: FeatureFileNode, isPinned: boolean) => {
     const tabId = file.path; // Use file path as unique tab ID
     
@@ -983,6 +990,40 @@ const GenerateAppScreen: React.FC = () => {
     setTabs(newTabs);
     setActiveTabId(tabId);
     setSelectedFeaturePath(file.path);
+  };
+
+  const handleOpenProjectTab = (file: ProjectFileNode, isPinned: boolean) => {
+    const tabId = 'project:' + file.path; // Use "project:" prefix + file path as unique tab ID
+    
+    // Check if tab already exists
+    const existingTab = tabs.find(t => t.id === tabId);
+    if (existingTab) {
+      // Just switch to the existing tab
+      setActiveTabId(tabId);
+      return;
+    }
+    
+    // Check if we're at max tabs (10 total)
+    const MAX_TABS = 10;
+    if (tabs.length >= MAX_TABS) {
+      alert('Maximum tabs reached. Close a tab to open another file.');
+      return;
+    }
+    
+    // Create new tab (always pinned, no more temporary tabs)
+    const newTab: Tab = {
+      id: tabId,
+      type: 'project-file',
+      label: file.name,
+      filePath: file.path,
+      isPinned: true,
+      isTemporary: false,
+      hasUnsavedChanges: false,
+    };
+    
+    const newTabs = [...tabs, newTab];
+    setTabs(newTabs);
+    setActiveTabId(tabId);
   };
 
   const handleTabSelect = (tabId: string) => {
@@ -1542,7 +1583,7 @@ const GenerateAppScreen: React.FC = () => {
           
           {/* Files Section */}
           <div className="flex-1 overflow-hidden">
-            <ProjectFilesViewer />
+            <ProjectFilesViewer onFileSelect={handleProjectFileSelect} />
           </div>
         </div>
 
@@ -1823,6 +1864,27 @@ const GenerateAppScreen: React.FC = () => {
             >
               {state.projectPath && tab.filePath && (
                 <FeatureFileTab
+                  filePath={tab.filePath}
+                  fileName={tab.label}
+                  projectPath={state.projectPath}
+                  isActive={activeTabId === tab.id}
+                  onContentChange={(hasChanges) => handleTabContentChange(tab.id, hasChanges)}
+                  onSave={() => handleTabSave(tab.id)}
+                  onStartEdit={() => handleTabStartEdit(tab.id)}
+                />
+              )}
+            </div>
+          ))}
+
+          {/* Project File Tabs Content */}
+          {tabs.filter(t => t.type === 'project-file').map(tab => (
+            <div 
+              key={tab.id}
+              className="flex-1 overflow-hidden"
+              style={{ display: activeTabId === tab.id ? 'flex' : 'none' }}
+            >
+              {state.projectPath && tab.filePath && (
+                <ProjectFileTab
                   filePath={tab.filePath}
                   fileName={tab.label}
                   projectPath={state.projectPath}
