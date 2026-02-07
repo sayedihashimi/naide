@@ -80,7 +80,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({
   
   return (
     <button
-      onClick={() => onFileSelect(node)}
+      onDoubleClick={() => onFileSelect(node)}
       className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded transition-colors ${
         isSelected
           ? 'bg-blue-600 text-white'

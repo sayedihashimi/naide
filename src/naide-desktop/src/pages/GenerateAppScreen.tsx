@@ -10,7 +10,8 @@ import {
 } from '../utils/conversationMemory';
 import MessageContent from '../components/MessageContent';
 import FeatureFilesViewer from '../components/FeatureFilesViewer';
-import FeatureFilePopup from '../components/FeatureFilePopup';
+import TabBar, { type Tab } from '../components/TabBar';
+import FeatureFileTab from '../components/FeatureFileTab';
 import ChatHistoryDropdown from '../components/ChatHistoryDropdown';
 import ActivityStatusBar from '../components/ActivityStatusBar';
 import AppSelectorDropdown from '../components/AppSelectorDropdown';
@@ -19,6 +20,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, removeRecentProject, type LastProject } from '../utils/globalSettings';
 import { logInfo, logError } from '../utils/logger';
+import { loadOpenTabs, saveOpenTabs, type PersistedTab } from '../utils/tabPersistence';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -128,15 +130,30 @@ const GenerateAppScreen: React.FC = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   // Ref to track current iframe URL (for immediate access in click handlers)
   const currentIframeUrlRef = useRef<string | null>(null);
-  const [featureFilePopup, setFeatureFilePopup] = useState<{
-    isOpen: boolean;
-    filePath: string;
-    fileName: string;
-  }>({
-    isOpen: false,
-    filePath: '',
-    fileName: '',
-  });
+  
+  // Tab state (replaces featureFilePopup)
+  const [tabs, setTabs] = useState<Tab[]>([
+    { id: 'generate-app', type: 'chat', label: 'Generate App', isPinned: true, isTemporary: false }
+  ]);
+  const [activeTabId, setActiveTabId] = useState('generate-app');
+  const [selectedFeaturePath, setSelectedFeaturePath] = useState<string | null>(null);
+  
+  // Refs to track current tab state for persistence (avoids excessive saves)
+  const tabsRef = useRef(tabs);
+  const activeTabIdRef = useRef(activeTabId);
+  const savingRef = useRef(false); // Track if save is in progress
+  
+  // Update refs when state changes
+  useEffect(() => {
+    tabsRef.current = tabs;
+    logInfo(`[TabState] Tabs updated: ${JSON.stringify(tabs.map(t => ({ id: t.id, label: t.label, type: t.type })))}`);
+  }, [tabs]);
+  
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+    logInfo(`[TabState] Active tab updated: ${activeTabId}`);
+  }, [activeTabId]);
+  
   // Right column resize state
   const [rightColumnWidth, setRightColumnWidth] = useState(600); // Default: 600px (larger for running app)
   const [isResizingRight, setIsResizingRight] = useState(false);
@@ -274,6 +291,31 @@ const GenerateAppScreen: React.FC = () => {
       };
     }
   }, [showAppSelector]);
+
+  // Save tabs to project config when they change (debounced)
+  useEffect(() => {
+    if (!state.projectPath || tabs.length === 0) {
+      return;
+    }
+
+    // Debounce saving to avoid too many writes
+    const timer = setTimeout(() => {
+      saveTabsToProject(state.projectPath!);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [tabs, activeTabId, state.projectPath]);
+
+  // Save tabs on component unmount
+  useEffect(() => {
+    return () => {
+      // Use refs to get current values at unmount time
+      if (state.projectPath && tabsRef.current.length > 0) {
+        // Note: This is best effort - might not complete if app closes quickly
+        saveTabsToProject(state.projectPath);
+      }
+    };
+  }, [state.projectPath]); // Only depend on projectPath, not tabs
 
   // Detect runnable app on project load
   useEffect(() => {
@@ -791,6 +833,11 @@ const GenerateAppScreen: React.FC = () => {
       // Get the current project path
       const projectPath = state.projectPath || await getProjectPath(state.projectName);
       
+      // Save current tabs before switching
+      if (state.projectPath) {
+        await saveTabsToProject(state.projectPath);
+      }
+      
       // Open folder selection dialog
       const selectedPath = await open({
         title: 'Select Project Folder',
@@ -813,6 +860,9 @@ const GenerateAppScreen: React.FC = () => {
         // Clear conversation summary for new project
         setConversationSummary(null);
         
+        // Reset tabs to just chat tab
+        resetTabsToChat();
+        
         // Update project name and path (this will trigger the loadChat useEffect)
         setProjectName(newProjectName);
         setProjectPath(selectedPath);
@@ -822,6 +872,9 @@ const GenerateAppScreen: React.FC = () => {
         if (loaded) {
           console.log('[GenerateApp] Successfully loaded project:', newProjectName);
           // The loadChat useEffect will automatically load the last chat session
+          
+          // Load saved tabs for this project
+          await loadTabsFromProject(selectedPath);
           
           // Reload recent projects to include the newly opened project
           const projects = await getRecentProjects();
@@ -843,6 +896,11 @@ const GenerateAppScreen: React.FC = () => {
     try {
       console.log('[GenerateApp] Selected recent project:', projectPath);
       
+      // Save current tabs before switching
+      if (state.projectPath) {
+        await saveTabsToProject(state.projectPath);
+      }
+      
       // Save the selected path to settings (this updates last accessed time)
       await saveLastProject(projectPath);
       console.log('[GenerateApp] Updated project in settings');
@@ -854,6 +912,9 @@ const GenerateAppScreen: React.FC = () => {
       // Clear conversation summary for new project
       setConversationSummary(null);
       
+      // Reset tabs to just chat tab
+      resetTabsToChat();
+      
       // Update project name and path (this will trigger the loadChat useEffect)
       setProjectName(newProjectName);
       setProjectPath(projectPath);
@@ -863,6 +924,9 @@ const GenerateAppScreen: React.FC = () => {
       if (loaded) {
         console.log('[GenerateApp] Successfully loaded project:', newProjectName);
         // The loadChat useEffect will automatically load the last chat session
+        
+        // Load saved tabs for this project
+        await loadTabsFromProject(projectPath);
       } else {
         console.log('[GenerateApp] Project not found at path:', projectPath);
         console.log('[GenerateApp] A new project structure will be created on first interaction');
@@ -876,19 +940,266 @@ const GenerateAppScreen: React.FC = () => {
   };
 
   const handleFeatureFileSelect = (file: FeatureFileNode) => {
-    setFeatureFilePopup({
-      isOpen: true,
+    // Always open as pinned tab (no more temporary/preview tabs)
+    handleOpenFeatureTab(file, true);
+  };
+
+  const handleOpenFeatureTab = (file: FeatureFileNode, isPinned: boolean) => {
+    const tabId = file.path; // Use file path as unique tab ID
+    
+    // Check if tab already exists
+    const existingTab = tabs.find(t => t.id === tabId);
+    if (existingTab) {
+      // Just switch to the existing tab
+      setActiveTabId(tabId);
+      setSelectedFeaturePath(file.path);
+      return;
+    }
+    
+    // Check if we're at max tabs (10 total)
+    const MAX_TABS = 10;
+    if (tabs.length >= MAX_TABS) {
+      alert('Maximum tabs reached. Close a tab to open another file.');
+      return;
+    }
+    
+    // Create new tab (always pinned, no more temporary tabs)
+    const newTab: Tab = {
+      id: tabId,
+      type: 'feature-file',
+      label: file.name,
       filePath: file.path,
-      fileName: file.name,
+      isPinned: true,
+      isTemporary: false,
+      hasUnsavedChanges: false,
+    };
+    
+    const newTabs = [...tabs, newTab];
+    setTabs(newTabs);
+    setActiveTabId(tabId);
+    setSelectedFeaturePath(file.path);
+  };
+
+  const handleTabSelect = (tabId: string) => {
+    setActiveTabId(tabId);
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab && tab.type === 'feature-file') {
+      setSelectedFeaturePath(tab.filePath || null);
+    } else {
+      setSelectedFeaturePath(null);
+    }
+  };
+
+  const handleCloseTab = (tabId: string) => {
+    logInfo('[TabClose] ========== handleCloseTab called ==========');
+    logInfo(`[TabClose] tabId: ${tabId}`);
+    logInfo(`[TabClose] Current tabs array: ${JSON.stringify(tabs.map(t => ({ id: t.id, label: t.label, type: t.type })))}`);
+    logInfo(`[TabClose] activeTabId: ${activeTabId}`);
+    
+    // Step 1: Check if we can close the tab (synchronous checks)
+    const tabToClose = tabs.find(t => t.id === tabId);
+    logInfo(`[TabClose] Found tab to close: ${tabToClose ? JSON.stringify({ id: tabToClose.id, label: tabToClose.label, type: tabToClose.type }) : 'NULL'}`);
+    
+    if (!tabToClose || tabToClose.type === 'chat') {
+      logInfo('[TabClose] ABORT: Tab not found or is chat tab');
+      return; // Don't close chat tab
+    }
+    
+    // Check for unsaved changes
+    if (tabToClose.hasUnsavedChanges) {
+      logInfo('[TabClose] Tab has unsaved changes, showing confirm dialog');
+      if (!confirm('You have unsaved changes. Discard?')) {
+        logInfo('[TabClose] ABORT: User cancelled');
+        return; // User cancelled
+      }
+    }
+    
+    // Step 2: Remove the tab
+    const newTabs = tabs.filter(t => t.id !== tabId);
+    logInfo(`[TabClose] newTabs after filter: ${JSON.stringify(newTabs.map(t => ({ id: t.id, label: t.label })))}`);
+    logInfo(`[TabClose] Calling setTabs with ${newTabs.length} tabs`);
+    setTabs(newTabs);
+    logInfo('[TabClose] setTabs called');
+    
+    // Step 3: Handle active tab switching if needed
+    if (activeTabId === tabId) {
+      logInfo('[TabClose] Closing active tab, need to switch');
+      const closedIndex = tabs.findIndex(t => t.id === tabId);
+      logInfo(`[TabClose] closedIndex: ${closedIndex}`);
+      const newActiveTab = newTabs[Math.max(0, closedIndex - 1)] || newTabs[0];
+      logInfo(`[TabClose] newActiveTab: ${newActiveTab ? JSON.stringify({ id: newActiveTab.id, label: newActiveTab.label }) : 'NULL'}`);
+      if (newActiveTab) {
+        logInfo(`[TabClose] Setting active tab to: ${newActiveTab.id}`);
+        setActiveTabId(newActiveTab.id);
+        if (newActiveTab.type === 'feature-file') {
+          setSelectedFeaturePath(newActiveTab.filePath || null);
+        } else {
+          setSelectedFeaturePath(null);
+        }
+      }
+    } else {
+      logInfo('[TabClose] Not closing active tab, no need to switch');
+    }
+    
+    logInfo('[TabClose] ========== handleCloseTab completed ==========');
+  };
+
+  const handleCloseAllTabs = () => {
+    // Check if any tabs have unsaved changes (do this BEFORE setState)
+    const tabsWithChanges = tabs.filter(t => t.type === 'feature-file' && t.hasUnsavedChanges);
+    if (tabsWithChanges.length > 0) {
+      const fileNames = tabsWithChanges.map(t => t.label).join(', ');
+      if (!confirm(`You have unsaved changes in: ${fileNames}. Discard all?`)) {
+        return;
+      }
+    }
+    
+    // Close all feature file tabs, keep only chat tab
+    const chatTab = tabs.find(t => t.type === 'chat');
+    if (chatTab) {
+      setTabs([chatTab]);
+      setActiveTabId(chatTab.id);
+      setSelectedFeaturePath(null);
+    }
+  };
+
+  // Helper function to reset tabs to just the chat tab (used when switching projects)
+  const resetTabsToChat = () => {
+    setTabs((currentTabs) => {
+      const chatTab = currentTabs.find(t => t.type === 'chat');
+      if (chatTab) {
+        setActiveTabId(chatTab.id);
+        setSelectedFeaturePath(null);
+        return [chatTab];
+      }
+      return currentTabs;
     });
   };
 
-  const handleFeatureFilePopupClose = () => {
-    setFeatureFilePopup({
-      isOpen: false,
-      filePath: '',
-      fileName: '',
-    });
+  // Save current tabs to project config
+  const saveTabsToProject = async (projectPath: string) => {
+    // Prevent concurrent saves
+    if (savingRef.current) {
+      return;
+    }
+    
+    try {
+      savingRef.current = true;
+      
+      // Use refs to get current values (avoids closure issues)
+      const currentTabs = tabsRef.current;
+      const currentActiveTabId = activeTabIdRef.current;
+      
+      // Convert tabs to persisted format (exclude hasUnsavedChanges)
+      const persistedTabs: PersistedTab[] = currentTabs.map(tab => ({
+        id: tab.id,
+        type: tab.type,
+        label: tab.label,
+        filePath: tab.filePath,
+        isPinned: tab.isPinned,
+        isTemporary: tab.isTemporary,
+      }));
+      
+      await saveOpenTabs(projectPath, {
+        tabs: persistedTabs,
+        activeTabId: currentActiveTabId,
+      });
+      
+      logInfo(`[TabPersistence] Saved ${persistedTabs.length} tabs for project`);
+    } catch (error) {
+      logError(`[TabPersistence] Error saving tabs: ${error}`);
+    } finally {
+      savingRef.current = false;
+    }
+  };
+
+  // Load tabs from project config
+  const loadTabsFromProject = async (projectPath: string) => {
+    logInfo(`[TabLoad] loadTabsFromProject called for: ${projectPath}`);
+    try {
+      const savedState = await loadOpenTabs(projectPath);
+      
+      if (!savedState || !savedState.tabs || savedState.tabs.length === 0) {
+        logInfo('[TabPersistence] No saved tabs found');
+        return;
+      }
+      
+      logInfo(`[TabLoad] Found saved tabs: ${JSON.stringify(savedState.tabs.map(t => ({ id: t.id, label: t.label })))}`);
+      
+      // Validate that files still exist by checking if they're feature files
+      // Convert persisted tabs back to full Tab format
+      const restoredTabs: Tab[] = savedState.tabs.map(tab => ({
+        ...tab,
+        hasUnsavedChanges: false, // Always start with no unsaved changes
+      }));
+      
+      // Filter out any tabs for files that might have been deleted
+      // Keep chat tab and any feature file tabs (we'll let the component handle missing files)
+      const validTabs = restoredTabs.filter(tab => 
+        tab.type === 'chat' || (tab.type === 'feature-file' && tab.filePath)
+      );
+      
+      if (validTabs.length > 0) {
+        logInfo(`[TabLoad] Setting tabs to ${validTabs.length} restored tabs`);
+        setTabs(validTabs);
+        
+        // Restore active tab if it still exists, otherwise default to chat
+        const activeTab = validTabs.find(t => t.id === savedState.activeTabId);
+        if (activeTab) {
+          setActiveTabId(savedState.activeTabId);
+          if (activeTab.type === 'feature-file') {
+            setSelectedFeaturePath(activeTab.filePath || null);
+          }
+        } else {
+          // Active tab no longer exists, default to chat
+          const chatTab = validTabs.find(t => t.type === 'chat');
+          if (chatTab) {
+            setActiveTabId(chatTab.id);
+            setSelectedFeaturePath(null);
+          }
+        }
+        
+        logInfo(`[TabPersistence] Restored ${validTabs.length} tabs`);
+      }
+    } catch (error) {
+      logError(`[TabPersistence] Error loading tabs: ${error}`);
+    }
+  };
+
+  const handleTabContentChange = (tabId: string, hasChanges: boolean) => {
+    logInfo(`[TabUpdate] handleTabContentChange called: tabId=${tabId}, hasChanges=${hasChanges}`);
+    
+    // Only update if the value actually changed (avoid unnecessary re-renders)
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab && tab.hasUnsavedChanges !== hasChanges) {
+      setTabs(tabs.map(t => 
+        t.id === tabId 
+          ? { ...t, hasUnsavedChanges: hasChanges }
+          : t
+      ));
+    } else {
+      logInfo(`[TabUpdate] Skipping setTabs - hasUnsavedChanges already ${hasChanges}`);
+    }
+  };
+
+  const handleTabSave = (tabId: string) => {
+    logInfo(`[TabUpdate] handleTabSave called: tabId=${tabId}`);
+    // Promote to pinned if temporary
+    setTabs(tabs.map(t => 
+      t.id === tabId 
+        ? { ...t, isPinned: true, isTemporary: false, hasUnsavedChanges: false }
+        : t
+    ));
+  };
+
+  const handleTabStartEdit = (tabId: string) => {
+    logInfo(`[TabUpdate] handleTabStartEdit called: tabId=${tabId}`);
+    // Promote to pinned if temporary
+    setTabs(tabs.map(t => 
+      t.id === tabId 
+        ? { ...t, isPinned: true, isTemporary: false }
+        : t
+    ));
   };
 
   // Handle right column resize
@@ -1249,41 +1560,96 @@ const GenerateAppScreen: React.FC = () => {
             <div className="flex-1 overflow-hidden">
               <FeatureFilesViewer 
                 onFileSelect={handleFeatureFileSelect}
-                selectedPath={featureFilePopup.isOpen ? featureFilePopup.filePath : null}
+                selectedPath={selectedFeaturePath}
               />
             </div>
           </div>
         </div>
 
-        {/* Center: Chat Area */}
+        {/* Center: Tabbed Area (Chat + Feature Files) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Chat Header */}
-          <div className="px-6 py-4 border-b border-zinc-800">
-            <h2 className="text-2xl font-semibold text-gray-100 mb-1">Generate App</h2>
-            <p className="text-sm text-gray-400">
-              Talk to Naide to generate and refine your app.
-            </p>
-          </div>
+          {/* Tab Bar */}
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onTabSelect={handleTabSelect}
+            onTabClose={handleCloseTab}
+            onTabCloseAll={handleCloseAllTabs}
+          />
 
-          {/* Transcript area */}
-          <div ref={transcriptRef} className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-3xl mx-auto space-y-4">
-              {messages.map((message, idx) => {
-                const finalMessageInList = idx === messages.length - 1;
-                const applyWorkingVisual = message.role === 'assistant' && isLoading && finalMessageInList;
-                
-                const computedBlueShade = applyWorkingVisual 
-                  ? computePulsingBlueColor(visualIntensity)
-                  : 'rgb(37, 99, 235)';
-                
-                return (
-                <div key={message.id} className="flex gap-3">
-                  {message.role === 'assistant' && (
+          {/* Chat Tab Content - hidden with CSS when not active to preserve state */}
+          <div 
+            className="flex-1 flex flex-col overflow-hidden"
+            style={{ display: activeTabId === 'generate-app' ? 'flex' : 'none' }}
+          >
+            {/* Chat Header */}
+            <div className="px-6 py-4 border-b border-zinc-800">
+              <h2 className="text-2xl font-semibold text-gray-100 mb-1">Generate App</h2>
+              <p className="text-sm text-gray-400">
+                Talk to Naide to generate and refine your app.
+              </p>
+            </div>
+
+            {/* Transcript area */}
+            <div ref={transcriptRef} className="flex-1 overflow-y-auto p-6">
+              <div className="max-w-3xl mx-auto space-y-4">
+                {messages.map((message, idx) => {
+                  const finalMessageInList = idx === messages.length - 1;
+                  const applyWorkingVisual = message.role === 'assistant' && isLoading && finalMessageInList;
+                  
+                  const computedBlueShade = applyWorkingVisual 
+                    ? computePulsingBlueColor(visualIntensity)
+                    : 'rgb(37, 99, 235)';
+                  
+                  return (
+                  <div key={message.id} className="flex gap-3">
+                    {message.role === 'assistant' && (
+                      <div 
+                        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                        style={{
+                          backgroundColor: computedBlueShade,
+                          opacity: applyWorkingVisual ? visualIntensity : 1.0,
+                        }}
+                      >
+                        <svg
+                          className="w-5 h-5 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                    <div className={`flex-1 ${message.role === 'user' ? 'ml-11' : ''}`}>
+                      <div className={`rounded-lg p-4 ${
+                        message.role === 'assistant'
+                          ? 'bg-zinc-900 border border-zinc-800'
+                          : 'bg-blue-600'
+                      }`}>
+                        {message.role === 'assistant' && !message.content && isLoading ? (
+                          <p className="text-gray-400 animate-pulse">Copilot is working on your request...</p>
+                        ) : (
+                          <MessageContent content={message.content} role={message.role} />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  );
+                })}
+                {/* Loading indicator - only shown before assistant placeholder is added */}
+                {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+                  <div className="flex gap-3">
                     <div 
                       className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
                       style={{
-                        backgroundColor: computedBlueShade,
-                        opacity: applyWorkingVisual ? visualIntensity : 1.0,
+                        backgroundColor: computePulsingBlueColor(visualIntensity),
+                        opacity: visualIntensity,
                       }}
                     >
                       <svg
@@ -1300,35 +1666,33 @@ const GenerateAppScreen: React.FC = () => {
                         />
                       </svg>
                     </div>
-                  )}
-                  <div className={`flex-1 ${message.role === 'user' ? 'ml-11' : ''}`}>
-                    <div className={`rounded-lg p-4 ${
-                      message.role === 'assistant'
-                        ? 'bg-zinc-900 border border-zinc-800'
-                        : 'bg-blue-600'
-                    }`}>
-                      {message.role === 'assistant' && !message.content && isLoading ? (
-                        <p className="text-gray-400 animate-pulse">Copilot is working on your request...</p>
-                      ) : (
-                        <MessageContent content={message.content} role={message.role} />
-                      )}
+                    <div className="flex-1">
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+                        <p className="text-gray-400">Copilot is thinking...</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-                );
-              })}
-              {/* Loading indicator - only shown before assistant placeholder is added */}
-              {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-                <div className="flex gap-3">
-                  <div 
-                    className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{
-                      backgroundColor: computePulsingBlueColor(visualIntensity),
-                      opacity: visualIntensity,
-                    }}
+                )}
+              </div>
+            </div>
+
+            {/* Activity Status Bar - between chat and input */}
+            <ActivityStatusBar />
+
+            {/* Input row */}
+            <div className="border-t border-zinc-800 p-6">
+              <div className="max-w-3xl mx-auto">
+                {/* Mode selector with New Chat and Chat History buttons */}
+                <div className="mb-3 flex items-center gap-2">
+                  {/* New Chat button */}
+                  <button
+                    onClick={handleNewChat}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-gray-100 transition-colors"
+                    title="New Chat"
+                    aria-label="Start new chat"
                   >
                     <svg
-                      className="w-5 h-5 text-white"
+                      className="w-5 h-5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1337,176 +1701,159 @@ const GenerateAppScreen: React.FC = () => {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                        d="M12 4v16m8-8H4"
                       />
                     </svg>
+                  </button>
+                  {/* Chat History button */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowChatHistory(!showChatHistory)}
+                      className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-gray-100 transition-colors"
+                      title="View chat history"
+                      aria-label="View chat history"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    </button>
+                    <ChatHistoryDropdown
+                      projectName={state.projectName}
+                      projectPath={state.projectPath || undefined}
+                      onLoadChat={handleLoadChat}
+                      onChatDeleted={handleChatDeleted}
+                      isOpen={showChatHistory}
+                      onClose={() => setShowChatHistory(false)}
+                    />
                   </div>
-                  <div className="flex-1">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-                      <p className="text-gray-400">Copilot is thinking...</p>
-                    </div>
+                  <label htmlFor="mode-select" className="text-sm text-gray-400">
+                    Mode:
+                  </label>
+                  <select
+                    id="mode-select"
+                    value={copilotMode}
+                    onChange={(e) => handleModeChange(e.target.value as CopilotMode)}
+                    className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Planning">Planning</option>
+                    <option value="Building">Building</option>
+                    <option value="Analyzing">Analyzing</option>
+                  </select>
+                  <span className="text-xs text-gray-500">
+                    {MODE_DESCRIPTIONS[copilotMode]}
+                  </span>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <textarea
+                      ref={textareaRef}
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type your message... (Ctrl/Cmd+Enter to send)"
+                      className={`w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                        isExpanded ? 'h-40' : 'h-20'
+                      }`}
+                    />
+                    {/* Expand/Collapse button */}
+                    <button
+                      onClick={toggleExpand}
+                      className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
+                      title={isExpanded ? 'Collapse' : 'Expand'}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        {isExpanded ? (
+                          // Collapse icon
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                          />
+                        ) : (
+                          // Expand icon
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                          />
+                        )}
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!messageInput.trim() || isLoading}
+                      className={`px-4 py-2 rounded-lg transition-colors ${
+                        !messageInput.trim() || isLoading
+                          ? 'bg-zinc-800 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      Send
+                    </button>
+                    <button
+                      disabled
+                      className="px-4 py-2 bg-zinc-800 text-gray-500 rounded-lg cursor-not-allowed flex items-center justify-center"
+                      title="Attach file"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                        />
+                      </svg>
+                    </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Feature File Tabs Content */}
+          {tabs.filter(t => t.type === 'feature-file').map(tab => (
+            <div 
+              key={tab.id}
+              className="flex-1 overflow-hidden"
+              style={{ display: activeTabId === tab.id ? 'flex' : 'none' }}
+            >
+              {state.projectPath && tab.filePath && (
+                <FeatureFileTab
+                  filePath={tab.filePath}
+                  fileName={tab.label}
+                  projectPath={state.projectPath}
+                  isActive={activeTabId === tab.id}
+                  onContentChange={(hasChanges) => handleTabContentChange(tab.id, hasChanges)}
+                  onSave={() => handleTabSave(tab.id)}
+                  onStartEdit={() => handleTabStartEdit(tab.id)}
+                />
               )}
             </div>
-          </div>
-
-          {/* Activity Status Bar - between chat and input */}
-          <ActivityStatusBar />
-
-          {/* Input row */}
-          <div className="border-t border-zinc-800 p-6">
-            <div className="max-w-3xl mx-auto">
-              {/* Mode selector with New Chat and Chat History buttons */}
-              <div className="mb-3 flex items-center gap-2">
-                {/* New Chat button */}
-                <button
-                  onClick={handleNewChat}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-gray-100 transition-colors"
-                  title="New Chat"
-                  aria-label="Start new chat"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                </button>
-                {/* Chat History button */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowChatHistory(!showChatHistory)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-gray-100 transition-colors"
-                    title="View chat history"
-                    aria-label="View chat history"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </button>
-                  <ChatHistoryDropdown
-                    projectName={state.projectName}
-                    projectPath={state.projectPath || undefined}
-                    onLoadChat={handleLoadChat}
-                    onChatDeleted={handleChatDeleted}
-                    isOpen={showChatHistory}
-                    onClose={() => setShowChatHistory(false)}
-                  />
-                </div>
-                <label htmlFor="mode-select" className="text-sm text-gray-400">
-                  Mode:
-                </label>
-                <select
-                  id="mode-select"
-                  value={copilotMode}
-                  onChange={(e) => handleModeChange(e.target.value as CopilotMode)}
-                  className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Planning">Planning</option>
-                  <option value="Building">Building</option>
-                  <option value="Analyzing">Analyzing</option>
-                </select>
-                <span className="text-xs text-gray-500">
-                  {MODE_DESCRIPTIONS[copilotMode]}
-                </span>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-1 relative">
-                  <textarea
-                    ref={textareaRef}
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your message... (Ctrl/Cmd+Enter to send)"
-                    className={`w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                      isExpanded ? 'h-40' : 'h-20'
-                    }`}
-                  />
-                  {/* Expand/Collapse button */}
-                  <button
-                    onClick={toggleExpand}
-                    className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
-                    title={isExpanded ? 'Collapse' : 'Expand'}
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      {isExpanded ? (
-                        // Collapse icon
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                        />
-                      ) : (
-                        // Expand icon
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                        />
-                      )}
-                    </svg>
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!messageInput.trim() || isLoading}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      !messageInput.trim() || isLoading
-                        ? 'bg-zinc-800 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    }`}
-                  >
-                    Send
-                  </button>
-                  <button
-                    disabled
-                    className="px-4 py-2 bg-zinc-800 text-gray-500 rounded-lg cursor-not-allowed flex items-center justify-center"
-                    title="Attach file"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Right: Running App Preview */}
@@ -1755,17 +2102,6 @@ const GenerateAppScreen: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Feature File Popup */}
-      {state.projectPath && (
-        <FeatureFilePopup
-          filePath={featureFilePopup.filePath}
-          fileName={featureFilePopup.fileName}
-          isOpen={featureFilePopup.isOpen}
-          onClose={handleFeatureFilePopupClose}
-          projectPath={state.projectPath}
-        />
-      )}
     </div>
   );
 };
