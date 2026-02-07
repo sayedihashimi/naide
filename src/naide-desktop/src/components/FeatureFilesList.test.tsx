@@ -45,7 +45,7 @@ describe('FeatureFilesList', () => {
     expect(screen.getByText('test-feature')).toBeInTheDocument();
   });
   
-  it('calls onFileSelect when file is clicked', async () => {
+  it('calls onFileSelect when file is double-clicked', async () => {
     const user = userEvent.setup();
     const files: FeatureFileNode[] = [
       {
@@ -67,7 +67,7 @@ describe('FeatureFilesList', () => {
     );
     
     const fileButton = screen.getByText('test-feature');
-    await user.click(fileButton);
+    await user.dblClick(fileButton);
     
     expect(mockOnFileSelect).toHaveBeenCalledWith(files[0]);
   });
