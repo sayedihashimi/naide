@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useAppContext } from '../context/useAppContext';
 import { listProjectFiles, type ProjectFileNode } from '../utils/projectFiles';
-import ProjectFilesList from './ProjectFilesList';
 
 interface ProjectFilesViewerProps {
   onFileSelect?: (file: ProjectFileNode) => void;
@@ -95,7 +94,7 @@ const ProjectFilesViewer: React.FC<ProjectFilesViewerProps> = ({ onFileSelect })
 
   // Build hierarchical tree from flat loaded data
   const fileTree = useMemo(() => {
-    const buildTree = (nodes: ProjectFileNode[], parentPath: string = ''): FileTreeNode[] => {
+    const buildTree = (nodes: ProjectFileNode[]): FileTreeNode[] => {
       const result: FileTreeNode[] = [];
 
       for (const node of nodes) {
@@ -104,7 +103,7 @@ const ProjectFilesViewer: React.FC<ProjectFilesViewerProps> = ({ onFileSelect })
         if (node.is_folder && expandedFolders.has(node.path)) {
           const children = loadedFolders.get(node.path);
           if (children) {
-            treeNode.children = buildTree(children, node.path);
+            treeNode.children = buildTree(children);
           }
         }
 
@@ -165,7 +164,7 @@ const ProjectFilesViewer: React.FC<ProjectFilesViewerProps> = ({ onFileSelect })
     return result;
   };
 
-  const flatTree = useMemo(() => flattenTree(filteredTree), [filteredTree, expandedFolders]);
+  const flatTree = useMemo(() => flattenTree(filteredTree), [filteredTree, flattenTree]);
 
   // Handle file click
   const handleFileClick = (file: ProjectFileNode) => {
@@ -222,15 +221,14 @@ const ProjectFilesViewer: React.FC<ProjectFilesViewerProps> = ({ onFileSelect })
                     !node.is_folder ? 'hover:text-gray-200' : ''
                   }`}
                   style={{ paddingLeft: `${depth * 12 + 8}px` }}
-                  onClick={(e) => {
+                  onClick={() => {
                     if (node.is_folder) {
                       handleFolderToggle(node.path);
                     }
                     // Single click on files does nothing (double-click opens them)
                   }}
-                  onDoubleClick={(e) => {
+                  onDoubleClick={() => {
                     if (!node.is_folder) {
-                      e.stopPropagation();
                       handleFileClick(node);
                     }
                   }}

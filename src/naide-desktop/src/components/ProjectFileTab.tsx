@@ -13,7 +13,6 @@ interface ProjectFileTabProps {
 
 const ProjectFileTab: React.FC<ProjectFileTabProps> = ({
   filePath,
-  fileName,
   projectPath,
   isActive,
   onContentChange,

@@ -116,7 +116,6 @@ const GenerateAppScreen: React.FC = () => {
   
   // Left column expand/collapse state
   const [isFeaturesExpanded, setIsFeaturesExpanded] = useState(true);
-  const [isFilesExpanded, setIsFilesExpanded] = useState(false);
   
   // Cyclical brightness modulation for assistant icon during processing
   useEffect(() => {
@@ -600,7 +599,7 @@ const GenerateAppScreen: React.FC = () => {
                     console.log('[GenerateApp] Tool completed:', eventData.data?.toolCallId);
                     break;
                     
-                  case 'done':
+                  case 'done': {
                     console.log('[GenerateApp] Stream done');
                     // Use the full buffered response for summary extraction (prefer server's buffer)
                     const fullResponse = eventData.data?.fullResponse !== undefined 
@@ -626,6 +625,7 @@ const GenerateAppScreen: React.FC = () => {
                       )
                     );
                     break;
+                  }
                     
                   case 'error':
                     console.error('[GenerateApp] Stream error:', eventData.data?.message);
@@ -819,7 +819,10 @@ const GenerateAppScreen: React.FC = () => {
     // Check if there are any archived chats left
     const { invoke } = await import('@tauri-apps/api/core');
     const actualPath = state.projectPath || await getProjectPath(state.projectName);
-    const remainingChats = await invoke<any[]>('list_chat_sessions', {
+    interface ChatSession {
+      filename: string;
+    }
+    const remainingChats = await invoke<ChatSession[]>('list_chat_sessions', {
       projectPath: actualPath,
     });
     
@@ -948,15 +951,15 @@ const GenerateAppScreen: React.FC = () => {
 
   const handleFeatureFileSelect = (file: FeatureFileNode) => {
     // Always open as pinned tab (no more temporary/preview tabs)
-    handleOpenFeatureTab(file, true);
+    handleOpenFeatureTab(file);
   };
 
   const handleProjectFileSelect = (file: ProjectFileNode) => {
     // Always open as pinned tab
-    handleOpenProjectTab(file, true);
+    handleOpenProjectTab(file);
   };
 
-  const handleOpenFeatureTab = (file: FeatureFileNode, isPinned: boolean) => {
+  const handleOpenFeatureTab = (file: FeatureFileNode) => {
     const tabId = file.path; // Use file path as unique tab ID
     
     // Check if tab already exists
@@ -992,7 +995,7 @@ const GenerateAppScreen: React.FC = () => {
     setSelectedFeaturePath(file.path);
   };
 
-  const handleOpenProjectTab = (file: ProjectFileNode, isPinned: boolean) => {
+  const handleOpenProjectTab = (file: ProjectFileNode) => {
     const tabId = 'project:' + file.path; // Use "project:" prefix + file path as unique tab ID
     
     // Check if tab already exists
