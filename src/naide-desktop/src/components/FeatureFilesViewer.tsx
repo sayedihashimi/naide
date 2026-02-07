@@ -58,7 +58,7 @@ const FeatureFilesViewer: React.FC<FeatureFilesViewerProps> = ({
   }, [viewOptions]);
   
   // Debounce timer ref
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Load files function (memoized)
   const loadFiles = useCallback(async () => {

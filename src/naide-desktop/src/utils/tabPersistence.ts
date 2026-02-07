@@ -7,7 +7,7 @@ const JSON_INDENT = 2;
 // Tab info for persistence (subset of Tab interface)
 export interface PersistedTab {
   id: string;
-  type: 'chat' | 'feature-file';
+  type: 'chat' | 'feature-file' | 'project-file';
   label: string;
   filePath?: string;
   isPinned: boolean;
