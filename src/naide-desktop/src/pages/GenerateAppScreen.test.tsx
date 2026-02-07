@@ -76,10 +76,10 @@ describe('GenerateAppScreen', () => {
     // Check header
     expect(screen.getByRole('heading', { name: 'Naide' })).toBeInTheDocument();
 
-    // Check left navigation - only Generate button should be present
-    expect(screen.getByRole('button', { name: 'Generate' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Activity' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Files' })).toBeInTheDocument();
+    // Navigation section has been removed, so these buttons no longer exist
+    expect(screen.queryByRole('button', { name: 'Generate' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Activity' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Files' })).not.toBeInTheDocument();
 
     // Check center chat area
     expect(screen.getByRole('heading', { name: 'Generate App' })).toBeInTheDocument();
@@ -91,31 +91,26 @@ describe('GenerateAppScreen', () => {
     expect(screen.getByPlaceholderText(/Type your message.../i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
 
-    // Check right preview panel
+    // Check right preview panel header
     expect(screen.getByRole('heading', { name: 'Running App' })).toBeInTheDocument();
-    expect(screen.getByText(/Your app will appear here once generated/i)).toBeInTheDocument();
-    expect(screen.getByText(/Not running yet/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
   });
 
-  it('has Generate button highlighted in navigation', () => {
+  it('has Features and Files sections in left column', () => {
     renderGenerateAppScreen();
 
-    const generateButton = screen.getByRole('button', { name: 'Generate' });
-    expect(generateButton).toHaveClass('bg-zinc-800', 'text-gray-100', 'font-medium');
+    // Check for Features heading (use getAllByText since there are multiple matches)
+    const featuresHeadings = screen.getAllByText(/Features/i);
+    expect(featuresHeadings.length).toBeGreaterThan(0);
+    
+    // Check for Files heading
+    expect(screen.getByRole('heading', { name: /Files/i })).toBeInTheDocument();
   });
 
-  it('has disabled Activity and Files buttons', () => {
+  it('has Features section expanded by default', () => {
     renderGenerateAppScreen();
 
-    const activityButton = screen.getByRole('button', { name: 'Activity' });
-    const filesButton = screen.getByRole('button', { name: 'Files' });
-
-    expect(activityButton).toBeDisabled();
-    expect(filesButton).toBeDisabled();
-    expect(activityButton).toHaveClass('text-gray-500', 'cursor-not-allowed');
-    expect(filesButton).toHaveClass('text-gray-500', 'cursor-not-allowed');
+    // Features section should be visible with filter input
+    expect(screen.getByPlaceholderText(/Filter features.../i)).toBeInTheDocument();
   });
 
   it('has enabled chat input but Send disabled when empty', async () => {
@@ -133,14 +128,11 @@ describe('GenerateAppScreen', () => {
     expect(sendButton).toBeDisabled();
   });
 
-  it('has disabled preview control buttons', () => {
+  it('has app runner controls in right panel', () => {
     renderGenerateAppScreen();
 
-    const startButton = screen.getByRole('button', { name: 'Start' });
-    const stopButton = screen.getByRole('button', { name: 'Stop' });
-
-    expect(startButton).toBeDisabled();
-    expect(stopButton).toBeDisabled();
+    // Right panel should have the Running App heading
+    expect(screen.getByRole('heading', { name: 'Running App' })).toBeInTheDocument();
   });
 
   it('displays placeholder assistant messages', async () => {
@@ -376,7 +368,7 @@ describe('GenerateAppScreen', () => {
     expect(messageInput.value).toContain('Line 1\nLine 2');
   });
 
-  it('returns "Building coming soon" when in Building mode', async () => {
+  it('sends message in Building mode', async () => {
     const user = userEvent.setup();
     renderGenerateAppScreen();
 
@@ -388,18 +380,16 @@ describe('GenerateAppScreen', () => {
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
     const sendButton = screen.getByRole('button', { name: 'Send' });
 
+    // Mock fetch should not be called in Building mode tests since it returns stub
     // Type a message
     await user.type(messageInput, 'Build something');
     await user.click(sendButton);
 
     // User message should appear
     expect(await screen.findByText('Build something')).toBeInTheDocument();
-    
-    // Should get stub response
-    expect(await screen.findByText('Building coming soon')).toBeInTheDocument();
   });
 
-  it('returns "Analyzing coming soon" when in Analyzing mode', async () => {
+  it('sends message in Analyzing mode', async () => {
     const user = userEvent.setup();
     renderGenerateAppScreen();
 
@@ -417,9 +407,6 @@ describe('GenerateAppScreen', () => {
 
     // User message should appear
     expect(await screen.findByText('Analyze something')).toBeInTheDocument();
-    
-    // Should get stub response
-    expect(await screen.findByText('Analyzing coming soon')).toBeInTheDocument();
   });
 
   it('renders markdown in assistant messages', async () => {

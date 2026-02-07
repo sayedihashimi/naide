@@ -106,8 +106,12 @@ describe('ChatHistoryDropdown', () => {
       expect(screen.getByText('Planning')).toBeInTheDocument();
     });
 
-    const chatButton = screen.getByRole('button');
-    fireEvent.click(chatButton);
+    // Find the button containing the chat session (not the delete button)
+    const chatButtons = screen.getAllByRole('button');
+    const chatButton = chatButtons.find(btn => btn.textContent?.includes('Planning'));
+    expect(chatButton).toBeDefined();
+    
+    fireEvent.click(chatButton!);
 
     expect(mockOnLoadChat).toHaveBeenCalledWith('chat-2026-02-01-001.json');
     expect(mockOnClose).toHaveBeenCalled();

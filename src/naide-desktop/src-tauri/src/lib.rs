@@ -15,6 +15,9 @@ use settings::{LastProject, read_settings, write_settings, add_recent_project, r
 mod app_runner;
 use app_runner::{detect_dotnet_app, detect_npm_app, detect_all_runnable_apps, start_dotnet_app, start_npm_app, wait_for_url, AppInfo, RunningAppInfo};
 
+mod project_files;
+use project_files::list_project_files;
+
 // Global state to track the sidecar process
 struct SidecarState {
     process: Option<Child>,
@@ -987,7 +990,8 @@ pub fn run() {
       detect_runnable_app,
       detect_all_runnable_apps_command,
       start_app,
-      stop_app
+      stop_app,
+      list_project_files
     ])
     .on_window_event(|_window, event| {
       // Clean up processes on app exit

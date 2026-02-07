@@ -10,6 +10,7 @@ import {
 } from '../utils/conversationMemory';
 import MessageContent from '../components/MessageContent';
 import FeatureFilesViewer from '../components/FeatureFilesViewer';
+import ProjectFilesViewer from '../components/ProjectFilesViewer';
 import TabBar, { type Tab } from '../components/TabBar';
 import FeatureFileTab from '../components/FeatureFileTab';
 import ChatHistoryDropdown from '../components/ChatHistoryDropdown';
@@ -110,6 +111,10 @@ const GenerateAppScreen: React.FC = () => {
   const [showChatHistory, setShowChatHistory] = useState(false);
   // Feature file popup state
   const [visualIntensity, setVisualIntensity] = useState<number>(1.0);
+  
+  // Left column expand/collapse state
+  const [isFeaturesExpanded, setIsFeaturesExpanded] = useState(true);
+  const [isFilesExpanded, setIsFilesExpanded] = useState(false);
   
   // Cyclical brightness modulation for assistant icon during processing
   useEffect(() => {
@@ -1522,47 +1527,22 @@ const GenerateAppScreen: React.FC = () => {
 
       {/* Main content area - 3 columns */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: Navigation Sidebar */}
+        {/* Left: Features & Files Sidebar */}
         <div className="w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-zinc-800">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Navigation
-            </h2>
-            <nav>
-              <button
-                className="w-full text-left px-3 py-2 rounded mb-1 transition-colors bg-zinc-800 text-gray-100 font-medium"
-                disabled
-              >
-                Generate
-              </button>
-              <button
-                className="w-full text-left px-3 py-2 rounded mb-1 transition-colors text-gray-500 cursor-not-allowed"
-                disabled
-              >
-                Activity
-              </button>
-              <button
-                className="w-full text-left px-3 py-2 rounded mb-1 transition-colors text-gray-500 cursor-not-allowed"
-                disabled
-              >
-                Files
-              </button>
-            </nav>
-          </div>
+          {/* Features Section */}
+          <FeatureFilesViewer 
+            onFileSelect={handleFeatureFileSelect}
+            selectedPath={selectedFeaturePath}
+            isExpanded={isFeaturesExpanded}
+            onToggleExpanded={() => setIsFeaturesExpanded(!isFeaturesExpanded)}
+          />
           
-          {/* Divider and Features section */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-zinc-800">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Features
-              </h2>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <FeatureFilesViewer 
-                onFileSelect={handleFeatureFileSelect}
-                selectedPath={selectedFeaturePath}
-              />
-            </div>
+          {/* Divider between Features and Files */}
+          <div className="border-b border-zinc-800" />
+          
+          {/* Files Section */}
+          <div className="flex-1 overflow-hidden">
+            <ProjectFilesViewer />
           </div>
         </div>
 
