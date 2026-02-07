@@ -131,7 +131,12 @@ const ProjectFileTab: React.FC<ProjectFileTabProps> = ({
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isActive, isEditing, handleSave]);
+    // Note: handleSave and handleCancel excluded from deps - they have stable functionality
+    // but change on every render due to their dependencies. Including them would cause
+    // unnecessary event listener churn. The functions are always called with current state
+    // because they're defined in the component body.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, isEditing]);
 
   return (
     <div className="h-full flex flex-col bg-zinc-900">
