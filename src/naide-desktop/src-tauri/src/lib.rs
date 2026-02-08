@@ -456,8 +456,8 @@ async fn write_project_file(project_path: String, file_path: String, content: St
 
 // Tauri command: Get file size
 #[tauri::command]
-async fn get_file_size(project_path: String, file_path: String) -> Result<u64, String> {
-    let full_path = PathBuf::from(&project_path).join(&file_path);
+async fn get_file_size(project_path: String, relative_path: String) -> Result<u64, String> {
+    let full_path = PathBuf::from(&project_path).join(&relative_path);
     
     // Security check: ensure the path is within the project directory
     let base_dir = PathBuf::from(&project_path);
