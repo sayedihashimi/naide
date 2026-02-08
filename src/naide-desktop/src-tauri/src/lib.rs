@@ -401,6 +401,27 @@ async fn write_feature_file(project_path: String, file_path: String, content: St
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
+// Tauri command: Read project file content
+#[tauri::command]
+async fn read_project_file(project_path: String, file_path: String) -> Result<String, String> {
+    let full_path = PathBuf::from(&project_path).join(&file_path);
+    
+    // Security check: ensure the path is within the project directory
+    let base_dir = PathBuf::from(&project_path);
+    let canonical_full_path = full_path.canonicalize()
+        .map_err(|e| format!("Invalid file path: {}", e))?;
+    let canonical_base_dir = base_dir.canonicalize()
+        .map_err(|e| format!("Invalid base directory: {}", e))?;
+    
+    if !canonical_full_path.starts_with(&canonical_base_dir) {
+        return Err("Access denied: path outside of project directory".to_string());
+    }
+    
+    // Read the file
+    fs::read_to_string(&canonical_full_path)
+        .map_err(|e| format!("Failed to read file: {}", e))
+}
+
 // Tauri command: Write project file content
 #[tauri::command]
 async fn write_project_file(project_path: String, file_path: String, content: String) -> Result<(), String> {
