@@ -5,9 +5,14 @@ import { logInfo, logError } from './logger';
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'command';
   content: string;
   timestamp: string;
+  // Command-specific fields
+  command?: string;
+  commandStatus?: 'running' | 'success' | 'error';
+  isExpanded?: boolean;
+  userToggled?: boolean;
 }
 
 export interface ChatSession {
@@ -146,6 +151,21 @@ export async function loadFullChatSession(projectName: string, sessionFilename: 
   }
 }
 
+// Serialize messages for disk storage - strip command output but keep command metadata
+function serializeMessagesForDisk(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map(m => {
+    if (m.role === 'command') {
+      return {
+        ...m,
+        content: '(command executed)',
+        isExpanded: undefined,
+        userToggled: undefined,
+      };
+    }
+    return m;
+  });
+}
+
 // Save chat session
 export async function saveChatSession(
   projectName: string,
@@ -172,6 +192,9 @@ export async function saveChatSession(
     logInfo(`[ChatPersistence] Attempting to save chat to: ${sessionPath}`);
     const sessionExists = await exists(sessionPath);
     
+    // Serialize messages for disk (strip command output)
+    const serializedMessages = serializeMessagesForDisk(messages);
+    
     let session: ChatSession;
     if (sessionExists) {
       // Update existing session
@@ -180,7 +203,7 @@ export async function saveChatSession(
       const existingSession: ChatSession = JSON.parse(existingContent);
       session = {
         ...existingSession,
-        messages,
+        messages: serializedMessages,
         updatedAt: new Date().toISOString(),
       };
     } else {
@@ -189,7 +212,7 @@ export async function saveChatSession(
       session = {
         id: filename.replace('.json', ''),
         projectName,
-        messages,
+        messages: serializedMessages,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -277,13 +300,16 @@ export async function archiveChatSession(
       await mkdir(chatSessionsDir, { recursive: true });
     }
     
+    // Serialize messages for disk (strip command output)
+    const serializedMessages = serializeMessagesForDisk(userMessages);
+    
     // Create the archived session object
     const now = new Date().toISOString();
     const session: ChatSession = {
       id: chatId,
       projectName,
       mode,
-      messages: userMessages,
+      messages: serializedMessages,
       summary,
       createdAt: messages[0]?.timestamp || now,
       updatedAt: now,

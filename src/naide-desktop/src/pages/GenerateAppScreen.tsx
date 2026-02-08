@@ -9,6 +9,7 @@ import {
   mergeSummary,
 } from '../utils/conversationMemory';
 import MessageContent from '../components/MessageContent';
+import CommandOutputBlock from '../components/CommandOutputBlock';
 import FeatureFilesViewer from '../components/FeatureFilesViewer';
 import ProjectFilesViewer from '../components/ProjectFilesViewer';
 import TabBar, { type Tab } from '../components/TabBar';
@@ -193,6 +194,10 @@ const GenerateAppScreen: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Track auto-collapse timeouts for command blocks
+  const commandCollapseTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  
   const [currentIframeUrl, setCurrentIframeUrl] = useState<string | null>(null);
 
   // Compute display URL: convert proxy URL back to real app URL
@@ -452,6 +457,16 @@ const GenerateAppScreen: React.FC = () => {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
     }
   }, [messages]);
+  
+  // Clean up command collapse timeouts on unmount
+  useEffect(() => {
+    const timeouts = commandCollapseTimeoutsRef.current;
+    return () => {
+      // Clear all pending timeouts
+      timeouts.forEach(timeout => clearTimeout(timeout));
+      timeouts.clear();
+    };
+  }, []);
 
   const handleStopRequest = useCallback(() => {
     if (abortControllerRef.current) {
@@ -481,6 +496,16 @@ const GenerateAppScreen: React.FC = () => {
     });
     
     setIsLoading(false);
+  }, []);
+
+  const handleToggleCommandBlock = useCallback((commandId: string) => {
+    setMessages(prev =>
+      prev.map(m =>
+        m.id === commandId
+          ? { ...m, isExpanded: !m.isExpanded, userToggled: true }
+          : m
+      )
+    );
   }, []);
 
   const handleSendMessage = async () => {
@@ -629,6 +654,68 @@ const GenerateAppScreen: React.FC = () => {
                       );
                     }
                     break;
+                  
+                  case 'command_start': {
+                    console.log('[GenerateApp] Command started:', eventData.data?.command);
+                    const { commandId, command } = eventData.data;
+                    // Insert a command message into the chat
+                    const cmdMessage: ChatMessage = {
+                      id: commandId,
+                      role: 'command',
+                      content: '',
+                      timestamp: new Date().toISOString(),
+                      command: command,
+                      commandStatus: 'running',
+                      isExpanded: true,  // Auto-expand while running
+                      userToggled: false,
+                    };
+                    setMessages(prev => [...prev, cmdMessage]);
+                    break;
+                  }
+                  
+                  case 'command_output': {
+                    const { commandId, output } = eventData.data;
+                    setMessages(prev =>
+                      prev.map(m =>
+                        m.id === commandId
+                          ? { ...m, content: m.content + output }
+                          : m
+                      )
+                    );
+                    break;
+                  }
+                  
+                  case 'command_complete': {
+                    const { commandId, success } = eventData.data;
+                    console.log('[GenerateApp] Command completed:', commandId, 'success:', success);
+                    setMessages(prev =>
+                      prev.map(m =>
+                        m.id === commandId
+                          ? { 
+                              ...m, 
+                              commandStatus: success ? 'success' : 'error',
+                            }
+                          : m
+                      )
+                    );
+                    
+                    // Schedule auto-collapse after 2 seconds (unless user manually toggled)
+                    const timeoutId = setTimeout(() => {
+                      setMessages(prev =>
+                        prev.map(m =>
+                          m.id === commandId && !m.userToggled
+                            ? { ...m, isExpanded: false }
+                            : m
+                        )
+                      );
+                      // Clean up timeout reference
+                      commandCollapseTimeoutsRef.current.delete(commandId);
+                    }, 2000);
+                    
+                    // Store timeout so we can clean it up if needed
+                    commandCollapseTimeoutsRef.current.set(commandId, timeoutId);
+                    break;
+                  }
                     
                   case 'tool_start':
                     console.log('[GenerateApp] Tool started:', eventData.data?.toolName);
@@ -1675,6 +1762,31 @@ const GenerateAppScreen: React.FC = () => {
             <div ref={transcriptRef} className="flex-1 overflow-y-auto p-6">
               <div className="max-w-3xl mx-auto space-y-4">
                 {messages.map((message, idx) => {
+                  // Handle command messages
+                  if (message.role === 'command') {
+                    // Check if this is a loaded-from-disk placeholder
+                    if (message.content === '(command executed)') {
+                      return (
+                        <div key={message.id} className="my-2 px-4 py-2 text-zinc-500 text-sm italic font-mono">
+                          $ {message.command} — (command executed)
+                        </div>
+                      );
+                    }
+                    
+                    // Render interactive command block
+                    return (
+                      <CommandOutputBlock
+                        key={message.id}
+                        command={message.command || ''}
+                        output={message.content}
+                        status={message.commandStatus || 'success'}
+                        isExpanded={message.isExpanded ?? false}
+                        onToggle={() => handleToggleCommandBlock(message.id)}
+                      />
+                    );
+                  }
+                  
+                  // Handle user and assistant messages
                   const finalMessageInList = idx === messages.length - 1;
                   const applyWorkingVisual = message.role === 'assistant' && isLoading && finalMessageInList;
                   
