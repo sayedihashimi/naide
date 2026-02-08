@@ -691,8 +691,12 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       // Helper function to extract command from tool arguments
       const extractCommandFromArgs = (args: Record<string, any>): string | null => {
-        // Try various common argument names for commands
-        return args.command || args.cmd || args.script || args.shellCommand || args.input || null;
+        // Try common argument names for commands, in order of specificity
+        // 'command' is most specific for command execution
+        // 'shellCommand' and 'script' are also specific to command execution
+        // 'cmd' is common abbreviation for command
+        // Note: We intentionally omit 'input' as it's too generic
+        return args.command || args.shellCommand || args.script || args.cmd || null;
       };
       
       // Function to clean up all listeners
@@ -774,8 +778,8 @@ app.post('/api/copilot/stream', async (req, res) => {
           toolArgs: event.data.arguments
         });
         
-        // Detect command execution tools
-        const isCommandTool = COMMAND_TOOLS.some(t => toolName.includes(t));
+        // Detect command execution tools (exact match or starts with pattern)
+        const isCommandTool = COMMAND_TOOLS.some(t => toolName === t || toolName.startsWith(`${t}_`));
         if (isCommandTool) {
           const command = extractCommandFromArgs(args);
           if (command) {

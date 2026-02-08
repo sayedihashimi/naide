@@ -194,6 +194,10 @@ const GenerateAppScreen: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Track auto-collapse timeouts for command blocks
+  const commandCollapseTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  
   const [currentIframeUrl, setCurrentIframeUrl] = useState<string | null>(null);
 
   // Compute display URL: convert proxy URL back to real app URL
@@ -453,6 +457,16 @@ const GenerateAppScreen: React.FC = () => {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
     }
   }, [messages]);
+  
+  // Clean up command collapse timeouts on unmount
+  useEffect(() => {
+    const timeouts = commandCollapseTimeoutsRef.current;
+    return () => {
+      // Clear all pending timeouts
+      timeouts.forEach(timeout => clearTimeout(timeout));
+      timeouts.clear();
+    };
+  }, []);
 
   const handleStopRequest = useCallback(() => {
     if (abortControllerRef.current) {
@@ -686,7 +700,7 @@ const GenerateAppScreen: React.FC = () => {
                     );
                     
                     // Schedule auto-collapse after 2 seconds (unless user manually toggled)
-                    setTimeout(() => {
+                    const timeoutId = setTimeout(() => {
                       setMessages(prev =>
                         prev.map(m =>
                           m.id === commandId && !m.userToggled
@@ -694,7 +708,12 @@ const GenerateAppScreen: React.FC = () => {
                             : m
                         )
                       );
+                      // Clean up timeout reference
+                      commandCollapseTimeoutsRef.current.delete(commandId);
                     }, 2000);
+                    
+                    // Store timeout so we can clean it up if needed
+                    commandCollapseTimeoutsRef.current.set(commandId, timeoutId);
                     break;
                   }
                     
