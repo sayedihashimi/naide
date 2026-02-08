@@ -25,7 +25,8 @@ struct SidecarState {
 
 // Global state to track file watchers
 struct WatcherState {
-    _watcher: Option<Box<dyn Watcher + Send>>,
+    _feature_watcher: Option<Box<dyn Watcher + Send>>,
+    _project_watcher: Option<Box<dyn Watcher + Send>>,
 }
 
 // Global state to track running app process
@@ -698,7 +699,7 @@ async fn watch_feature_files(window: tauri::Window, project_path: String) -> Res
     
     // Store watcher to keep it alive
     // Note: The watcher will be dropped when the app closes, which is fine
-    window.state::<Mutex<WatcherState>>().lock().unwrap()._watcher = Some(Box::new(watcher));
+    window.state::<Mutex<WatcherState>>().lock().unwrap()._feature_watcher = Some(Box::new(watcher));
     
     Ok(())
 }
@@ -791,9 +792,9 @@ async fn watch_project_files(window: tauri::Window, project_path: String) -> Res
     });
     
     // Store watcher to keep it alive
-    // Note: We're reusing the same WatcherState as feature files
-    // Only one watcher can be active at a time per state
-    window.state::<Mutex<WatcherState>>().lock().unwrap()._watcher = Some(Box::new(watcher));
+    // Note: We're storing in a separate field from feature files watcher
+    // Both can be active simultaneously
+    window.state::<Mutex<WatcherState>>().lock().unwrap()._project_watcher = Some(Box::new(watcher));
     
     Ok(())
 }
@@ -1064,7 +1065,8 @@ pub fn run() {
       
       // Initialize watcher state
       app.manage(Mutex::new(WatcherState {
-        _watcher: None,
+        _feature_watcher: None,
+        _project_watcher: None,
       }));
       
       // Initialize running app state
