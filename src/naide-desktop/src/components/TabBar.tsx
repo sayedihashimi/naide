@@ -3,9 +3,9 @@ import { logInfo } from '../utils/logger';
 
 export interface Tab {
   id: string;                    // Unique ID (e.g., file path or 'generate-app')
-  type: 'chat' | 'feature-file';
+  type: 'chat' | 'feature-file' | 'project-file';
   label: string;                 // Display name
-  filePath?: string;             // For feature file tabs
+  filePath?: string;             // For feature file and project file tabs
   isPinned: boolean;             // false = temporary/preview
   isTemporary: boolean;          // true = italic, replaceable
   hasUnsavedChanges?: boolean;   // Show dot indicator

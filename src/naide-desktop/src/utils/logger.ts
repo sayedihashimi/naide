@@ -12,11 +12,11 @@ import { invoke } from '@tauri-apps/api/core';
 function safeInvoke(level: string, message: string): void {
   try {
     if (typeof invoke !== 'undefined') {
-      invoke('log_to_file', { level, message }).catch(e => 
-        console.error('Failed to write to Tauri log:', e)
+      invoke('log_to_file', { level, message }).catch((err: Error) => 
+        console.error('Failed to write to Tauri log:', err)
       );
     }
-  } catch (e) {
+  } catch {
     // Silently fail in test environment where Tauri is not available
   }
 }

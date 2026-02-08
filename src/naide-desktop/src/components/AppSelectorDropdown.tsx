@@ -16,7 +16,7 @@ interface AppSelectorDropdownProps {
   onToggle: () => void;
   onSelect: (app: AppInfo) => void;
   buttonText?: string;
-  dropdownRef: React.RefObject<HTMLDivElement>;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const AppSelectorDropdown: React.FC<AppSelectorDropdownProps> = ({
