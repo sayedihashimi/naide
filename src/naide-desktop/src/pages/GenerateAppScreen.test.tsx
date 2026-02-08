@@ -469,4 +469,210 @@ describe('GenerateAppScreen', () => {
     const boldText = screen.getByText('function');
     expect(boldText.tagName).toBe('STRONG');
   });
+
+  describe('Stop Button', () => {
+    it('shows Stop button when loading', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      // Initially, Send button should be present
+      expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
+      expect(screen.queryByTitle(/Stop request/i)).not.toBeInTheDocument();
+
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // Mock fetch to return a delayed streaming response
+      (global.fetch as any).mockImplementationOnce(() => 
+        new Promise(resolve => {
+          setTimeout(() => {
+            resolve(createStreamingResponse('Response'));
+          }, 1000);
+        })
+      );
+
+      // Type and send a message
+      await user.type(messageInput, 'Test');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Stop button should appear when loading
+      expect(await screen.findByTitle(/Stop request/i)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
+    });
+
+    it('cancels request when Stop button is clicked', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // Mock fetch with a controller that can be tracked
+      const abortMock = vi.fn();
+      (global.fetch as any).mockImplementationOnce(() => {
+        const mockController = { abort: abortMock };
+        return new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          }, 100);
+        });
+      });
+
+      // Type and send a message
+      await user.type(messageInput, 'Test');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Wait for Stop button to appear
+      const stopButton = await screen.findByTitle(/Stop request/i);
+      
+      // Click Stop button
+      await user.click(stopButton);
+
+      // Should show "Cancelled by user" message
+      expect(await screen.findByText('Cancelled by user')).toBeInTheDocument();
+      
+      // Send button should reappear
+      expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
+    });
+
+    it('preserves partial content when cancelled', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // Mock fetch that returns partial content before being cancelled
+      const encoder = new TextEncoder();
+      (global.fetch as any).mockImplementationOnce(() => ({
+        ok: true,
+        body: new ReadableStream({
+          async start(controller) {
+            // Send partial content
+            const deltaEvent = `data: ${JSON.stringify({ type: 'delta', data: { content: 'Partial response' } })}\n\n`;
+            controller.enqueue(encoder.encode(deltaEvent));
+            
+            // Wait a bit then close (simulating cancellation)
+            await new Promise(resolve => setTimeout(resolve, 100));
+            controller.close();
+          }
+        })
+      }));
+
+      // Type and send a message
+      await user.type(messageInput, 'Test');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Wait for Stop button
+      const stopButton = await screen.findByTitle(/Stop request/i);
+      
+      // Wait for partial content to appear
+      await screen.findByText('Partial response');
+      
+      // Click Stop
+      await user.click(stopButton);
+
+      // Both partial content and cancellation message should be visible
+      expect(screen.getByText('Partial response')).toBeInTheDocument();
+      expect(await screen.findByText('Cancelled by user')).toBeInTheDocument();
+    });
+
+    it('removes empty placeholder when cancelled before response', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // Mock fetch that never returns content
+      (global.fetch as any).mockImplementationOnce(() => 
+        new Promise(() => {
+          // Never resolves - simulating waiting for response
+        })
+      );
+
+      // Type and send a message
+      await user.type(messageInput, 'Test');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Wait for Stop button
+      const stopButton = await screen.findByTitle(/Stop request/i);
+      
+      // Should show "Copilot is working..." while waiting
+      expect(await screen.findByText(/Copilot is working on your request/i)).toBeInTheDocument();
+      
+      // Click Stop
+      await user.click(stopButton);
+
+      // Should only show cancellation message, not empty placeholder
+      expect(await screen.findByText('Cancelled by user')).toBeInTheDocument();
+      expect(screen.queryByText(/Copilot is working on your request/i)).not.toBeInTheDocument();
+    });
+
+    it('supports Ctrl+X keyboard shortcut to cancel', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // Mock fetch that delays
+      (global.fetch as any).mockImplementationOnce(() => 
+        new Promise(resolve => {
+          setTimeout(() => {
+            resolve(createStreamingResponse('Response'));
+          }, 1000);
+        })
+      );
+
+      // Type and send a message
+      await user.type(messageInput, 'Test');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Wait for Stop button to confirm loading state
+      await screen.findByTitle(/Stop request/i);
+      
+      // Press Ctrl+X
+      await user.keyboard('{Control>}x{/Control}');
+
+      // Should show cancellation message
+      expect(await screen.findByText('Cancelled by user')).toBeInTheDocument();
+      
+      // Send button should reappear
+      expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
+    });
+
+    it('styles "Cancelled by user" message differently', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // Mock fetch that never completes
+      (global.fetch as any).mockImplementationOnce(() => new Promise(() => {}));
+
+      // Send a message
+      await user.type(messageInput, 'Test');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Stop the request
+      const stopButton = await screen.findByTitle(/Stop request/i);
+      await user.click(stopButton);
+
+      // Find the cancellation message
+      const cancelMessage = await screen.findByText('Cancelled by user');
+      
+      // Check it has the correct styling classes
+      expect(cancelMessage).toHaveClass('text-zinc-500');
+      expect(cancelMessage).toHaveClass('italic');
+      expect(cancelMessage).toHaveClass('text-sm');
+    });
+  });
 });
