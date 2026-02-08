@@ -120,6 +120,7 @@ const MonacoEditorWrapper: React.FC<MonacoEditorWrapperProps> = ({
   return (
     <Editor
       height="100%"
+      width="100%"
       language={language}
       value={value}
       onChange={(value) => onChange?.(value || '')}
