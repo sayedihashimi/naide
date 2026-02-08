@@ -137,7 +137,7 @@ const FeatureFileTab: React.FC<FeatureFileTabProps> = ({
   }, [isActive, isEditing, handleSave]);
 
   return (
-    <div className="h-full flex flex-col bg-zinc-900">
+    <div className="h-full w-full flex flex-col bg-zinc-900">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-700 bg-zinc-800">
         <div className="text-sm text-gray-400 font-mono">
