@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import MarkdownPreview from './MarkdownPreview';
+import MonacoEditorWrapper from './MonacoEditorWrapper';
 import { readProjectFile, writeProjectFile } from '../utils/projectFileUtils';
+import { getMonacoLanguage, isMarkdownFile, formatFileSize } from '../utils/languageDetection';
+
+// Maximum file size: 1 MB
+const MAX_FILE_SIZE = 1_048_576;
 
 interface ProjectFileTabProps {
   filePath: string;
@@ -13,6 +20,7 @@ interface ProjectFileTabProps {
 
 const ProjectFileTab: React.FC<ProjectFileTabProps> = ({
   filePath,
+  fileName,
   projectPath,
   isActive,
   onContentChange,
@@ -35,6 +43,19 @@ const ProjectFileTab: React.FC<ProjectFileTabProps> = ({
 
       try {
         setLoadError(null);
+        
+        // Check file size first
+        const fileSize = await invoke<number>('get_file_size', { 
+          projectPath, 
+          relativePath: filePath 
+        });
+        
+        if (fileSize > MAX_FILE_SIZE) {
+          setLoadError(`This file is too large to open (${formatFileSize(fileSize)} > 1 MB)`);
+          setFileContent(null);
+          return;
+        }
+        
         const content = await readProjectFile(projectPath, filePath);
         setFileContent(content);
         setEditedContent(content);
@@ -74,9 +95,9 @@ const ProjectFileTab: React.FC<ProjectFileTabProps> = ({
     }
   };
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditedContent(e.target.value);
-    const hasChanges = e.target.value !== fileContent;
+  const handleContentChange = (value: string) => {
+    setEditedContent(value);
+    const hasChanges = value !== fileContent;
     setHasUnsavedChanges(hasChanges);
   };
 
@@ -196,18 +217,31 @@ const ProjectFileTab: React.FC<ProjectFileTabProps> = ({
               </button>
             </div>
           </div>
-          <textarea
-            value={editedContent}
-            onChange={handleContentChange}
-            className="flex-1 p-4 bg-zinc-900 text-gray-100 font-mono text-sm resize-none focus:outline-none"
-            placeholder="Enter file content..."
+          <div className="flex-1">
+            <MonacoEditorWrapper
+              value={editedContent}
+              language={getMonacoLanguage(fileName)}
+              readOnly={false}
+              onChange={handleContentChange}
+            />
+          </div>
+        </div>
+      ) : isMarkdownFile(fileName) ? (
+        <div className="flex-1 overflow-y-auto">
+          <MarkdownPreview
+            content={fileContent}
+            fileName={fileName}
+            onEdit={handleToggleEdit}
+            canEdit={!!fileContent}
           />
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-4">
-          <pre className="text-gray-100 font-mono text-sm whitespace-pre-wrap">
-            {fileContent}
-          </pre>
+        <div className="flex-1">
+          <MonacoEditorWrapper
+            value={fileContent || ''}
+            language={getMonacoLanguage(fileName)}
+            readOnly={true}
+          />
         </div>
       )}
     </div>
