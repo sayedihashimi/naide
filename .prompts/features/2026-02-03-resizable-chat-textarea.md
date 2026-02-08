@@ -1,12 +1,14 @@
 ---
-Status: planned
+Status: not-implemented
 Area: ui, chat
 Created: 2026-02-03
-LastUpdated: 2026-02-03
+LastUpdated: 2026-02-08
 ---
 
 # Feature: Resizable Chat Textarea
-**Status**: 🟡 PLANNED
+**Status**: ❌ NOT IMPLEMENTED
+
+> **Note (2026-02-08):** Only the basic expand/collapse toggle exists (switching between fixed `h-20` and `h-40` heights). The drag-to-resize handle, `expandedHeight` state, and dynamic height adjustment described in this spec have **not** been implemented.
 
 ## Summary
 Add resize functionality to the expanded chat textarea, allowing users to adjust the height dynamically by dragging a resize handle, rather than being limited to fixed collapsed/expanded sizes.

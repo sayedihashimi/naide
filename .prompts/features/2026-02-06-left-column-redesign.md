@@ -1,12 +1,12 @@
 ---
-Status: planned
+Status: implemented
 Area: ui, layout
 Created: 2026-02-06
-LastUpdated: 2026-02-06
+LastUpdated: 2026-02-08
 ---
 
 # Feature: Left Column Redesign — Remove Navigation, Improve Features, Add Files Section
-**Status**: 🟡 PLANNED
+**Status**: ✅ IMPLEMENTED
 
 ## Summary
 Redesign the left column of the Generate App screen to:

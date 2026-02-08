@@ -1,12 +1,12 @@
 ---
-Status: planned
+Status: implemented
 Area: ui, chat
 Created: 2026-02-04
-LastUpdated: 2026-02-04
+LastUpdated: 2026-02-08
 ---
 
 # Feature: Delete Chat Sessions
-**Status**: 🟡 PLANNED
+**Status**: ✅ IMPLEMENTED
 
 ## Summary
 Add the ability to delete archived chat sessions from the chat history dropdown. Users can click a delete icon next to each chat to remove it permanently. If the user deletes the only remaining chat, a new empty chat is automatically created.

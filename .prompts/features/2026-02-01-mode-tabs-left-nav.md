@@ -1,27 +1,25 @@
 ---
-Status: partially-implemented
+Status: superseded
 Area: ui
 Created: 2026-02-01
-LastUpdated: 2026-02-03
+LastUpdated: 2026-02-08
+SupersededBy: 2026-02-06-left-column-redesign.md
 ---
 
 # Feature: Replace left nav with Planning / Building / Analyzing tabs (remove mode dropdown)
-**Status**: 🟡 PARTIALLY IMPLEMENTED
+**Status**: 🚫 SUPERSEDED by [2026-02-06-left-column-redesign.md](./2026-02-06-left-column-redesign.md)
 
-## Implementation Status
+## Superseded Notes (2026-02-08)
 
-The mode selector dropdown has been implemented with Planning, Building, and Analyzing options. However, the left navigation still shows the original "Generate", "Activity", and "Files" buttons instead of mode-based tabs.
+This feature was superseded by the Left Column Redesign feature, which took a different approach:
+- The Navigation section (Generate/Activity/Files buttons) was **removed entirely** instead of being replaced with mode tabs
+- The mode selector **remains as a dropdown** in the chat input area
+- The left column now contains **Features** (file browser for `.prompts/features/`) and **Files** (project file browser) sections
+- Mode selection via left nav tabs was never completed and is no longer planned
 
-**Current State:**
-- Mode dropdown exists and works correctly
-- Left nav still has "Generate" (active), "Activity" (disabled), "Files" (disabled)
-- Mode changes update the chat behavior correctly
+## Original Implementation Status
 
-**Remaining Work:**
-- Replace left nav buttons with "Planning", "Building", "Analyzing" tabs
-- Remove the mode dropdown
-- Make the active left tab determine the current mode
-- Update routing to support mode-based navigation (optional)
+The mode selector dropdown was implemented with Planning, Building, and Analyzing options. However, the left navigation was never converted to mode-based tabs before the navigation section was removed entirely.
 
 ## Summary
 Update the left navigation on the Generate App page to use mode-based tabs:

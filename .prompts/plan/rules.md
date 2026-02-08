@@ -13,10 +13,15 @@
 - `.prompts/features/**` - Feature specifications
 - `.prompts/learnings/**` - Project learnings
 
-### Prohibited Writes
-- Application source code (unless in Building mode - future)
+### Prohibited Writes (Planning Mode)
+- Application source code (allowed in Building mode)
 - Configuration files outside allowed directories
 - Any file outside the workspace root
+
+### Building Mode Writes
+- Application source code in project folder
+- Test files and configuration files (with restrictions)
+- Protected: `.env`, `.git/**`, `node_modules/**`, lock files
 
 ## Learnings Capture
 
@@ -47,10 +52,13 @@ Examples:
 - Propose changes explicitly
 - Update specs after user confirms
 
-### Building Mode (Future)
+### Building Mode
 - Can update both code and specs
 - Must maintain spec/code synchronization
 - Run tests before marking complete
+- Code placement: new apps in `src/`, existing apps follow patterns
+- Protected files: `.env`, `.git/`, `node_modules/`, lock files
+- User confirmation required for: deletions, build config changes, new dependencies, major refactoring
 
 ### Analyzing Mode (Future)
 - Read-only analysis
