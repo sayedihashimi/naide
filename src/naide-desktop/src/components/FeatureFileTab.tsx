@@ -194,7 +194,7 @@ const FeatureFileTab: React.FC<FeatureFileTabProps> = ({
               </button>
             </div>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 w-full">
             <MonacoEditorWrapper
               value={editedContent}
               language="markdown"

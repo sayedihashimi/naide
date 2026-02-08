@@ -217,7 +217,7 @@ const ProjectFileTab: React.FC<ProjectFileTabProps> = ({
               </button>
             </div>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 w-full">
             <MonacoEditorWrapper
               value={editedContent}
               language={getMonacoLanguage(fileName)}
@@ -236,7 +236,7 @@ const ProjectFileTab: React.FC<ProjectFileTabProps> = ({
           />
         </div>
       ) : (
-        <div className="flex-1">
+        <div className="flex-1 w-full">
           <MonacoEditorWrapper
             value={fileContent || ''}
             language={getMonacoLanguage(fileName)}
