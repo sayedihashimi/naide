@@ -1862,7 +1862,7 @@ const GenerateAppScreen: React.FC = () => {
           {tabs.filter(t => t.type === 'feature-file').map(tab => (
             <div 
               key={tab.id}
-              className="flex-1 overflow-hidden"
+              className="flex-1 w-full overflow-hidden"
               style={{ display: activeTabId === tab.id ? 'flex' : 'none' }}
             >
               {state.projectPath && tab.filePath && (
@@ -1883,7 +1883,7 @@ const GenerateAppScreen: React.FC = () => {
           {tabs.filter(t => t.type === 'project-file').map(tab => (
             <div 
               key={tab.id}
-              className="flex-1 overflow-hidden"
+              className="flex-1 w-full overflow-hidden"
               style={{ display: activeTabId === tab.id ? 'flex' : 'none' }}
             >
               {state.projectPath && tab.filePath && (
