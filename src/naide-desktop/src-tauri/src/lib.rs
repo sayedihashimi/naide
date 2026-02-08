@@ -746,10 +746,14 @@ async fn watch_project_files(window: tauri::Window, project_path: String) -> Res
                         let should_exclude = event.paths.iter().any(|path| {
                             // Get relative path from project root
                             if let Ok(rel_path) = path.strip_prefix(&project_path_clone) {
-                                let path_str = rel_path.to_string_lossy();
-                                // Check if path contains any excluded directory
-                                excluded_dirs.iter().any(|excluded| {
-                                    path_str.contains(excluded)
+                                // Check if any path component matches an excluded directory
+                                rel_path.components().any(|component| {
+                                    if let std::path::Component::Normal(os_str) = component {
+                                        if let Some(name) = os_str.to_str() {
+                                            return excluded_dirs.contains(&name);
+                                        }
+                                    }
+                                    false
                                 })
                             } else {
                                 false
