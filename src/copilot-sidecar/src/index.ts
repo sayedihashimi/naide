@@ -21,6 +21,8 @@ const FOOTER_MARKER = '<!-- created by naide -->';
 // File write tool names from Copilot SDK's built-in tools
 // These are the tools the AI uses to create/modify files
 const FILE_WRITE_TOOLS = ['create', 'edit', 'write_file', 'write'];
+// Command execution tool names - tools that execute terminal commands
+const COMMAND_TOOLS = ['bash', 'run_command', 'execute_command', 'run_in_terminal', 'shell', 'powershell', 'terminal'];
 // Streaming timeout constants
 const RESPONSE_TIMEOUT_MS = 180000; // 3 minutes - initial timeout before any response
 const ACTIVITY_TIMEOUT_MS = 120000; // 2 minutes - timeout once streaming starts
@@ -681,8 +683,17 @@ app.post('/api/copilot/stream', async (req, res) => {
       // Track tool calls for status reporting
       const toolCalls = new Map<string, { toolName: string; toolArgs: any }>();
       
+      // Track active command executions
+      const activeCommands = new Map<string, { commandId: string; command: string }>();
+      
       // Track all unsubscribe functions for cleanup
       const unsubscribeFns: Array<() => void> = [];
+      
+      // Helper function to extract command from tool arguments
+      const extractCommandFromArgs = (args: Record<string, any>): string | null => {
+        // Try various common argument names for commands
+        return args.command || args.cmd || args.script || args.shellCommand || args.input || null;
+      };
       
       // Function to clean up all listeners
       const cleanupListeners = () => {
@@ -763,6 +774,26 @@ app.post('/api/copilot/stream', async (req, res) => {
           toolArgs: event.data.arguments
         });
         
+        // Detect command execution tools
+        const isCommandTool = COMMAND_TOOLS.some(t => toolName.includes(t));
+        if (isCommandTool) {
+          const command = extractCommandFromArgs(args);
+          if (command) {
+            const commandId = `cmd-${event.data.toolCallId}`;
+            console.log(`[Sidecar] Command execution detected: ${command}`);
+            
+            // Track this as an active command
+            activeCommands.set(event.data.toolCallId, { commandId, command });
+            
+            // Emit command_start event
+            sendEvent('command_start', {
+              commandId,
+              command,
+              toolCallId: event.data.toolCallId
+            });
+          }
+        }
+        
         // Emit status for file operations (with relative paths)
         if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
           const relativePath = toRelativePath(workspace, filePath);
@@ -783,6 +814,17 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       unsubscribeFns.push(session.on('tool.execution_progress', (event) => {
         console.log(`[Sidecar] Tool progress: ${event.data.progressMessage}`);
+        
+        // Check if this is an active command execution
+        const activeCmd = activeCommands.get(event.data.toolCallId);
+        if (activeCmd && event.data.progressMessage) {
+          // Emit command output event
+          sendEvent('command_output', {
+            commandId: activeCmd.commandId,
+            output: event.data.progressMessage
+          });
+        }
+        
         sendEvent('tool_progress', { message: event.data.progressMessage });
         resetTimeout(`tool progress: ${event.data.progressMessage}`);
       }));
@@ -793,6 +835,20 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       unsubscribeFns.push(session.on('tool.execution_complete', (event) => {
         console.log(`[Sidecar] Tool completed: ${event.data.toolCallId}, success: ${event.data.success}`);
+        
+        // Check if this was a command execution
+        const activeCmd = activeCommands.get(event.data.toolCallId);
+        if (activeCmd) {
+          // Emit command_complete event
+          sendEvent('command_complete', {
+            commandId: activeCmd.commandId,
+            exitCode: event.data.exitCode ?? (event.data.success ? 0 : 1),
+            success: event.data.success !== false
+          });
+          
+          // Clean up command tracking
+          activeCommands.delete(event.data.toolCallId);
+        }
         
         // Get stored tool call info
         const toolCallInfo = toolCalls.get(event.data.toolCallId);
