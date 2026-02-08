@@ -842,7 +842,7 @@ app.post('/api/copilot/stream', async (req, res) => {
           // Emit command_complete event
           sendEvent('command_complete', {
             commandId: activeCmd.commandId,
-            exitCode: event.data.exitCode ?? (event.data.success ? 0 : 1),
+            exitCode: event.data.success ? 0 : 1,
             success: event.data.success !== false
           });
           
