@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAppContext } from '../context/useAppContext';
 import type { ChatMessage } from '../utils/chatPersistence';
 import {
@@ -24,6 +24,7 @@ import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, removeRecentProject, type LastProject } from '../utils/globalSettings';
 import { logInfo, logError } from '../utils/logger';
 import { loadOpenTabs, saveOpenTabs, type PersistedTab } from '../utils/tabPersistence';
+import { Square } from 'lucide-react';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -32,6 +33,8 @@ const MODE_DESCRIPTIONS: Record<CopilotMode, string> = {
   Building: '(Update code and specs)',
   Analyzing: '(Coming soon)',
 };
+
+const CANCELLED_BY_USER_MESSAGE = 'Cancelled by user';
 
 const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
   const timestamp = new Date().toISOString();
@@ -189,6 +192,7 @@ const GenerateAppScreen: React.FC = () => {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [currentIframeUrl, setCurrentIframeUrl] = useState<string | null>(null);
 
   // Compute display URL: convert proxy URL back to real app URL
@@ -449,6 +453,36 @@ const GenerateAppScreen: React.FC = () => {
     }
   }, [messages]);
 
+  const handleStopRequest = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
+    // Clean up the partial message
+    setMessages(prev => {
+      const updated = [...prev];
+      const lastMsg = updated[updated.length - 1];
+      
+      // If last message is an empty assistant placeholder, remove it
+      if (lastMsg?.role === 'assistant' && !lastMsg.content.trim()) {
+        updated.pop();
+      }
+      
+      // Append cancellation message
+      updated.push({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: CANCELLED_BY_USER_MESSAGE,
+        timestamp: new Date().toISOString(),
+      });
+      
+      return updated;
+    });
+    
+    setIsLoading(false);
+  }, []);
+
   const handleSendMessage = async () => {
     if (!messageInput.trim() || isLoading) return;
 
@@ -514,6 +548,10 @@ const GenerateAppScreen: React.FC = () => {
       // Add the empty assistant message to the UI
       setMessages(prev => [...prev, assistantMessage]);
       
+      // Create abort controller for this request
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      
       try {
         const response = await fetch('http://localhost:3001/api/copilot/stream', {
           method: 'POST',
@@ -526,6 +564,7 @@ const GenerateAppScreen: React.FC = () => {
             workspaceRoot: projectPath,
             conversationContext,
           }),
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -654,6 +693,11 @@ const GenerateAppScreen: React.FC = () => {
       } catch (streamError) {
         console.error('[GenerateApp] Error in streaming:', streamError);
         
+        // If user cancelled, don't show error message - handleStopRequest already handled it
+        if (streamError instanceof DOMException && streamError.name === 'AbortError') {
+          return;
+        }
+        
         // Provide specific error message based on error type
         let errorMessage = 'An error occurred while streaming the response.';
         if (streamError instanceof TypeError && streamError.message.includes('fetch')) {
@@ -702,6 +746,19 @@ const GenerateAppScreen: React.FC = () => {
     }
     // Just Enter adds a new line (default behavior)
   };
+
+  // Keyboard shortcut for stopping requests (Ctrl+X)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'x' && isLoading) {
+        e.preventDefault();
+        handleStopRequest();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isLoading, handleStopRequest]);
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
@@ -1658,6 +1715,10 @@ const GenerateAppScreen: React.FC = () => {
                       }`}>
                         {message.role === 'assistant' && !message.content && isLoading ? (
                           <p className="text-gray-400 animate-pulse">Copilot is working on your request...</p>
+                        ) : message.content === CANCELLED_BY_USER_MESSAGE ? (
+                          <div className="text-zinc-500 italic text-sm">
+                            {CANCELLED_BY_USER_MESSAGE}
+                          </div>
                         ) : (
                           <MessageContent content={message.content} role={message.role} />
                         )}
@@ -1822,17 +1883,28 @@ const GenerateAppScreen: React.FC = () => {
                     </button>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={!messageInput.trim() || isLoading}
-                      className={`px-4 py-2 rounded-lg transition-colors ${
-                        !messageInput.trim() || isLoading
-                          ? 'bg-zinc-800 text-gray-500 cursor-not-allowed'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white'
-                      }`}
-                    >
-                      Send
-                    </button>
+                    {isLoading ? (
+                      <button
+                        onClick={handleStopRequest}
+                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
+                        title="Stop request (Ctrl+X)"
+                        aria-label="Stop request"
+                      >
+                        <Square size={18} fill="currentColor" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={!messageInput.trim()}
+                        className={`px-4 py-2 rounded-lg transition-colors ${
+                          !messageInput.trim()
+                            ? 'bg-zinc-800 text-gray-500 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
+                      >
+                        Send
+                      </button>
+                    )}
                     <button
                       disabled
                       className="px-4 py-2 bg-zinc-800 text-gray-500 rounded-lg cursor-not-allowed flex items-center justify-center"
