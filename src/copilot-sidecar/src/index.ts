@@ -780,14 +780,19 @@ app.post('/api/copilot/stream', async (req, res) => {
         
         // Detect command execution tools (exact match or starts with pattern)
         const isCommandTool = COMMAND_TOOLS.some(t => toolName === t || toolName.startsWith(`${t}_`));
+        console.log(`[Sidecar] Tool name check: "${toolName}", isCommandTool: ${isCommandTool}, COMMAND_TOOLS:`, COMMAND_TOOLS);
+        
         if (isCommandTool) {
           const command = extractCommandFromArgs(args);
+          console.log(`[Sidecar] Extracted command from args:`, command, 'Args:', args);
+          
           if (command) {
             const commandId = `cmd-${event.data.toolCallId}`;
-            console.log(`[Sidecar] Command execution detected: ${command}`);
+            console.log(`[Sidecar] Command execution detected: ${command}, commandId: ${commandId}, toolCallId: ${event.data.toolCallId}`);
             
             // Track this as an active command
             activeCommands.set(event.data.toolCallId, { commandId, command });
+            console.log(`[Sidecar] Added to activeCommands. Map size: ${activeCommands.size}`);
             
             // Emit command_start event
             sendEvent('command_start', {
@@ -795,6 +800,8 @@ app.post('/api/copilot/stream', async (req, res) => {
               command,
               toolCallId: event.data.toolCallId
             });
+          } else {
+            console.log(`[Sidecar] Command tool detected but no command extracted from args`);
           }
         }
         
@@ -817,11 +824,15 @@ app.post('/api/copilot/stream', async (req, res) => {
       }));
       
       unsubscribeFns.push(session.on('tool.execution_progress', (event) => {
-        console.log(`[Sidecar] Tool progress: ${event.data.progressMessage}`);
+        console.log(`[Sidecar] Tool progress - toolCallId: ${event.data.toolCallId}, message: ${event.data.progressMessage}`);
         
         // Check if this is an active command execution
         const activeCmd = activeCommands.get(event.data.toolCallId);
+        console.log(`[Sidecar] Active command lookup for ${event.data.toolCallId}:`, activeCmd ? `Found: ${activeCmd.command}` : 'Not found');
+        console.log(`[Sidecar] Active commands map size: ${activeCommands.size}, keys:`, Array.from(activeCommands.keys()));
+        
         if (activeCmd && event.data.progressMessage) {
+          console.log(`[Sidecar] Emitting command_output for ${activeCmd.commandId}`);
           // Emit command output event
           sendEvent('command_output', {
             commandId: activeCmd.commandId,
@@ -833,7 +844,20 @@ app.post('/api/copilot/stream', async (req, res) => {
         resetTimeout(`tool progress: ${event.data.progressMessage}`);
       }));
       
-      unsubscribeFns.push(session.on('tool.execution_partial_result', () => {
+      unsubscribeFns.push(session.on('tool.execution_partial_result', (event) => {
+        console.log(`[Sidecar] Tool partial result - toolCallId: ${event.data.toolCallId}, output length: ${event.data.partialOutput?.length || 0}`);
+        
+        // Check if this is an active command execution
+        const activeCmd = activeCommands.get(event.data.toolCallId);
+        if (activeCmd && event.data.partialOutput) {
+          console.log(`[Sidecar] Emitting command_output from partial_result for ${activeCmd.commandId}`);
+          // Emit command output event
+          sendEvent('command_output', {
+            commandId: activeCmd.commandId,
+            output: event.data.partialOutput
+          });
+        }
+        
         resetTimeout('tool partial result');
       }));
       
