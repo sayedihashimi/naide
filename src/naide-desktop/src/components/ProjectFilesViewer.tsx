@@ -301,7 +301,7 @@ const ProjectFilesViewer: React.FC<ProjectFilesViewerProps> = ({ onFileSelect })
                 placeholder="Filter files..."
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
-                className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               />
               <button
                 onClick={handleRefresh}
