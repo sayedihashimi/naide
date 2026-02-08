@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import MarkdownPreview from './MarkdownPreview';
+import MonacoEditorWrapper from './MonacoEditorWrapper';
 import { readFeatureFile, writeFeatureFile } from '../utils/featureFiles';
 
 interface FeatureFileTabProps {
@@ -76,9 +77,9 @@ const FeatureFileTab: React.FC<FeatureFileTabProps> = ({
     }
   };
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditedContent(e.target.value);
-    const hasChanges = e.target.value !== fileContent;
+  const handleContentChange = (value: string) => {
+    setEditedContent(value);
+    const hasChanges = value !== fileContent;
     setHasUnsavedChanges(hasChanges);
   };
 
@@ -136,7 +137,7 @@ const FeatureFileTab: React.FC<FeatureFileTabProps> = ({
   }, [isActive, isEditing, handleSave]);
 
   return (
-    <div className="h-full flex flex-col bg-zinc-900">
+    <div className="h-full w-full flex flex-col bg-zinc-900">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-700 bg-zinc-800">
         <div className="text-sm text-gray-400 font-mono">
@@ -193,12 +194,14 @@ const FeatureFileTab: React.FC<FeatureFileTabProps> = ({
               </button>
             </div>
           </div>
-          <textarea
-            value={editedContent}
-            onChange={handleContentChange}
-            className="flex-1 p-4 bg-zinc-900 text-gray-100 font-mono text-sm resize-none focus:outline-none"
-            placeholder="Enter markdown content..."
-          />
+          <div className="flex-1 w-full">
+            <MonacoEditorWrapper
+              value={editedContent}
+              language="markdown"
+              readOnly={false}
+              onChange={handleContentChange}
+            />
+          </div>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">

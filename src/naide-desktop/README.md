@@ -18,6 +18,8 @@ cd src/naide-desktop
 npm install
 ```
 
+**⚠️ Important**: Always run `npm install` after pulling changes from the repository, especially if you see import errors or missing module errors. New dependencies may have been added.
+
 ### Running the Application
 
 ```bash

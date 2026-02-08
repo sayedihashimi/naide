@@ -1,4 +1,72 @@
-# Troubleshooting Test Failures
+# Troubleshooting
+
+## Issue: `Failed to resolve import "@monaco-editor/react"`
+
+If you're seeing this error when running `npm run dev` or `npm run tauri:dev`:
+
+```
+Failed to resolve import "@monaco-editor/react" from "src/components/MonacoEditorWrapper.tsx". Does the file exist?
+```
+
+### Solution
+
+This means you need to install the new dependencies after pulling the latest changes.
+
+#### Quick Fix
+
+```bash
+cd src/naide-desktop
+npm install
+```
+
+Then restart your dev server:
+```bash
+npm run tauri:dev
+```
+
+### Why This Happens
+
+The Monaco Editor packages (`@monaco-editor/react` and `monaco-editor`) were recently added to provide a better code editing experience. When you pull changes that add new dependencies to `package.json`, you must run `npm install` to download and install those packages into your local `node_modules` folder.
+
+### Verification
+
+After running `npm install`, you can verify the packages are installed:
+
+```bash
+# Check Monaco editor is installed
+ls node_modules/@monaco-editor  # Should show 'react' folder
+ls node_modules/monaco-editor    # Should show Monaco editor files
+```
+
+### Still Having Issues?
+
+If the error persists after running `npm install`:
+
+1. **Clean install**:
+   ```bash
+   # Windows
+   rmdir /s /q node_modules
+   del package-lock.json
+   
+   # Linux/Mac
+   rm -rf node_modules package-lock.json
+   
+   # Then reinstall
+   npm install
+   ```
+
+2. **Check package.json**: Make sure you have the latest version from the repository:
+   ```json
+   "dependencies": {
+     "@monaco-editor/react": "^4.7.0",
+     "monaco-editor": "^0.55.1",
+     ...
+   }
+   ```
+
+3. **Clear npm cache**: `npm cache clean --force`, then `npm install`
+
+---
 
 ## Issue: `ReferenceError: __vite_ssr_exportName__ is not defined`
 
