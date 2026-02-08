@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAppContext } from '../context/useAppContext';
 import type { ChatMessage } from '../utils/chatPersistence';
 import {
@@ -33,6 +33,8 @@ const MODE_DESCRIPTIONS: Record<CopilotMode, string> = {
   Building: '(Update code and specs)',
   Analyzing: '(Coming soon)',
 };
+
+const CANCELLED_BY_USER_MESSAGE = 'Cancelled by user';
 
 const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
   const timestamp = new Date().toISOString();
@@ -451,7 +453,7 @@ const GenerateAppScreen: React.FC = () => {
     }
   }, [messages]);
 
-  const handleStopRequest = () => {
+  const handleStopRequest = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -471,7 +473,7 @@ const GenerateAppScreen: React.FC = () => {
       updated.push({
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: 'Cancelled by user',
+        content: CANCELLED_BY_USER_MESSAGE,
         timestamp: new Date().toISOString(),
       });
       
@@ -479,7 +481,7 @@ const GenerateAppScreen: React.FC = () => {
     });
     
     setIsLoading(false);
-  };
+  }, []);
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || isLoading) return;
@@ -756,7 +758,7 @@ const GenerateAppScreen: React.FC = () => {
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isLoading]);
+  }, [isLoading, handleStopRequest]);
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
@@ -1713,9 +1715,9 @@ const GenerateAppScreen: React.FC = () => {
                       }`}>
                         {message.role === 'assistant' && !message.content && isLoading ? (
                           <p className="text-gray-400 animate-pulse">Copilot is working on your request...</p>
-                        ) : message.content === 'Cancelled by user' ? (
+                        ) : message.content === CANCELLED_BY_USER_MESSAGE ? (
                           <div className="text-zinc-500 italic text-sm">
-                            Cancelled by user
+                            {CANCELLED_BY_USER_MESSAGE}
                           </div>
                         ) : (
                           <MessageContent content={message.content} role={message.role} />
@@ -1886,6 +1888,7 @@ const GenerateAppScreen: React.FC = () => {
                         onClick={handleStopRequest}
                         className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
                         title="Stop request (Ctrl+X)"
+                        aria-label="Stop request"
                       >
                         <Square size={18} fill="currentColor" />
                       </button>
