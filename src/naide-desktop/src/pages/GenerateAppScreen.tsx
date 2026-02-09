@@ -197,7 +197,7 @@ const GenerateAppScreen: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   
   // Track auto-collapse timeouts for command blocks
-  const commandCollapseTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const commandCollapseTimeoutsRef = useRef<Map<string, number>>(new Map());
   
   const [currentIframeUrl, setCurrentIframeUrl] = useState<string | null>(null);
 

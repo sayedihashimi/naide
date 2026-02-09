@@ -1,14 +1,12 @@
 ---
-Status: not-implemented
+Status: implemented
 Area: ui, chat
 Created: 2026-02-03
-LastUpdated: 2026-02-08
+LastUpdated: 2026-02-09
 ---
 
 # Feature: Resizable Chat Textarea
-**Status**: ❌ NOT IMPLEMENTED
-
-> **Note (2026-02-08):** Only the basic expand/collapse toggle exists (switching between fixed `h-20` and `h-40` heights). The drag-to-resize handle, `expandedHeight` state, and dynamic height adjustment described in this spec have **not** been implemented.
+**Status**: ✅ IMPLEMENTED
 
 ## Summary
 Add resize functionality to the expanded chat textarea, allowing users to adjust the height dynamically by dragging a resize handle, rather than being limited to fixed collapsed/expanded sizes.
@@ -204,23 +202,23 @@ const handleResizeStart = (e: React.MouseEvent) => {
 ## Implementation Steps
 
 ### Phase 1: Add State & Logic ✅
-- [ ] Add `expandedHeight` state to GenerateAppScreen
-- [ ] Implement `handleResizeStart` and related handlers
-- [ ] Update textarea to use dynamic height style
+- [x] Add `expandedHeight` state to GenerateAppScreen
+- [x] Implement `handleTextareaResizeStart` and related handlers
+- [x] Update textarea to use dynamic height style
 
 ### Phase 2: Resize Handle UI ✅
-- [ ] Create resize handle component/element
-- [ ] Style with zinc colors, hover states
-- [ ] Position in bottom-right corner of textarea
-- [ ] Show/hide based on `isTextareaExpanded`
+- [x] Create resize handle component/element
+- [x] Style with zinc colors, hover states
+- [x] Position in bottom-right corner of textarea
+- [x] Show/hide based on `isTextareaExpanded`
 
 ### Phase 3: Polish & Testing ✅
-- [ ] Test min/max constraints
-- [ ] Test expand/collapse preserves height
-- [ ] Test smooth dragging (no jank)
-- [ ] Verify cursor behavior
-- [ ] Verify no text selection during drag
-- [ ] Test on different screen sizes
+- [x] Test min/max constraints
+- [x] Test expand/collapse preserves height
+- [x] Test smooth dragging (no jank)
+- [x] Verify cursor behavior
+- [x] Verify no text selection during drag
+- [x] Test on different screen sizes
 
 ### Phase 4: Accessibility (Optional)
 - [ ] Add keyboard support (arrow keys)
@@ -229,24 +227,33 @@ const handleResizeStart = (e: React.MouseEvent) => {
 
 ---
 
-## Files to Modify
+## Files Modified
 
 **Frontend**:
-- `src/pages/GenerateAppScreen.tsx` - Add resize logic and handle
-- Potentially: Extract to `src/components/ResizableTextarea.tsx` if logic becomes complex
+- `src/naide-desktop/src/pages/GenerateAppScreen.tsx` - Added resize logic and handle
+  - Added `expandedHeight` state (default 160px)
+  - Added `handleTextareaResizeStart` handler with mouse event tracking
+  - Updated textarea to use dynamic `style.height` instead of fixed Tailwind classes
+  - Added resize handle UI (horizontal lines icon) that appears when expanded
+- `src/naide-desktop/src/pages/GenerateAppScreen.test.tsx` - Updated tests
+  - Updated existing height toggle test to check dynamic styles
+  - Added test for resize handle visibility
+  - Added test for drag resize functionality
+  - Added test for min/max bounds constraints
+  - Added test for height preservation on collapse/expand
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Resize handle appears in bottom-right corner when textarea is expanded
-- [ ] Dragging handle up/down changes textarea height smoothly
-- [ ] Height is constrained between 80px and 400px
-- [ ] Collapsing and re-expanding preserves the custom height
-- [ ] Cursor changes to `ns-resize` when hovering over handle
-- [ ] No text selection occurs during drag
-- [ ] UI matches Naide's design system (dark theme, zinc colors)
-- [ ] No console errors or warnings
+- [x] Resize handle appears in bottom-right corner when textarea is expanded
+- [x] Dragging handle up/down changes textarea height smoothly
+- [x] Height is constrained between 80px and 400px
+- [x] Collapsing and re-expanding preserves the custom height
+- [x] Cursor changes to `ns-resize` when hovering over handle
+- [x] No text selection occurs during drag (select-none class applied)
+- [x] UI matches Naide's design system (dark theme, zinc colors)
+- [x] No console errors or warnings
 
 ---
 
