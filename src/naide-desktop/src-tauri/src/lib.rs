@@ -25,7 +25,8 @@ struct SidecarState {
 
 // Global state to track file watchers
 struct WatcherState {
-    _watcher: Option<Box<dyn Watcher + Send>>,
+    _feature_watcher: Option<Box<dyn Watcher + Send>>,
+    _project_watcher: Option<Box<dyn Watcher + Send>>,
 }
 
 // Global state to track running app process
@@ -698,7 +699,106 @@ async fn watch_feature_files(window: tauri::Window, project_path: String) -> Res
     
     // Store watcher to keep it alive
     // Note: The watcher will be dropped when the app closes, which is fine
-    window.state::<Mutex<WatcherState>>().lock().unwrap()._watcher = Some(Box::new(watcher));
+    window.state::<Mutex<WatcherState>>().lock().unwrap()._feature_watcher = Some(Box::new(watcher));
+    
+    Ok(())
+}
+
+// Tauri command: Watch project files directory for changes
+#[tauri::command]
+async fn watch_project_files(window: tauri::Window, project_path: String) -> Result<(), String> {
+    let project_path_buf = PathBuf::from(&project_path);
+    
+    if !project_path_buf.exists() {
+        log::warn!("Project directory does not exist: {:?}", project_path_buf);
+        return Err("Project directory does not exist".to_string());
+    }
+    
+    log::info!("Starting project file watcher for: {:?}", project_path_buf);
+    
+    let (tx, rx) = channel();
+    
+    // List of directories to exclude from watching
+    let excluded_dirs = vec![
+        "node_modules",
+        ".git",
+        "bin",
+        "obj",
+        "dist",
+        "build",
+        "out",
+        ".naide",
+        "target", // Rust
+        "__pycache__", // Python
+        ".venv", // Python
+        "venv", // Python
+    ];
+    
+    // Create the watcher
+    let project_path_clone = project_path_buf.clone();
+    let mut watcher = recommended_watcher(move |res: Result<Event, notify::Error>| {
+        match res {
+            Ok(event) => {
+                // Filter for events we care about (Create, Remove, Rename only - ignore Modify)
+                match event.kind {
+                    EventKind::Create(_) | EventKind::Remove(_) => {
+                        // Check if any of the paths should be excluded
+                        let should_exclude = event.paths.iter().any(|path| {
+                            // Get relative path from project root
+                            if let Ok(rel_path) = path.strip_prefix(&project_path_clone) {
+                                // Check if any path component matches an excluded directory
+                                rel_path.components().any(|component| {
+                                    if let std::path::Component::Normal(os_str) = component {
+                                        if let Some(name) = os_str.to_str() {
+                                            return excluded_dirs.contains(&name);
+                                        }
+                                    }
+                                    false
+                                })
+                            } else {
+                                false
+                            }
+                        });
+                        
+                        if !should_exclude {
+                            log::debug!("Project file change detected: {:?}", event);
+                            // Send through channel
+                            let _ = tx.send(());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Err(e) => {
+                log::error!("Watch error: {:?}", e);
+            }
+        }
+    }).map_err(|e| format!("Failed to create watcher: {}", e))?;
+    
+    // Start watching
+    watcher.watch(&project_path_buf, RecursiveMode::Recursive)
+        .map_err(|e| format!("Failed to watch directory: {}", e))?;
+    
+    log::info!("Project file watcher started successfully");
+    
+    // Clone window for the thread, keep original for state access
+    let window_clone = window.clone();
+    
+    // Spawn a thread to listen for events and emit to frontend
+    std::thread::spawn(move || {
+        while let Ok(_) = rx.recv() {
+            // Emit event to frontend
+            log::debug!("Emitting project-files-changed event");
+            if let Err(e) = window_clone.emit("project-files-changed", ()) {
+                log::error!("Failed to emit event: {}", e);
+            }
+        }
+    });
+    
+    // Store watcher to keep it alive
+    // Note: We're storing in a separate field from feature files watcher
+    // Both can be active simultaneously
+    window.state::<Mutex<WatcherState>>().lock().unwrap()._project_watcher = Some(Box::new(watcher));
     
     Ok(())
 }
@@ -969,7 +1069,8 @@ pub fn run() {
       
       // Initialize watcher state
       app.manage(Mutex::new(WatcherState {
-        _watcher: None,
+        _feature_watcher: None,
+        _project_watcher: None,
       }));
       
       // Initialize running app state
@@ -1066,6 +1167,7 @@ pub fn run() {
       load_chat_session_file,
       delete_chat_session,
       watch_feature_files,
+      watch_project_files,
       detect_runnable_app,
       detect_all_runnable_apps_command,
       start_app,
