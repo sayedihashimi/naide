@@ -170,6 +170,35 @@ async fn remove_recent_project_cmd(app: tauri::AppHandle, path: String) -> Resul
     Ok(())
 }
 
+// Tauri command: Get project link domains from settings
+#[tauri::command]
+async fn get_project_link_domains(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let settings = read_settings(&app)?;
+    Ok(settings.project_link_domains)
+}
+
+// Tauri command: Check if a file exists within the project directory
+#[tauri::command]
+async fn check_file_exists(project_path: String, relative_path: String) -> Result<bool, String> {
+    use std::path::Path;
+    
+    let full_path = Path::new(&project_path).join(&relative_path);
+
+    // Security: ensure path is within project directory
+    let canonical = match full_path.canonicalize() {
+        Ok(c) => c,
+        Err(_) => return Ok(false), // Path doesn't exist
+    };
+    let project_canonical = Path::new(&project_path).canonicalize()
+        .map_err(|e| format!("Failed to resolve project path: {}", e))?;
+
+    if !canonical.starts_with(&project_canonical) {
+        return Ok(false); // Path escapes project directory
+    }
+
+    Ok(canonical.is_file())
+}
+
 // View options for feature files
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ViewOptions {
@@ -1156,6 +1185,8 @@ pub fn run() {
       get_recent_projects,
       add_recent_project_cmd,
       remove_recent_project_cmd,
+      get_project_link_domains,
+      check_file_exists,
       log_to_file,
       list_feature_files,
       read_feature_file,

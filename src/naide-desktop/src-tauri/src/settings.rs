@@ -16,6 +16,8 @@ pub struct GlobalSettings {
     pub last_used_project: Option<LastProject>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recent_projects: Vec<LastProject>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub project_link_domains: Vec<String>,
 }
 
 impl Default for GlobalSettings {
@@ -24,6 +26,7 @@ impl Default for GlobalSettings {
             version: 1,
             last_used_project: None,
             recent_projects: Vec::new(),
+            project_link_domains: Vec::new(),
         }
     }
 }
