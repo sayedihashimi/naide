@@ -16,8 +16,13 @@ const ProjectLinkContext = createContext<ProjectLinkContextValue>({
   onOpenProjectFile: () => {},
 });
 
-export const useProjectLinkContext = () => useContext(ProjectLinkContext);
+// Export hook separately
+// eslint-disable-next-line react-refresh/only-export-components
+export function useProjectLinkContext() {
+  return useContext(ProjectLinkContext);
+}
 
+// Export provider component
 export const ProjectLinkProvider: React.FC<{
   children: React.ReactNode;
   projectPath: string | null;
