@@ -1973,55 +1973,48 @@ const GenerateAppScreen: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex gap-3">
-                  <div className="flex-1 relative">
-                    <textarea
-                      ref={textareaRef}
-                      value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Type your message... (Ctrl/Cmd+Enter to send)"
-                      style={{
-                        height: isExpanded ? `${expandedHeight}px` : '5rem', // 5rem = 80px (h-20)
-                      }}
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-                    {/* Expand/Collapse button */}
-                    <button
-                      onClick={toggleExpand}
-                      className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
-                      title={isExpanded ? 'Collapse' : 'Expand'}
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        {isExpanded ? (
-                          // Collapse icon
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                          />
-                        ) : (
-                          // Expand icon
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                          />
-                        )}
-                      </svg>
-                    </button>
-                    {/* Resize handle - only shown when expanded */}
+                  <div className="flex-1 flex flex-col">
+                    {/* Resize handle container - only shown when expanded */}
                     {isExpanded && (
-                      <div
-                        className="absolute top-2 right-10 p-1.5 cursor-ns-resize text-zinc-600 hover:text-zinc-400 transition-colors select-none"
-                        onMouseDown={handleTextareaResizeStart}
-                        title="Drag to resize textarea"
+                      <div className="flex justify-end items-center h-6 px-2">
+                        <div
+                          className="p-1.5 cursor-ns-resize text-zinc-600 hover:text-zinc-400 transition-colors select-none"
+                          onMouseDown={handleTextareaResizeStart}
+                          title="Drag to resize textarea"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 8h16M4 16h16"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                    <div className="relative">
+                      <textarea
+                        ref={textareaRef}
+                        value={messageInput}
+                        onChange={(e) => setMessageInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type your message... (Ctrl/Cmd+Enter to send)"
+                        style={{
+                          height: isExpanded ? `${expandedHeight}px` : '5rem', // 5rem = 80px (h-20)
+                        }}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      {/* Expand/Collapse button */}
+                      <button
+                        onClick={toggleExpand}
+                        className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
+                        title={isExpanded ? 'Collapse' : 'Expand'}
                       >
                         <svg
                           className="w-4 h-4"
@@ -2029,15 +2022,26 @@ const GenerateAppScreen: React.FC = () => {
                           stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 8h16M4 16h16"
-                          />
+                          {isExpanded ? (
+                            // Collapse icon
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                            />
+                          ) : (
+                            // Expand icon
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                            />
+                          )}
                         </svg>
-                      </div>
-                    )}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     {isLoading ? (

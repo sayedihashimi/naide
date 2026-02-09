@@ -63,19 +63,22 @@ const [isTextareaExpanded, setIsTextareaExpanded] = useState(false);
 ## Proposed Solution
 
 ### Visual Design
-When textarea is expanded, show a **resize handle** in the top-right corner:
+When textarea is expanded, show a **resize handle** in a horizontal container above the textarea:
 - Icon: ⋰ or drag indicator (horizontal lines)
-- Position: Absolute, top-right corner with padding
+- Position: In a separate horizontal container (h-6) above the textarea, aligned to the right
 - Cursor: `ns-resize` (vertical resize cursor)
 - Style: Subtle zinc-600 color, zinc-400 on hover
+- Layout: Handle is in its own container, preventing text overlap
 
 ### Interaction Flow
 1. User clicks expand button → textarea expands to last known height (or default)
-2. User sees resize handle in top-right corner
-3. User drags handle down → textarea height increases (expands)
-4. User drags handle up → textarea height decreases (shrinks)
+2. User sees resize handle in a dedicated bar above the textarea
+3. User drags handle up → textarea height increases (expands)
+4. User drags handle down → textarea height decreases (shrinks)
 5. Release drag → height locks at final position
 6. Click collapse button → textarea returns to collapsed height
+
+**Note**: With inverted logic, dragging UP expands the textarea, dragging DOWN shrinks it.
 
 ### Height Constraints
 - **Minimum**: 80px (h-20, collapsed height)
@@ -233,14 +236,15 @@ const handleResizeStart = (e: React.MouseEvent) => {
 **Frontend**:
 - `src/naide-desktop/src/pages/GenerateAppScreen.tsx` - Added resize logic and handle
   - Added `expandedHeight` state (default 160px)
-  - Added `handleTextareaResizeStart` handler with mouse event tracking
+  - Added `handleTextareaResizeStart` handler with mouse event tracking and **inverted logic** (drag up = expand, drag down = shrink)
   - Updated textarea to use dynamic `style.height` instead of fixed Tailwind classes
-  - Added resize handle UI (horizontal lines icon) positioned at **top-right** that appears when expanded
-  - **Update (2026-02-09)**: Moved resize handle from bottom-right to top-right for more intuitive interaction
+  - **Update (2026-02-09)**: Moved resize handle from bottom-right to top-right, then to separate horizontal container
+  - **Update (2026-02-09)**: Restructured layout with resize handle in dedicated h-6 container above textarea to prevent text overlap
+  - **Update (2026-02-09)**: Inverted resize logic so dragging up expands (increases height) and dragging down shrinks (decreases height)
 - `src/naide-desktop/src/pages/GenerateAppScreen.test.tsx` - Updated tests
   - Updated existing height toggle test to check dynamic styles
   - Added test for resize handle visibility
-  - Added test for drag resize functionality
+  - Added test for drag resize functionality with inverted logic
   - Added test for min/max bounds constraints
   - Added test for height preservation on collapse/expand
 
@@ -248,9 +252,10 @@ const handleResizeStart = (e: React.MouseEvent) => {
 
 ## Acceptance Criteria
 
-- [x] Resize handle appears in top-right corner when textarea is expanded (updated from bottom-right for more intuitive UX)
-- [x] Dragging handle down increases textarea height (expansion)
-- [x] Dragging handle up decreases textarea height (shrinking)
+- [x] Resize handle appears in dedicated container above textarea when expanded (updated for no text overlap)
+- [x] Dragging handle UP increases textarea height (expansion) - inverted logic
+- [x] Dragging handle DOWN decreases textarea height (shrinking) - inverted logic
+- [x] Handle is in separate horizontal container, preventing text overlap
 - [x] Height is constrained between 80px and 400px
 - [x] Collapsing and re-expanding preserves the custom height
 - [x] Cursor changes to `ns-resize` when hovering over handle
