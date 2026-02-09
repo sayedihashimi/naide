@@ -187,12 +187,17 @@ async fn check_file_exists(project_path: String, relative_path: String) -> Resul
     // Security: ensure path is within project directory
     let canonical = match full_path.canonicalize() {
         Ok(c) => c,
-        Err(_) => return Ok(false), // Path doesn't exist
+        Err(e) => {
+            // Path doesn't exist or can't be accessed
+            log::debug!("Failed to canonicalize path {}: {}", full_path.display(), e);
+            return Ok(false);
+        }
     };
     let project_canonical = Path::new(&project_path).canonicalize()
         .map_err(|e| format!("Failed to resolve project path: {}", e))?;
 
     if !canonical.starts_with(&project_canonical) {
+        log::warn!("Path escapes project directory: {}", canonical.display());
         return Ok(false); // Path escapes project directory
     }
 

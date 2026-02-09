@@ -1248,7 +1248,9 @@ const GenerateAppScreen: React.FC = () => {
   // Handle opening a file from a link click
   const handleOpenFileFromLink = (relativePath: string) => {
     const tabType = getTabType(relativePath);
-    const fileName = relativePath.split('/').pop() || relativePath;
+    // Normalize path separators to forward slashes and extract filename
+    const normalizedPath = relativePath.replace(/\\/g, '/');
+    const fileName = normalizedPath.split('/').pop() || relativePath;
     
     if (tabType === 'feature-file') {
       // Open as feature file tab

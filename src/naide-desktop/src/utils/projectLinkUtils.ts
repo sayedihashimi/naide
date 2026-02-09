@@ -36,11 +36,13 @@ export function extractProjectFilePath(
 }
 
 /**
- * Decode URL encoding and normalize the path:
- * - Decode percent-encoded characters
- * - Strip leading slash
- * - Strip query string and hash
- * - Normalize path separators to forward slashes
+ * Decode URL encoding and normalize the path for project file usage:
+ * - Decodes percent-encoded characters (e.g., %20 → space)
+ * - Strips leading slashes (e.g., /src/App.tsx → src/App.tsx)
+ * - Strips query strings (e.g., ?v=123)
+ * - Strips hash fragments (e.g., #section)
+ * - Normalizes path separators to forward slashes
+ * Returns null if the path is empty after processing.
  */
 function decodeAndNormalizePath(urlPath: string): string | null {
   try {
