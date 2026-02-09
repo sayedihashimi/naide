@@ -41,6 +41,7 @@ This index provides a chronological overview of all feature files in `.prompts/f
 
 | Feature File | Summary | Status |
 |--------------|---------|--------|
+| [2026-02-09-favorite-chat-sessions.md](./2026-02-09-favorite-chat-sessions.md) | Favorite chat sessions with star icon for quick access | planned |
 | [2026-02-03-adaptive-learnings-index.md](./2026-02-03-adaptive-learnings-index.md) | Auto-indexing for large learning sets | planned |
 | [2026-02-06-project-file-watcher.md](./2026-02-06-project-file-watcher.md) | Watch project folder for new runnable apps | planned |
 | [2026-02-08-monaco-editor-integration.md](./2026-02-08-monaco-editor-integration.md) | Monaco Editor for syntax highlighting, line numbers, and rich editing | planned |
