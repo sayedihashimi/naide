@@ -63,18 +63,19 @@ const [isTextareaExpanded, setIsTextareaExpanded] = useState(false);
 ## Proposed Solution
 
 ### Visual Design
-When textarea is expanded, show a **resize handle** in the bottom-right corner:
+When textarea is expanded, show a **resize handle** in the top-right corner:
 - Icon: ⋰ or drag indicator (horizontal lines)
-- Position: Absolute, bottom-right corner with padding
+- Position: Absolute, top-right corner with padding
 - Cursor: `ns-resize` (vertical resize cursor)
 - Style: Subtle zinc-600 color, zinc-400 on hover
 
 ### Interaction Flow
 1. User clicks expand button → textarea expands to last known height (or default)
-2. User sees resize handle in bottom-right corner
-3. User drags handle up/down → textarea height adjusts in real-time
-4. Release drag → height locks at final position
-5. Click collapse button → textarea returns to collapsed height
+2. User sees resize handle in top-right corner
+3. User drags handle down → textarea height increases (expands)
+4. User drags handle up → textarea height decreases (shrinks)
+5. Release drag → height locks at final position
+6. Click collapse button → textarea returns to collapsed height
 
 ### Height Constraints
 - **Minimum**: 80px (h-20, collapsed height)
@@ -104,7 +105,7 @@ const [expandedHeight, setExpandedHeight] = useState<number>(160); // Default 16
 ```tsx
 {isTextareaExpanded && (
   <div
-    className="absolute bottom-1 right-1 cursor-ns-resize text-zinc-600 hover:text-zinc-400"
+    className="absolute top-1 right-1 cursor-ns-resize text-zinc-600 hover:text-zinc-400"
     onMouseDown={handleResizeStart}
   >
     <svg>...</svg> {/* Resize icon */}
@@ -234,7 +235,8 @@ const handleResizeStart = (e: React.MouseEvent) => {
   - Added `expandedHeight` state (default 160px)
   - Added `handleTextareaResizeStart` handler with mouse event tracking
   - Updated textarea to use dynamic `style.height` instead of fixed Tailwind classes
-  - Added resize handle UI (horizontal lines icon) that appears when expanded
+  - Added resize handle UI (horizontal lines icon) positioned at **top-right** that appears when expanded
+  - **Update (2026-02-09)**: Moved resize handle from bottom-right to top-right for more intuitive interaction
 - `src/naide-desktop/src/pages/GenerateAppScreen.test.tsx` - Updated tests
   - Updated existing height toggle test to check dynamic styles
   - Added test for resize handle visibility
@@ -246,8 +248,9 @@ const handleResizeStart = (e: React.MouseEvent) => {
 
 ## Acceptance Criteria
 
-- [x] Resize handle appears in bottom-right corner when textarea is expanded
-- [x] Dragging handle up/down changes textarea height smoothly
+- [x] Resize handle appears in top-right corner when textarea is expanded (updated from bottom-right for more intuitive UX)
+- [x] Dragging handle down increases textarea height (expansion)
+- [x] Dragging handle up decreases textarea height (shrinking)
 - [x] Height is constrained between 80px and 400px
 - [x] Collapsing and re-expanding preserves the custom height
 - [x] Cursor changes to `ns-resize` when hovering over handle

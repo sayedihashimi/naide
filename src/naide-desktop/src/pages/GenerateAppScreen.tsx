@@ -2018,7 +2018,7 @@ const GenerateAppScreen: React.FC = () => {
                     {/* Resize handle - only shown when expanded */}
                     {isExpanded && (
                       <div
-                        className="absolute bottom-2 right-10 p-1.5 cursor-ns-resize text-zinc-600 hover:text-zinc-400 transition-colors select-none"
+                        className="absolute top-2 right-10 p-1.5 cursor-ns-resize text-zinc-600 hover:text-zinc-400 transition-colors select-none"
                         onMouseDown={handleTextareaResizeStart}
                         title="Drag to resize textarea"
                       >
