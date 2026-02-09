@@ -240,13 +240,17 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
       {!isLoading && !error && chatSessions.length > 0 && (
         <div className="overflow-y-auto max-h-96">
           {(() => {
-            // Split chats into favorites and non-favorites
-            const favoritedChats = chatSessions.filter(session => 
-              favoriteSessions.includes(session.filename)
-            );
-            const otherChats = chatSessions.filter(session => 
-              !favoriteSessions.includes(session.filename)
-            );
+            // Split chats into favorites and non-favorites in a single pass
+            const favoritedChats: ChatSessionMetadata[] = [];
+            const otherChats: ChatSessionMetadata[] = [];
+            
+            for (const session of chatSessions) {
+              if (favoriteSessions.includes(session.filename)) {
+                favoritedChats.push(session);
+              } else {
+                otherChats.push(session);
+              }
+            }
 
             const renderChatItem = (session: ChatSessionMetadata) => {
               const isFavorited = favoriteSessions.includes(session.filename);
