@@ -335,17 +335,17 @@ describe('GenerateAppScreen', () => {
     // Get resize handle
     const resizeHandle = screen.getByTitle('Drag to resize textarea');
 
-    // Simulate drag down to increase height
+    // Simulate drag up to increase height (with inverted logic)
     act(() => {
       const startEvent = new MouseEvent('mousedown', { bubbles: true, clientY: 100 });
       resizeHandle.dispatchEvent(startEvent);
 
-      const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientY: 150 }); // +50px
+      const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientY: 50 }); // -50px (up)
       document.dispatchEvent(moveEvent);
     });
 
-    // Height should increase
-    expect(messageInput.style.height).toBe('210px'); // 160 + 50
+    // Height should increase (inverted logic: negative deltaY increases height)
+    expect(messageInput.style.height).toBe('210px'); // 160 - (-50) = 210
 
     act(() => {
       const upEvent = new MouseEvent('mouseup', { bubbles: true });
@@ -370,12 +370,12 @@ describe('GenerateAppScreen', () => {
 
     const resizeHandle = screen.getByTitle('Drag to resize textarea');
 
-    // Try to drag above maximum (400px)
+    // Try to drag up to exceed maximum (400px) - inverted logic: drag up = bigger
     act(() => {
       const startEvent = new MouseEvent('mousedown', { bubbles: true, clientY: 100 });
       resizeHandle.dispatchEvent(startEvent);
 
-      const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientY: 600 }); // +500px would exceed max
+      const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientY: -500 }); // Large negative (up) would exceed max
       document.dispatchEvent(moveEvent);
     });
 
@@ -387,12 +387,12 @@ describe('GenerateAppScreen', () => {
       document.dispatchEvent(upEvent);
     });
 
-    // Try to drag below minimum (80px)
+    // Try to drag down to go below minimum (80px) - inverted logic: drag down = smaller
     act(() => {
       const startEvent2 = new MouseEvent('mousedown', { bubbles: true, clientY: 100 });
       resizeHandle.dispatchEvent(startEvent2);
 
-      const moveEvent2 = new MouseEvent('mousemove', { bubbles: true, clientY: -500 }); // Large negative would go below min
+      const moveEvent2 = new MouseEvent('mousemove', { bubbles: true, clientY: 600 }); // Large positive (down) would go below min
       document.dispatchEvent(moveEvent2);
     });
 
@@ -423,14 +423,14 @@ describe('GenerateAppScreen', () => {
       const startEvent = new MouseEvent('mousedown', { bubbles: true, clientY: 100 });
       resizeHandle.dispatchEvent(startEvent);
 
-      const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientY: 180 }); // +80px
+      const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientY: 20 }); // -80px (up)
       document.dispatchEvent(moveEvent);
 
       const upEvent = new MouseEvent('mouseup', { bubbles: true });
       document.dispatchEvent(upEvent);
     });
 
-    // Height should be 240px (160 + 80)
+    // Height should be 240px (160 - (-80) = 240) with inverted logic
     expect(messageInput.style.height).toBe('240px');
 
     // Collapse

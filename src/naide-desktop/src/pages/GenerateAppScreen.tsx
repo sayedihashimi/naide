@@ -859,7 +859,8 @@ const GenerateAppScreen: React.FC = () => {
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaY = moveEvent.clientY - startY;
-      const newHeight = Math.max(80, Math.min(400, startHeight + deltaY));
+      // Invert deltaY for top handle: dragging up (negative) should increase height
+      const newHeight = Math.max(80, Math.min(400, startHeight - deltaY));
       setExpandedHeight(newHeight);
     };
 
