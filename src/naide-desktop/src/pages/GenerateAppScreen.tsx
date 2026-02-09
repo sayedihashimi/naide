@@ -105,6 +105,7 @@ const GenerateAppScreen: React.FC = () => {
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedHeight, setExpandedHeight] = useState<number>(160); // Default 160px (h-40)
   const [isLoading, setIsLoading] = useState(false);
   const [chatInitialized, setChatInitialized] = useState(false);
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('Planning');
@@ -196,7 +197,7 @@ const GenerateAppScreen: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   
   // Track auto-collapse timeouts for command blocks
-  const commandCollapseTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const commandCollapseTimeoutsRef = useRef<Map<string, number>>(new Map());
   
   const [currentIframeUrl, setCurrentIframeUrl] = useState<string | null>(null);
 
@@ -850,6 +851,27 @@ const GenerateAppScreen: React.FC = () => {
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
   };
+
+  const handleTextareaResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = expandedHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      // Invert deltaY for top handle: dragging up (negative) should increase height
+      const newHeight = Math.max(80, Math.min(400, startHeight - deltaY));
+      setExpandedHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [expandedHeight]);
 
   const handleModeChange = (newMode: CopilotMode) => {
     setCopilotMode(newMode);
@@ -1951,48 +1973,75 @@ const GenerateAppScreen: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex gap-3">
-                  <div className="flex-1 relative">
-                    <textarea
-                      ref={textareaRef}
-                      value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Type your message... (Ctrl/Cmd+Enter to send)"
-                      className={`w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                        isExpanded ? 'h-40' : 'h-20'
-                      }`}
-                    />
-                    {/* Expand/Collapse button */}
-                    <button
-                      onClick={toggleExpand}
-                      className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
-                      title={isExpanded ? 'Collapse' : 'Expand'}
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                  <div className="flex-1 flex flex-col">
+                    {/* Resize handle container - only shown when expanded */}
+                    {isExpanded && (
+                      <div className="flex justify-end items-center h-6 px-2">
+                        <div
+                          className="p-1.5 cursor-ns-resize text-zinc-600 hover:text-zinc-400 transition-colors select-none"
+                          onMouseDown={handleTextareaResizeStart}
+                          title="Drag to resize textarea"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 8h16M4 16h16"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                    <div className="relative">
+                      <textarea
+                        ref={textareaRef}
+                        value={messageInput}
+                        onChange={(e) => setMessageInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type your message... (Ctrl/Cmd+Enter to send)"
+                        style={{
+                          height: isExpanded ? `${expandedHeight}px` : '5rem', // 5rem = 80px (h-20)
+                        }}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      {/* Expand/Collapse button */}
+                      <button
+                        onClick={toggleExpand}
+                        className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-gray-200 hover:bg-zinc-700 rounded transition-colors"
+                        title={isExpanded ? 'Collapse' : 'Expand'}
                       >
-                        {isExpanded ? (
-                          // Collapse icon
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                          />
-                        ) : (
-                          // Expand icon
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                          />
-                        )}
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          {isExpanded ? (
+                            // Collapse icon
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                            />
+                          ) : (
+                            // Expand icon
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                            />
+                          )}
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     {isLoading ? (

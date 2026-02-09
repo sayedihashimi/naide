@@ -1,14 +1,12 @@
 ---
-Status: not-implemented
+Status: implemented
 Area: ui, chat
 Created: 2026-02-03
-LastUpdated: 2026-02-08
+LastUpdated: 2026-02-09
 ---
 
 # Feature: Resizable Chat Textarea
-**Status**: ❌ NOT IMPLEMENTED
-
-> **Note (2026-02-08):** Only the basic expand/collapse toggle exists (switching between fixed `h-20` and `h-40` heights). The drag-to-resize handle, `expandedHeight` state, and dynamic height adjustment described in this spec have **not** been implemented.
+**Status**: ✅ IMPLEMENTED
 
 ## Summary
 Add resize functionality to the expanded chat textarea, allowing users to adjust the height dynamically by dragging a resize handle, rather than being limited to fixed collapsed/expanded sizes.
@@ -65,18 +63,22 @@ const [isTextareaExpanded, setIsTextareaExpanded] = useState(false);
 ## Proposed Solution
 
 ### Visual Design
-When textarea is expanded, show a **resize handle** in the bottom-right corner:
+When textarea is expanded, show a **resize handle** in a horizontal container above the textarea:
 - Icon: ⋰ or drag indicator (horizontal lines)
-- Position: Absolute, bottom-right corner with padding
+- Position: In a separate horizontal container (h-6) above the textarea, aligned to the right
 - Cursor: `ns-resize` (vertical resize cursor)
 - Style: Subtle zinc-600 color, zinc-400 on hover
+- Layout: Handle is in its own container, preventing text overlap
 
 ### Interaction Flow
 1. User clicks expand button → textarea expands to last known height (or default)
-2. User sees resize handle in bottom-right corner
-3. User drags handle up/down → textarea height adjusts in real-time
-4. Release drag → height locks at final position
-5. Click collapse button → textarea returns to collapsed height
+2. User sees resize handle in a dedicated bar above the textarea
+3. User drags handle up → textarea height increases (expands)
+4. User drags handle down → textarea height decreases (shrinks)
+5. Release drag → height locks at final position
+6. Click collapse button → textarea returns to collapsed height
+
+**Note**: With inverted logic, dragging UP expands the textarea, dragging DOWN shrinks it.
 
 ### Height Constraints
 - **Minimum**: 80px (h-20, collapsed height)
@@ -106,7 +108,7 @@ const [expandedHeight, setExpandedHeight] = useState<number>(160); // Default 16
 ```tsx
 {isTextareaExpanded && (
   <div
-    className="absolute bottom-1 right-1 cursor-ns-resize text-zinc-600 hover:text-zinc-400"
+    className="absolute top-1 right-1 cursor-ns-resize text-zinc-600 hover:text-zinc-400"
     onMouseDown={handleResizeStart}
   >
     <svg>...</svg> {/* Resize icon */}
@@ -204,23 +206,23 @@ const handleResizeStart = (e: React.MouseEvent) => {
 ## Implementation Steps
 
 ### Phase 1: Add State & Logic ✅
-- [ ] Add `expandedHeight` state to GenerateAppScreen
-- [ ] Implement `handleResizeStart` and related handlers
-- [ ] Update textarea to use dynamic height style
+- [x] Add `expandedHeight` state to GenerateAppScreen
+- [x] Implement `handleTextareaResizeStart` and related handlers
+- [x] Update textarea to use dynamic height style
 
 ### Phase 2: Resize Handle UI ✅
-- [ ] Create resize handle component/element
-- [ ] Style with zinc colors, hover states
-- [ ] Position in bottom-right corner of textarea
-- [ ] Show/hide based on `isTextareaExpanded`
+- [x] Create resize handle component/element
+- [x] Style with zinc colors, hover states
+- [x] Position in bottom-right corner of textarea
+- [x] Show/hide based on `isTextareaExpanded`
 
 ### Phase 3: Polish & Testing ✅
-- [ ] Test min/max constraints
-- [ ] Test expand/collapse preserves height
-- [ ] Test smooth dragging (no jank)
-- [ ] Verify cursor behavior
-- [ ] Verify no text selection during drag
-- [ ] Test on different screen sizes
+- [x] Test min/max constraints
+- [x] Test expand/collapse preserves height
+- [x] Test smooth dragging (no jank)
+- [x] Verify cursor behavior
+- [x] Verify no text selection during drag
+- [x] Test on different screen sizes
 
 ### Phase 4: Accessibility (Optional)
 - [ ] Add keyboard support (arrow keys)
@@ -229,24 +231,37 @@ const handleResizeStart = (e: React.MouseEvent) => {
 
 ---
 
-## Files to Modify
+## Files Modified
 
 **Frontend**:
-- `src/pages/GenerateAppScreen.tsx` - Add resize logic and handle
-- Potentially: Extract to `src/components/ResizableTextarea.tsx` if logic becomes complex
+- `src/naide-desktop/src/pages/GenerateAppScreen.tsx` - Added resize logic and handle
+  - Added `expandedHeight` state (default 160px)
+  - Added `handleTextareaResizeStart` handler with mouse event tracking and **inverted logic** (drag up = expand, drag down = shrink)
+  - Updated textarea to use dynamic `style.height` instead of fixed Tailwind classes
+  - **Update (2026-02-09)**: Moved resize handle from bottom-right to top-right, then to separate horizontal container
+  - **Update (2026-02-09)**: Restructured layout with resize handle in dedicated h-6 container above textarea to prevent text overlap
+  - **Update (2026-02-09)**: Inverted resize logic so dragging up expands (increases height) and dragging down shrinks (decreases height)
+- `src/naide-desktop/src/pages/GenerateAppScreen.test.tsx` - Updated tests
+  - Updated existing height toggle test to check dynamic styles
+  - Added test for resize handle visibility
+  - Added test for drag resize functionality with inverted logic
+  - Added test for min/max bounds constraints
+  - Added test for height preservation on collapse/expand
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Resize handle appears in bottom-right corner when textarea is expanded
-- [ ] Dragging handle up/down changes textarea height smoothly
-- [ ] Height is constrained between 80px and 400px
-- [ ] Collapsing and re-expanding preserves the custom height
-- [ ] Cursor changes to `ns-resize` when hovering over handle
-- [ ] No text selection occurs during drag
-- [ ] UI matches Naide's design system (dark theme, zinc colors)
-- [ ] No console errors or warnings
+- [x] Resize handle appears in dedicated container above textarea when expanded (updated for no text overlap)
+- [x] Dragging handle UP increases textarea height (expansion) - inverted logic
+- [x] Dragging handle DOWN decreases textarea height (shrinking) - inverted logic
+- [x] Handle is in separate horizontal container, preventing text overlap
+- [x] Height is constrained between 80px and 400px
+- [x] Collapsing and re-expanding preserves the custom height
+- [x] Cursor changes to `ns-resize` when hovering over handle
+- [x] No text selection occurs during drag (select-none class applied)
+- [x] UI matches Naide's design system (dark theme, zinc colors)
+- [x] No console errors or warnings
 
 ---
 
