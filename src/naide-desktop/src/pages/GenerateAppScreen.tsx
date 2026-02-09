@@ -105,6 +105,7 @@ const GenerateAppScreen: React.FC = () => {
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedHeight, setExpandedHeight] = useState<number>(160); // Default 160px (h-40)
   const [isLoading, setIsLoading] = useState(false);
   const [chatInitialized, setChatInitialized] = useState(false);
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('Planning');
@@ -850,6 +851,26 @@ const GenerateAppScreen: React.FC = () => {
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
   };
+
+  const handleTextareaResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = expandedHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const newHeight = Math.max(80, Math.min(400, startHeight + deltaY));
+      setExpandedHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [expandedHeight]);
 
   const handleModeChange = (newMode: CopilotMode) => {
     setCopilotMode(newMode);
@@ -1958,9 +1979,10 @@ const GenerateAppScreen: React.FC = () => {
                       onChange={(e) => setMessageInput(e.target.value)}
                       onKeyDown={handleKeyDown}
                       placeholder="Type your message... (Ctrl/Cmd+Enter to send)"
-                      className={`w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                        isExpanded ? 'h-40' : 'h-20'
-                      }`}
+                      style={{
+                        height: isExpanded ? `${expandedHeight}px` : '5rem', // 5rem = 80px (h-20)
+                      }}
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     {/* Expand/Collapse button */}
                     <button
@@ -1993,6 +2015,28 @@ const GenerateAppScreen: React.FC = () => {
                         )}
                       </svg>
                     </button>
+                    {/* Resize handle - only shown when expanded */}
+                    {isExpanded && (
+                      <div
+                        className="absolute bottom-2 right-10 p-1.5 cursor-ns-resize text-zinc-600 hover:text-zinc-400 transition-colors select-none"
+                        onMouseDown={handleTextareaResizeStart}
+                        title="Drag to resize textarea"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 8h16M4 16h16"
+                          />
+                        </svg>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-2">
                     {isLoading ? (

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import GenerateAppScreen from './GenerateAppScreen';
@@ -282,24 +282,166 @@ describe('GenerateAppScreen', () => {
 
     await screen.findByPlaceholderText(/Type your message.../i);
     
-    const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i) as HTMLTextAreaElement;
     const expandButton = screen.getByTitle(/Expand/i);
 
-    // Initially compact (h-20)
-    expect(messageInput).toHaveClass('h-20');
+    // Initially compact (80px = 5rem)
+    expect(messageInput.style.height).toBe('5rem');
 
     // Click to expand
     await user.click(expandButton);
 
-    // Should be expanded (h-40)
-    expect(messageInput).toHaveClass('h-40');
+    // Should be expanded (160px default)
+    expect(messageInput.style.height).toBe('160px');
 
     // Click to collapse
     const collapseButton = screen.getByTitle(/Collapse/i);
     await user.click(collapseButton);
 
     // Should be compact again
-    expect(messageInput).toHaveClass('h-20');
+    expect(messageInput.style.height).toBe('5rem');
+  });
+
+  it('shows resize handle only when expanded', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    // Resize handle should not be visible when collapsed
+    expect(screen.queryByTitle('Drag to resize textarea')).not.toBeInTheDocument();
+
+    // Click to expand
+    const expandButton = screen.getByTitle(/Expand/i);
+    await user.click(expandButton);
+
+    // Resize handle should be visible when expanded
+    expect(screen.getByTitle('Drag to resize textarea')).toBeInTheDocument();
+  });
+
+  it('allows resizing textarea by dragging handle', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i) as HTMLTextAreaElement;
+    const expandButton = screen.getByTitle(/Expand/i);
+
+    // Expand first
+    await user.click(expandButton);
+    expect(messageInput.style.height).toBe('160px');
+
+    // Get resize handle
+    const resizeHandle = screen.getByTitle('Drag to resize textarea');
+
+    // Simulate drag down to increase height
+    act(() => {
+      const startEvent = new MouseEvent('mousedown', { bubbles: true, clientY: 100 });
+      resizeHandle.dispatchEvent(startEvent);
+
+      const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientY: 150 }); // +50px
+      document.dispatchEvent(moveEvent);
+    });
+
+    // Height should increase
+    expect(messageInput.style.height).toBe('210px'); // 160 + 50
+
+    act(() => {
+      const upEvent = new MouseEvent('mouseup', { bubbles: true });
+      document.dispatchEvent(upEvent);
+    });
+
+    // Height should be maintained
+    expect(messageInput.style.height).toBe('210px');
+  });
+
+  it('constrains resize within min/max bounds', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i) as HTMLTextAreaElement;
+    const expandButton = screen.getByTitle(/Expand/i);
+
+    // Expand first
+    await user.click(expandButton);
+
+    const resizeHandle = screen.getByTitle('Drag to resize textarea');
+
+    // Try to drag above maximum (400px)
+    act(() => {
+      const startEvent = new MouseEvent('mousedown', { bubbles: true, clientY: 100 });
+      resizeHandle.dispatchEvent(startEvent);
+
+      const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientY: 600 }); // +500px would exceed max
+      document.dispatchEvent(moveEvent);
+    });
+
+    // Height should be clamped to 400px
+    expect(messageInput.style.height).toBe('400px');
+
+    act(() => {
+      const upEvent = new MouseEvent('mouseup', { bubbles: true });
+      document.dispatchEvent(upEvent);
+    });
+
+    // Try to drag below minimum (80px)
+    act(() => {
+      const startEvent2 = new MouseEvent('mousedown', { bubbles: true, clientY: 100 });
+      resizeHandle.dispatchEvent(startEvent2);
+
+      const moveEvent2 = new MouseEvent('mousemove', { bubbles: true, clientY: -500 }); // Large negative would go below min
+      document.dispatchEvent(moveEvent2);
+    });
+
+    // Height should be clamped to 80px
+    expect(messageInput.style.height).toBe('80px');
+
+    act(() => {
+      const upEvent2 = new MouseEvent('mouseup', { bubbles: true });
+      document.dispatchEvent(upEvent2);
+    });
+  });
+
+  it('preserves custom height when collapsing and re-expanding', async () => {
+    const user = userEvent.setup();
+    renderGenerateAppScreen();
+
+    await screen.findByPlaceholderText(/Type your message.../i);
+    
+    const messageInput = screen.getByPlaceholderText(/Type your message.../i) as HTMLTextAreaElement;
+    const expandButton = screen.getByTitle(/Expand/i);
+
+    // Expand and resize
+    await user.click(expandButton);
+    
+    const resizeHandle = screen.getByTitle('Drag to resize textarea');
+    
+    act(() => {
+      const startEvent = new MouseEvent('mousedown', { bubbles: true, clientY: 100 });
+      resizeHandle.dispatchEvent(startEvent);
+
+      const moveEvent = new MouseEvent('mousemove', { bubbles: true, clientY: 180 }); // +80px
+      document.dispatchEvent(moveEvent);
+
+      const upEvent = new MouseEvent('mouseup', { bubbles: true });
+      document.dispatchEvent(upEvent);
+    });
+
+    // Height should be 240px (160 + 80)
+    expect(messageInput.style.height).toBe('240px');
+
+    // Collapse
+    const collapseButton = screen.getByTitle(/Collapse/i);
+    await user.click(collapseButton);
+    expect(messageInput.style.height).toBe('5rem');
+
+    // Re-expand - should restore custom height
+    const expandButton2 = screen.getByTitle(/Expand/i);
+    await user.click(expandButton2);
+    expect(messageInput.style.height).toBe('240px');
   });
 
   it('sends message when Send button is clicked', async () => {
