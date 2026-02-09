@@ -45,6 +45,7 @@ This index provides a chronological overview of all feature files in `.prompts/f
 | [2026-02-06-project-file-watcher.md](./2026-02-06-project-file-watcher.md) | Watch project folder for new runnable apps | planned |
 | [2026-02-08-monaco-editor-integration.md](./2026-02-08-monaco-editor-integration.md) | Monaco Editor for syntax highlighting, line numbers, and rich editing | planned |
 | [2026-02-08-terminal-command-output-in-chat.md](./2026-02-08-terminal-command-output-in-chat.md) | Show terminal command output inline in chat as collapsible blocks | planned |
+| [2026-02-09-project-file-link-interception.md](./2026-02-09-project-file-link-interception.md) | Intercept project file links in chat/previews and open in editor tabs | planned |
 
 ## Superseded Features
 
