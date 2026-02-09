@@ -25,7 +25,8 @@ import { getProjectPath } from '../utils/fileSystem';
 import { getRecentProjects, saveLastProject, removeRecentProject, type LastProject } from '../utils/globalSettings';
 import { logInfo, logError } from '../utils/logger';
 import { loadOpenTabs, saveOpenTabs, type PersistedTab } from '../utils/tabPersistence';
-import { Square } from 'lucide-react';
+import { loadFavoriteSessions, toggleFavoriteSession } from '../utils/favoritePersistence';
+import { Square, Star } from 'lucide-react';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
 
@@ -116,6 +117,9 @@ const GenerateAppScreen: React.FC = () => {
   const [recentProjects, setRecentProjects] = useState<LastProject[]>([]);
   // Chat history dropdown state
   const [showChatHistory, setShowChatHistory] = useState(false);
+  // Favorite sessions state
+  const [favoriteSessions, setFavoriteSessions] = useState<string[]>([]);
+  const [currentChatFilename, setCurrentChatFilename] = useState<string | null>(null);
   // Feature file popup state
   const [visualIntensity, setVisualIntensity] = useState<number>(1.0);
   
@@ -275,6 +279,18 @@ const GenerateAppScreen: React.FC = () => {
     };
     loadRecentProjects();
   }, []);
+
+  // Load favorite sessions when project changes
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (state.projectPath) {
+        const favorites = await loadFavoriteSessions(state.projectPath);
+        setFavoriteSessions(favorites);
+        logInfo(`[GenerateApp] Loaded ${favorites.length} favorite sessions`);
+      }
+    };
+    loadFavorites();
+  }, [state.projectPath]);
 
   // Click outside handler to close dropdown
   useEffect(() => {
@@ -912,6 +928,7 @@ const GenerateAppScreen: React.FC = () => {
     setChatInitialized(false);
     setMessages(getWelcomeMessages(copilotMode));
     setConversationSummary(null);
+    setCurrentChatFilename(null); // New chat has no filename yet
     
     // Focus the textarea
     if (textareaRef.current) {
@@ -966,6 +983,7 @@ const GenerateAppScreen: React.FC = () => {
         }
         
         setChatInitialized(true);
+        setCurrentChatFilename(filename); // Track the loaded chat filename
         
         // Focus the textarea
         if (textareaRef.current) {
@@ -1001,6 +1019,18 @@ const GenerateAppScreen: React.FC = () => {
     if (remainingChats.length === 0 || hasUserMessages) {
       logInfo('[GenerateApp] Creating new empty chat after deletion');
       handleNewChat();
+    }
+  };
+
+  const handleToggleFavorite = async (filename: string) => {
+    if (!state.projectPath) return;
+    
+    try {
+      const updatedFavorites = await toggleFavoriteSession(state.projectPath, filename);
+      setFavoriteSessions(updatedFavorites);
+      logInfo(`[GenerateApp] Toggled favorite for ${filename}. Total favorites: ${updatedFavorites.length}`);
+    } catch (error) {
+      logError(`[GenerateApp] Error toggling favorite: ${error}`);
     }
   };
 
@@ -1953,8 +1983,33 @@ const GenerateAppScreen: React.FC = () => {
                       onChatDeleted={handleChatDeleted}
                       isOpen={showChatHistory}
                       onClose={() => setShowChatHistory(false)}
+                      favoriteSessions={favoriteSessions}
+                      onToggleFavorite={handleToggleFavorite}
                     />
                   </div>
+                  {/* Favorite button - only visible for archived chats */}
+                  {currentChatFilename && (
+                    <button
+                      onClick={() => handleToggleFavorite(currentChatFilename)}
+                      className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-gray-100 transition-colors"
+                      title={favoriteSessions.includes(currentChatFilename)
+                        ? "Remove from favorites"
+                        : "Add to favorites"
+                      }
+                      aria-label={favoriteSessions.includes(currentChatFilename)
+                        ? "Remove from favorites"
+                        : "Add to favorites"
+                      }
+                    >
+                      <Star
+                        size={18}
+                        className={favoriteSessions.includes(currentChatFilename)
+                          ? "text-yellow-400 fill-yellow-400"
+                          : "text-zinc-500 hover:text-zinc-300"
+                        }
+                      />
+                    </button>
+                  )}
                   <label htmlFor="mode-select" className="text-sm text-gray-400">
                     Mode:
                   </label>
