@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
@@ -41,6 +41,32 @@ const MessageContent: React.FC<MessageContentProps> = ({ content, role }) => {
   const textColor = role === 'assistant' ? 'text-gray-100' : 'text-white';
   const { projectPath, projectLinkDomains, onOpenProjectFile } = useProjectLinkContext();
   const [linkTooltip, setLinkTooltip] = useState<LinkTooltipState | null>(null);
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper to show tooltip with auto-dismiss
+  const showTooltip = useCallback((message: string, x: number, y: number) => {
+    // Clear any existing timeout
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+    
+    setLinkTooltip({ message, x, y });
+    
+    // Auto-dismiss after 3 seconds
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setLinkTooltip(null);
+      tooltipTimeoutRef.current = null;
+    }, 3000);
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Create components with link interception
   const components = useMemo((): Components => ({
@@ -69,31 +95,13 @@ const MessageContent: React.FC<MessageContentProps> = ({ content, role }) => {
           } else {
             // Show tooltip error
             const rect = e.currentTarget.getBoundingClientRect();
-            setLinkTooltip({
-              message: `File not found: ${projectFilePath}`,
-              x: rect.left,
-              y: rect.bottom + 4,
-            });
-
-            // Auto-dismiss after 3 seconds
-            setTimeout(() => {
-              setLinkTooltip(null);
-            }, 3000);
+            showTooltip(`File not found: ${projectFilePath}`, rect.left, rect.bottom + 4);
           }
         } catch (error) {
           console.error('Error checking file existence:', error);
           // Show tooltip error
           const rect = e.currentTarget.getBoundingClientRect();
-          setLinkTooltip({
-            message: `Unable to verify file: ${projectFilePath}`,
-            x: rect.left,
-            y: rect.bottom + 4,
-          });
-
-          // Auto-dismiss after 3 seconds
-          setTimeout(() => {
-            setLinkTooltip(null);
-          }, 3000);
+          showTooltip(`Unable to verify file: ${projectFilePath}`, rect.left, rect.bottom + 4);
         }
       };
 
@@ -167,7 +175,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ content, role }) => {
         {...props}
       />
     ),
-  }), [projectPath, projectLinkDomains, onOpenProjectFile]);
+  }), [projectPath, projectLinkDomains, onOpenProjectFile, showTooltip]);
 
   return (
     <>
