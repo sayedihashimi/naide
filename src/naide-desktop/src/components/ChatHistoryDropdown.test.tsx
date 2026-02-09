@@ -17,6 +17,8 @@ const { invoke } = await import('@tauri-apps/api/core');
 describe('ChatHistoryDropdown', () => {
   const mockOnLoadChat = vi.fn();
   const mockOnClose = vi.fn();
+  const mockOnChatDeleted = vi.fn();
+  const mockOnToggleFavorite = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,8 +29,11 @@ describe('ChatHistoryDropdown', () => {
       <ChatHistoryDropdown
         projectName="test-project"
         onLoadChat={mockOnLoadChat}
+        onChatDeleted={mockOnChatDeleted}
         isOpen={false}
         onClose={mockOnClose}
+        favoriteSessions={[]}
+        onToggleFavorite={mockOnToggleFavorite}
       />
     );
     expect(container.firstChild).toBeNull();
@@ -41,8 +46,11 @@ describe('ChatHistoryDropdown', () => {
       <ChatHistoryDropdown
         projectName="test-project"
         onLoadChat={mockOnLoadChat}
+        onChatDeleted={mockOnChatDeleted}
         isOpen={true}
         onClose={mockOnClose}
+        favoriteSessions={[]}
+        onToggleFavorite={mockOnToggleFavorite}
       />
     );
 
@@ -68,8 +76,11 @@ describe('ChatHistoryDropdown', () => {
       <ChatHistoryDropdown
         projectName="test-project"
         onLoadChat={mockOnLoadChat}
+        onChatDeleted={mockOnChatDeleted}
         isOpen={true}
         onClose={mockOnClose}
+        favoriteSessions={[]}
+        onToggleFavorite={mockOnToggleFavorite}
       />
     );
 
@@ -97,8 +108,11 @@ describe('ChatHistoryDropdown', () => {
       <ChatHistoryDropdown
         projectName="test-project"
         onLoadChat={mockOnLoadChat}
+        onChatDeleted={mockOnChatDeleted}
         isOpen={true}
         onClose={mockOnClose}
+        favoriteSessions={[]}
+        onToggleFavorite={mockOnToggleFavorite}
       />
     );
 
@@ -106,7 +120,7 @@ describe('ChatHistoryDropdown', () => {
       expect(screen.getByText('Planning')).toBeInTheDocument();
     });
 
-    // Find the button containing the chat session (not the delete button)
+    // Find the button containing the chat session (not the delete button or star button)
     const chatButtons = screen.getAllByRole('button');
     const chatButton = chatButtons.find(btn => btn.textContent?.includes('Planning'));
     expect(chatButton).toBeDefined();
@@ -124,8 +138,11 @@ describe('ChatHistoryDropdown', () => {
       <ChatHistoryDropdown
         projectName="test-project"
         onLoadChat={mockOnLoadChat}
+        onChatDeleted={mockOnChatDeleted}
         isOpen={true}
         onClose={mockOnClose}
+        favoriteSessions={[]}
+        onToggleFavorite={mockOnToggleFavorite}
       />
     );
 
@@ -141,8 +158,11 @@ describe('ChatHistoryDropdown', () => {
       <ChatHistoryDropdown
         projectName="test-project"
         onLoadChat={mockOnLoadChat}
+        onChatDeleted={mockOnChatDeleted}
         isOpen={true}
         onClose={mockOnClose}
+        favoriteSessions={[]}
+        onToggleFavorite={mockOnToggleFavorite}
       />
     );
 
@@ -169,8 +189,11 @@ describe('ChatHistoryDropdown', () => {
       <ChatHistoryDropdown
         projectName="test-project"
         onLoadChat={mockOnLoadChat}
+        onChatDeleted={mockOnChatDeleted}
         isOpen={true}
         onClose={mockOnClose}
+        favoriteSessions={[]}
+        onToggleFavorite={mockOnToggleFavorite}
       />
     );
 
@@ -178,5 +201,88 @@ describe('ChatHistoryDropdown', () => {
       const truncatedText = screen.getByText(/aaa.*\.\.\./);
       expect(truncatedText).toBeInTheDocument();
     });
+  });
+
+  it('should render favorites at the top of the list', async () => {
+    const mockSessions = [
+      {
+        filename: 'chat-1.json',
+        last_modified: Date.now() / 1000,
+        message_count: 5,
+        mode: 'Planning',
+        first_user_message: 'Non-favorite chat',
+      },
+      {
+        filename: 'chat-2.json',
+        last_modified: Date.now() / 1000 - 1000,
+        message_count: 3,
+        mode: 'Building',
+        first_user_message: 'Favorite chat',
+      },
+    ];
+
+    vi.mocked(invoke).mockResolvedValue(mockSessions);
+
+    const { container } = render(
+      <ChatHistoryDropdown
+        projectName="test-project"
+        onLoadChat={mockOnLoadChat}
+        onChatDeleted={mockOnChatDeleted}
+        isOpen={true}
+        onClose={mockOnClose}
+        favoriteSessions={['chat-2.json']}
+        onToggleFavorite={mockOnToggleFavorite}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Favorite chat')).toBeInTheDocument();
+    });
+
+    // Get all chat items and verify order
+    const chatItems = container.querySelectorAll('.relative.group');
+    expect(chatItems.length).toBe(2);
+    
+    // First item should be the favorite
+    expect(chatItems[0].textContent).toContain('Favorite chat');
+    // Second item should be the non-favorite
+    expect(chatItems[1].textContent).toContain('Non-favorite chat');
+  });
+
+  it('should call onToggleFavorite when star is clicked', async () => {
+    const mockSessions = [
+      {
+        filename: 'chat-1.json',
+        last_modified: Date.now() / 1000,
+        message_count: 5,
+        mode: 'Planning',
+        first_user_message: 'Test chat',
+      },
+    ];
+
+    vi.mocked(invoke).mockResolvedValue(mockSessions);
+
+    render(
+      <ChatHistoryDropdown
+        projectName="test-project"
+        onLoadChat={mockOnLoadChat}
+        onChatDeleted={mockOnChatDeleted}
+        isOpen={true}
+        onClose={mockOnClose}
+        favoriteSessions={[]}
+        onToggleFavorite={mockOnToggleFavorite}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Test chat')).toBeInTheDocument();
+    });
+
+    // Find the star button (the first button that has aria-label containing "favorites")
+    const starButton = screen.getByLabelText('Add to favorites');
+    fireEvent.click(starButton);
+
+    expect(mockOnToggleFavorite).toHaveBeenCalledWith('chat-1.json');
+    expect(mockOnLoadChat).not.toHaveBeenCalled(); // Should not trigger chat load
   });
 });

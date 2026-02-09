@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Star } from 'lucide-react';
 import { getProjectPath } from '../utils/fileSystem';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -19,6 +19,8 @@ interface ChatHistoryDropdownProps {
   onChatDeleted: () => void; // Callback when a chat is deleted (to refresh if needed)
   isOpen: boolean;
   onClose: () => void;
+  favoriteSessions: string[];
+  onToggleFavorite: (filename: string) => void;
 }
 
 const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
@@ -28,6 +30,8 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
   onChatDeleted,
   isOpen,
   onClose,
+  favoriteSessions,
+  onToggleFavorite,
 }) => {
   const [chatSessions, setChatSessions] = useState<ChatSessionMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,6 +108,11 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
   const handleChatClick = (filename: string) => {
     onLoadChat(filename);
     onClose();
+  };
+
+  const handleToggleFavoriteClick = (filename: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent chat selection
+    onToggleFavorite(filename);
   };
 
   const handleDeleteClick = (session: ChatSessionMetadata, e: React.MouseEvent) => {
@@ -230,45 +239,97 @@ const ChatHistoryDropdown: React.FC<ChatHistoryDropdownProps> = ({
 
       {!isLoading && !error && chatSessions.length > 0 && (
         <div className="overflow-y-auto max-h-96">
-          {chatSessions.map((session) => (
-            <div
-              key={session.filename}
-              className="relative group"
-            >
-              <button
-                onClick={() => handleChatClick(session.filename)}
-                className="w-full text-left px-4 py-3 hover:bg-zinc-700 transition-colors border-b border-zinc-700 last:border-b-0"
-              >
-                <div className="text-sm font-semibold text-gray-200 mb-1">
-                  {formatDate(session.last_modified)}
-                </div>
-                <div className="flex items-center gap-2 text-xs mb-1">
-                  <span className={getModeColor(session.mode)}>
-                    {session.mode}
-                  </span>
-                  <span className="text-gray-500">•</span>
-                  <span className="text-gray-500">
-                    {session.message_count} message{session.message_count !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                {session.first_user_message && (
-                  <div className="text-xs text-zinc-400">
-                    {truncateMessage(session.first_user_message)}
-                  </div>
-                )}
-              </button>
+          {(() => {
+            // Split chats into favorites and non-favorites in a single pass
+            const favoritedChats: ChatSessionMetadata[] = [];
+            const otherChats: ChatSessionMetadata[] = [];
+            
+            for (const session of chatSessions) {
+              if (favoriteSessions.includes(session.filename)) {
+                favoritedChats.push(session);
+              } else {
+                otherChats.push(session);
+              }
+            }
+
+            const renderChatItem = (session: ChatSessionMetadata) => {
+              const isFavorited = favoriteSessions.includes(session.filename);
               
-              {/* Delete button - shows on hover */}
-              <button
-                onClick={(e) => handleDeleteClick(session, e)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded hover:bg-zinc-600 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                aria-label="Delete chat"
-                title="Move to trash"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
+              return (
+                <div
+                  key={session.filename}
+                  className="relative group border-b border-zinc-700 last:border-b-0"
+                >
+                  <div className="flex items-start hover:bg-zinc-700 transition-colors">
+                    {/* Star icon button */}
+                    <button
+                      onClick={(e) => handleToggleFavoriteClick(session.filename, e)}
+                      className="flex-shrink-0 p-3 pl-4 hover:scale-110 transition-transform"
+                      aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+                      title={isFavorited ? "Remove from favorites" : "Add to favorites"}
+                    >
+                      <Star
+                        size={16}
+                        className={isFavorited
+                          ? "text-yellow-400 fill-yellow-400"
+                          : "text-zinc-600 hover:text-zinc-400"
+                        }
+                      />
+                    </button>
+                    
+                    {/* Chat content button */}
+                    <button
+                      onClick={() => handleChatClick(session.filename)}
+                      className="flex-1 text-left py-3 pr-4"
+                    >
+                      <div className="text-sm font-semibold text-gray-200 mb-1">
+                        {formatDate(session.last_modified)}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs mb-1">
+                        <span className={getModeColor(session.mode)}>
+                          {session.mode}
+                        </span>
+                        <span className="text-gray-500">•</span>
+                        <span className="text-gray-500">
+                          {session.message_count} message{session.message_count !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      {session.first_user_message && (
+                        <div className="text-xs text-zinc-400">
+                          {truncateMessage(session.first_user_message)}
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                  
+                  {/* Delete button - shows on hover */}
+                  <button
+                    onClick={(e) => handleDeleteClick(session, e)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded hover:bg-zinc-600 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    aria-label="Delete chat"
+                    title="Move to trash"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              );
+            };
+
+            return (
+              <>
+                {/* Favorites section */}
+                {favoritedChats.map(renderChatItem)}
+                
+                {/* Separator between favorites and other chats */}
+                {favoritedChats.length > 0 && otherChats.length > 0 && (
+                  <div className="border-b border-zinc-700 my-1"></div>
+                )}
+                
+                {/* Other chats section */}
+                {otherChats.map(renderChatItem)}
+              </>
+            );
+          })()}
         </div>
       )}
       
