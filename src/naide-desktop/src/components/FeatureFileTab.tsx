@@ -208,6 +208,7 @@ const FeatureFileTab: React.FC<FeatureFileTabProps> = ({
           <MarkdownPreview
             content={fileContent}
             fileName={fileName}
+            filePath={filePath}
             onEdit={handleToggleEdit}
             canEdit={!!fileContent}
           />

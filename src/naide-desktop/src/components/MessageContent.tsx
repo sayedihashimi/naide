@@ -39,7 +39,7 @@ const isValidHref = (href?: string): boolean => {
  */
 const MessageContent: React.FC<MessageContentProps> = ({ content, role }) => {
   const textColor = role === 'assistant' ? 'text-gray-100' : 'text-white';
-  const { projectPath, projectLinkDomains, onOpenProjectFile } = useProjectLinkContext();
+  const { projectPath, projectLinkDomains, currentFilePath, onOpenProjectFile } = useProjectLinkContext();
   const [linkTooltip, setLinkTooltip] = useState<LinkTooltipState | null>(null);
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -78,7 +78,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ content, role }) => {
       const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
         if (!href || !projectPath) return;
 
-        const projectFilePath = extractProjectFilePath(href, projectLinkDomains);
+        const projectFilePath = extractProjectFilePath(href, projectLinkDomains, currentFilePath);
         if (!projectFilePath) return; // Not a project link, let default behavior happen
 
         e.preventDefault(); // Prevent browser navigation
@@ -175,7 +175,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ content, role }) => {
         {...props}
       />
     ),
-  }), [projectPath, projectLinkDomains, onOpenProjectFile, showTooltip]);
+  }), [projectPath, projectLinkDomains, currentFilePath, onOpenProjectFile, showTooltip]);
 
   return (
     <>

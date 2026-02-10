@@ -141,3 +141,73 @@ describe('getTabType', () => {
     expect(getTabType('.prompts\\features\\test.md')).toBe('feature-file');
   });
 });
+
+describe('extractProjectFilePath with currentFilePath (relative link resolution)', () => {
+  const customDomains: string[] = [];
+
+  describe('relative links with ./', () => {
+    it('should resolve ./ link relative to current file in same directory', () => {
+      const currentFile = '.prompts/features/file1.md';
+      expect(extractProjectFilePath('./file2.md', customDomains, currentFile)).toBe('.prompts/features/file2.md');
+    });
+
+    it('should resolve ./ link relative to current file in nested directory', () => {
+      const currentFile = '.prompts/features/subfolder/file1.md';
+      expect(extractProjectFilePath('./file2.md', customDomains, currentFile)).toBe('.prompts/features/subfolder/file2.md');
+    });
+
+    it('should resolve ./ link with subdirectory', () => {
+      const currentFile = '.prompts/features/file1.md';
+      expect(extractProjectFilePath('./subfolder/file2.md', customDomains, currentFile)).toBe('.prompts/features/subfolder/file2.md');
+    });
+  });
+
+  describe('relative links with ../', () => {
+    it('should resolve ../ link to parent directory', () => {
+      const currentFile = '.prompts/features/subfolder/file1.md';
+      expect(extractProjectFilePath('../file2.md', customDomains, currentFile)).toBe('.prompts/features/file2.md');
+    });
+
+    it('should resolve multiple ../ to go up multiple levels', () => {
+      const currentFile = '.prompts/features/subfolder/deep/file1.md';
+      expect(extractProjectFilePath('../../file2.md', customDomains, currentFile)).toBe('.prompts/features/file2.md');
+    });
+
+    it('should resolve ../ with subdirectory after', () => {
+      const currentFile = '.prompts/features/subfolder/file1.md';
+      expect(extractProjectFilePath('../other/file2.md', customDomains, currentFile)).toBe('.prompts/features/other/file2.md');
+    });
+  });
+
+  describe('relative links without currentFilePath', () => {
+    it('should treat relative paths as project-root relative when no currentFilePath', () => {
+      expect(extractProjectFilePath('./file.md', customDomains, null)).toBe('file.md');
+      expect(extractProjectFilePath('./src/App.tsx', customDomains, undefined)).toBe('src/App.tsx');
+    });
+  });
+
+  describe('non-./ or ../ relative links should remain project-root relative', () => {
+    it('should not resolve relative paths that do not start with ./ or ../', () => {
+      const currentFile = '.prompts/features/file1.md';
+      expect(extractProjectFilePath('src/App.tsx', customDomains, currentFile)).toBe('src/App.tsx');
+      expect(extractProjectFilePath('.prompts/plan/overview.md', customDomains, currentFile)).toBe('.prompts/plan/overview.md');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle . in path normalization', () => {
+      const currentFile = '.prompts/features/file1.md';
+      expect(extractProjectFilePath('././file2.md', customDomains, currentFile)).toBe('.prompts/features/file2.md');
+    });
+
+    it('should not go above root with too many ../', () => {
+      const currentFile = '.prompts/file1.md';
+      expect(extractProjectFilePath('../../../file2.md', customDomains, currentFile)).toBe('file2.md');
+    });
+
+    it('should handle backslashes in currentFilePath', () => {
+      const currentFile = '.prompts\\features\\file1.md';
+      expect(extractProjectFilePath('./file2.md', customDomains, currentFile)).toBe('.prompts/features/file2.md');
+    });
+  });
+});
