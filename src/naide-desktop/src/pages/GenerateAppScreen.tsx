@@ -164,6 +164,14 @@ const GenerateAppScreen: React.FC = () => {
     
     return () => clearInterval(timerId);
   }, [isLoading]);
+  
+  // Debug logging for autoModeInferredBehavior changes
+  useEffect(() => {
+    console.log(`[GenerateApp] autoModeInferredBehavior changed to: ${autoModeInferredBehavior}`);
+    console.log(`[GenerateApp] copilotMode is: ${copilotMode}`);
+    console.log(`[GenerateApp] Should show indicator: ${copilotMode === 'Auto' && autoModeInferredBehavior !== null}`);
+  }, [autoModeInferredBehavior, copilotMode]);
+  
   const iframeRef = useRef<HTMLIFrameElement>(null);
   // Ref to track current iframe URL (for immediate access in click handlers)
   const currentIframeUrlRef = useRef<string | null>(null);
@@ -573,6 +581,9 @@ const GenerateAppScreen: React.FC = () => {
     // Reset auto mode inferred behavior on new message
     setAutoModeInferredBehavior(null);
 
+    console.log(`[GenerateApp] Sending message in ${copilotMode} mode`);
+    console.log(`[GenerateApp] Message: ${messageInput.trim().substring(0, 100)}${messageInput.trim().length > 100 ? '...' : ''}`);
+
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       role: 'user',
@@ -708,8 +719,10 @@ const GenerateAppScreen: React.FC = () => {
                       if (copilotMode === 'Auto' && !autoModeMarkerFound) {
                         const autoModeMatch = accumulatedContent.match(/<!-- AUTO_MODE: (planning|building) -->/);
                         if (autoModeMatch) {
+                          console.log(`[GenerateApp] AUTO_MODE marker detected: ${autoModeMatch[1]}`);
                           setAutoModeInferredBehavior(autoModeMatch[1] as 'planning' | 'building');
                           autoModeMarkerFound = true;
+                          console.log(`[GenerateApp] Set autoModeInferredBehavior to: ${autoModeMatch[1]}`);
                         }
                       }
                       
