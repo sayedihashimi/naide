@@ -21,6 +21,9 @@ The AI Activity Status Display has been fully implemented with real-time status 
 - Animated icons for in-progress operations (spinning loader)
 - Visual feedback for completed (checkmark) and error (X) states
 - Dark theme styling consistent with Naide's design system
+- **Max height constraint**: Status bar limited to ~10 lines (240px) with vertical scrollbar when content overflows
+- **Resizable pane**: Drag handle at top of status bar allows user to resize (min 24px, max 240px, default 120px)
+- **Auto-scroll**: Automatically scrolls to bottom when new events arrive
 
 **Technical Implementation:**
 - **Backend**: StatusEventEmitter class in `src/copilot-sidecar/src/statusEvents.ts`

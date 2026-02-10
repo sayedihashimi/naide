@@ -23,8 +23,10 @@ export interface StatusEvent {
   timestamp: number;
 }
 
-const MAX_VISIBLE_EVENTS = 3;
 const AUTO_REMOVE_DELAY = 2000; // 2 seconds
+const DEFAULT_HEIGHT = 120; // ~5 lines
+const MAX_HEIGHT = 240; // ~10 lines
+const MIN_HEIGHT = 24; // very small minimum
 
 const getIconForEvent = (event: StatusEvent) => {
   // Status-based icons take precedence
@@ -79,9 +81,11 @@ const truncatePath = (path: string, maxLength: number = 60): string => {
 
 const ActivityStatusBar: React.FC = () => {
   const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
+  const [paneHeight, setPaneHeight] = useState<number>(DEFAULT_HEIGHT);
   const wsRef = useRef<WebSocket | null>(null);
   const removeTimersRef = useRef<Map<string, number>>(new Map());
   const autoHideTimerRef = useRef<number | null>(null);
+  const eventsContainerRef = useRef<HTMLDivElement>(null);
 
   // WebSocket connection management
   useEffect(() => {
@@ -128,11 +132,7 @@ const ActivityStatusBar: React.FC = () => {
             
             // Add new event
             const updated = [...prev, statusEvent];
-            
-            // Keep only last MAX_VISIBLE_EVENTS
-            const trimmed = updated.slice(-MAX_VISIBLE_EVENTS);
-            
-            return trimmed;
+            return updated;
           });
 
           // Auto-remove completed events after delay
@@ -183,23 +183,65 @@ const ActivityStatusBar: React.FC = () => {
     };
   }, []);
 
+  // Auto-scroll to bottom when new events arrive
+  useEffect(() => {
+    if (eventsContainerRef.current) {
+      eventsContainerRef.current.scrollTop = eventsContainerRef.current.scrollHeight;
+    }
+  }, [statusEvents]);
+
+  // Resize handler — drag up to expand, drag down to shrink
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = paneHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = startY - moveEvent.clientY;
+      const newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startHeight + deltaY));
+      setPaneHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   // Don't render if no events
   if (statusEvents.length === 0) {
     return null;
   }
 
   return (
-    <div className="bg-zinc-900 border-t border-zinc-700 px-4 py-3 font-mono text-xs">
-      <div className="max-w-3xl mx-auto space-y-1">
-        {statusEvents.map((event) => (
-          <div
-            key={event.id}
-            className={`flex items-center gap-2 ${getColorForStatus(event.status)}`}
-          >
-            <span className="flex-shrink-0">{getIconForEvent(event)}</span>
-            <span className="truncate">{truncatePath(event.message)}</span>
-          </div>
-        ))}
+    <div className="bg-zinc-900 border-t border-zinc-700 font-mono text-xs relative">
+      {/* Resize handle */}
+      <div
+        className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-zinc-600 transition-colors z-10"
+        onMouseDown={handleResizeStart}
+      />
+      {/* Scrollable events container */}
+      <div
+        ref={eventsContainerRef}
+        className="overflow-y-auto px-4 py-2 pt-3"
+        style={{ maxHeight: `${paneHeight}px` }}
+      >
+        <div className="max-w-3xl mx-auto space-y-1">
+          {statusEvents.map((event) => (
+            <div
+              key={event.id}
+              className={`flex items-center gap-2 ${getColorForStatus(event.status)}`}
+            >
+              <span className="flex-shrink-0">{getIconForEvent(event)}</span>
+              <span className="truncate">{truncatePath(event.message)}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
