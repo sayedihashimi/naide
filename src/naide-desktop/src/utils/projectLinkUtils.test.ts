@@ -209,5 +209,12 @@ describe('extractProjectFilePath with currentFilePath (relative link resolution)
       const currentFile = '.prompts\\features\\file1.md';
       expect(extractProjectFilePath('./file2.md', customDomains, currentFile)).toBe('.prompts/features/file2.md');
     });
+
+    it('should work with real feature file scenario', () => {
+      // This simulates the actual use case: clicking a link in a feature file
+      const currentFile = '.prompts/features/2026-02-09-project-file-link-interception.md';
+      expect(extractProjectFilePath('./2026-02-06-feature-file-tabs.md', customDomains, currentFile))
+        .toBe('.prompts/features/2026-02-06-feature-file-tabs.md');
+    });
   });
 });
