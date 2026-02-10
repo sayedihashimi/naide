@@ -706,7 +706,7 @@ const GenerateAppScreen: React.FC = () => {
                       // Parse AUTO_MODE marker if in Auto mode
                       if (copilotMode === 'Auto') {
                         const autoModeMatch = accumulatedContent.match(/<!-- AUTO_MODE: (planning|building) -->/);
-                        if (autoModeMatch && !autoModeInferredBehavior) {
+                        if (autoModeMatch) {
                           setAutoModeInferredBehavior(autoModeMatch[1] as 'planning' | 'building');
                         }
                       }
