@@ -1253,10 +1253,15 @@ const GenerateAppScreen: React.FC = () => {
     const fileName = normalizedPath.split('/').pop() || relativePath;
     
     if (tabType === 'feature-file') {
+      // Feature files: strip .prompts/features/ prefix since backend expects path relative to features dir
+      const featureRelativePath = normalizedPath.startsWith('.prompts/features/')
+        ? normalizedPath.substring('.prompts/features/'.length)
+        : normalizedPath;
+      
       // Open as feature file tab
       const featureFile: FeatureFileNode = {
         name: fileName,
-        path: relativePath,
+        path: featureRelativePath,
         type: 'file',
       };
       handleOpenFeatureTab(featureFile);
