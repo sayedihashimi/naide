@@ -628,14 +628,21 @@ app.post('/api/copilot/stream', async (req, res) => {
   
   // For Analyzing mode, return stub response (not ready yet)
   if (mode === 'Analyzing') {
+    console.log('[Sidecar] Analyzing mode requested - returning stub response');
     sendEvent('delta', { content: 'Analyzing coming soon' });
     sendEvent('done', {});
     res.end();
     return;
   }
   
-  // For Planning and Building modes, use Copilot SDK with streaming
-  if (mode === 'Planning' || mode === 'Building') {
+  // For Auto, Planning and Building modes, use Copilot SDK with streaming
+  if (mode === 'Auto' || mode === 'Planning' || mode === 'Building') {
+    console.log(`[Sidecar] Starting streaming request for ${mode} mode`);
+    console.log(`[Sidecar] Message: ${message?.substring(0, 100)}${message && message.length > 100 ? '...' : ''}`);
+    console.log(`[Sidecar] Workspace: ${workspaceRoot || 'not specified'}`);
+    if (conversationContext) {
+      console.log(`[Sidecar] Conversation context: ${conversationContext.totalMessageCount} total messages, summary: ${conversationContext.summary ? 'present' : 'none'}`);
+    }
     // Check if Copilot is initialized
     if (!copilotReady || !copilotClient) {
       const initResult = await initializeCopilot();
@@ -649,29 +656,37 @@ app.post('/api/copilot/stream', async (req, res) => {
     try {
       const workspace = workspaceRoot || process.cwd();
       
+      console.log('[Sidecar] Loading system prompts...');
       // Load system prompts (same as non-streaming endpoint)
       let fullSystemPrompt = loadSystemPrompts(mode);
+      console.log(`[Sidecar] System prompts loaded: ${fullSystemPrompt.length} chars`);
+      
+      console.log('[Sidecar] Loading spec and feature files...');
       const specs = loadSpecFiles(workspace);
       const features = loadFeatureFiles(workspace);
       fullSystemPrompt += specs;
       fullSystemPrompt += features;
+      console.log(`[Sidecar] Specs and features loaded: ${specs.length + features.length} chars added`);
       // Learnings are now accessed via the search_learnings tool, not bulk-loaded
       
       if (conversationContext?.summary) {
         const summaryPrompt = formatConversationSummary(conversationContext.summary);
         fullSystemPrompt += summaryPrompt;
+        console.log(`[Sidecar] Conversation summary added: ${summaryPrompt.length} chars`);
       }
       
       if (conversationContext?.recentMessages && conversationContext.recentMessages.length > 0) {
         const messagesPrompt = formatRecentMessages(conversationContext.recentMessages);
         fullSystemPrompt += messagesPrompt;
+        console.log(`[Sidecar] Recent messages added: ${conversationContext.recentMessages.length} messages, ${messagesPrompt.length} chars`);
       }
       
       console.log(`[Sidecar] Full prompt assembled for streaming, total length: ${fullSystemPrompt.length} chars`);
       
       // Create a new session for streaming
-      console.log('[Sidecar] Creating new Copilot session for streaming Planning mode');
+      console.log(`[Sidecar] Creating new Copilot session for streaming ${mode} mode`);
       console.log(`[Sidecar] Workspace directory: ${workspace}`);
+      console.log(`[Sidecar] Model: gpt-4o`);
       const session = await copilotClient!.createSession({
         model: 'gpt-4o',
         workingDirectory: workspace,
@@ -805,6 +820,10 @@ app.post('/api/copilot/stream', async (req, res) => {
         const args = event.data.arguments as Record<string, any> || {};
         const filePath = args.path || args.file || args.filename;
         
+        console.log(`[Sidecar] Tool execution started: ${event.data.toolName}`);
+        console.log(`[Sidecar] Tool call ID: ${event.data.toolCallId}`);
+        console.log(`[Sidecar] Tool arguments:`, JSON.stringify(args, null, 2).substring(0, 200));
+        
         // Store tool call info for later use
         toolCalls.set(event.data.toolCallId, {
           toolName: event.data.toolName,
@@ -813,19 +832,20 @@ app.post('/api/copilot/stream', async (req, res) => {
         
         // Detect command execution tools (exact match or starts with pattern)
         const isCommandTool = COMMAND_TOOLS.some(t => toolName === t || toolName.startsWith(`${t}_`));
-        console.log(`[Sidecar] Tool name check: "${toolName}", isCommandTool: ${isCommandTool}, COMMAND_TOOLS:`, COMMAND_TOOLS);
+        console.log(`[Sidecar] Tool name check: "${toolName}", isCommandTool: ${isCommandTool}`);
         
         if (isCommandTool) {
           const command = extractCommandFromArgs(args);
-          console.log(`[Sidecar] Extracted command from args:`, command, 'Args:', args);
+          console.log(`[Sidecar] Extracted command from args:`, command);
           
           if (command) {
             const commandId = `cmd-${event.data.toolCallId}`;
-            console.log(`[Sidecar] Command execution detected: ${command}, commandId: ${commandId}, toolCallId: ${event.data.toolCallId}`);
+            console.log(`[Sidecar] Command execution detected: ${command.substring(0, 100)}${command.length > 100 ? '...' : ''}`);
+            console.log(`[Sidecar] Command ID: ${commandId}, Tool call ID: ${event.data.toolCallId}`);
             
             // Track this as an active command
             activeCommands.set(event.data.toolCallId, { commandId, command });
-            console.log(`[Sidecar] Added to activeCommands. Map size: ${activeCommands.size}`);
+            console.log(`[Sidecar] Active commands tracked: ${activeCommands.size}`);
             
             // Emit command_start event
             sendEvent('command_start', {
@@ -841,6 +861,7 @@ app.post('/api/copilot/stream', async (req, res) => {
         // Emit status for file operations (with relative paths)
         if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
           const relativePath = toRelativePath(workspace, filePath);
+          console.log(`[Sidecar] File write operation: ${relativePath}`);
           statusEmitter.emitFileWrite(relativePath, 'in_progress');
         } else if (toolName.includes('view') || toolName.includes('read')) {
           if (filePath) {
@@ -895,11 +916,16 @@ app.post('/api/copilot/stream', async (req, res) => {
       }));
       
       unsubscribeFns.push(session.on('tool.execution_complete', (event) => {
-        console.log(`[Sidecar] Tool completed: ${event.data.toolCallId}, success: ${event.data.success}`);
+        console.log(`[Sidecar] Tool execution completed`);
+        console.log(`[Sidecar] Tool call ID: ${event.data.toolCallId}`);
+        console.log(`[Sidecar] Success: ${event.data.success}`);
         
         // Check if this was a command execution
         const activeCmd = activeCommands.get(event.data.toolCallId);
         if (activeCmd) {
+          console.log(`[Sidecar] Command completed: ${activeCmd.command.substring(0, 100)}${activeCmd.command.length > 100 ? '...' : ''}`);
+          console.log(`[Sidecar] Exit code: ${event.data.success ? 0 : 1}`);
+          
           // Emit command_complete event
           sendEvent('command_complete', {
             commandId: activeCmd.commandId,
@@ -918,24 +944,32 @@ app.post('/api/copilot/stream', async (req, res) => {
           const args = ((toolCallInfo.toolArgs as Record<string, any> | undefined) || {});
           const filePath = args.path || args.file || args.filename;
           
+          console.log(`[Sidecar] Tool "${toolName}" completed, file path: ${filePath || 'none'}`);
+          
           // Emit completion status for file operations (with relative paths)
           if (event.data.success) {
             if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
               const relativePath = toRelativePath(workspace, filePath);
+              console.log(`[Sidecar] File write successful: ${relativePath}`);
               statusEmitter.emitFileWrite(relativePath, 'complete');
             } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
               const relativePath = toRelativePath(workspace, filePath);
+              console.log(`[Sidecar] File read successful: ${relativePath}`);
               statusEmitter.emitFileRead(relativePath, 'complete');
             } else if (toolName.includes('grep') || toolName.includes('glob')) {
+              console.log(`[Sidecar] Search completed successfully`);
               statusEmitter.emitAnalysis('Search complete', 'complete');
             }
           } else {
+            console.log(`[Sidecar] Tool execution failed`);
             // Emit error status if tool failed (with relative paths)
             if (FILE_WRITE_TOOLS.some(t => toolName.includes(t)) && filePath) {
               const relativePath = toRelativePath(workspace, filePath);
+              console.log(`[Sidecar] File write failed: ${relativePath}`);
               statusEmitter.emitFileWrite(`Failed to write ${relativePath}`, 'error');
             } else if ((toolName.includes('view') || toolName.includes('read')) && filePath) {
               const relativePath = toRelativePath(workspace, filePath);
+              console.log(`[Sidecar] File read failed: ${relativePath}`);
               statusEmitter.emitFileRead(`Failed to read ${relativePath}`, 'error');
             }
           }
@@ -959,13 +993,17 @@ app.post('/api/copilot/stream', async (req, res) => {
       }));
       
       unsubscribeFns.push(session.on('subagent.completed', () => {
+        console.log('[Sidecar] Subagent completed');
         sendEvent('subagent_complete', {});
         resetTimeout('subagent completed');
       }));
       
       // Session becomes idle - completion signal
       unsubscribeFns.push(session.on('session.idle', () => {
+        console.log('[Sidecar] ========================================');
         console.log('[Sidecar] Session idle - streaming complete');
+        console.log(`[Sidecar] Total response length: ${responseBuffer.join('').length} chars`);
+        console.log('[Sidecar] ========================================');
         clearTimeout(timeoutHandle);
         cleanupListeners();
         
@@ -985,7 +1023,9 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       // Session error
       unsubscribeFns.push(session.on('session.error', (event) => {
-        console.error('[Sidecar] Session error:', event.data.message);
+        console.error('[Sidecar] ========================================');
+        console.error('[Sidecar] SESSION ERROR:', event.data.message);
+        console.error('[Sidecar] ========================================');
         clearTimeout(timeoutHandle);
         cleanupListeners();
         
@@ -1011,10 +1051,15 @@ app.post('/api/copilot/stream', async (req, res) => {
       statusEmitter.emitApiCall('Requesting Copilot response...', 'in_progress');
       
       // Send the message to start streaming
+      console.log('[Sidecar] Sending message to Copilot session...');
       await session.send({ prompt: message });
+      console.log('[Sidecar] Message sent to Copilot, waiting for response...');
       
     } catch (error: unknown) {
-      console.error('[Sidecar] Error in streaming:', error);
+      console.error('[Sidecar] ========================================');
+      console.error('[Sidecar] ERROR IN STREAMING:');
+      console.error('[Sidecar]', error);
+      console.error('[Sidecar] ========================================');
       const errorMessage = error instanceof Error ? error.message : String(error);
       sendEvent('error', { message: `Failed to communicate with Copilot: ${errorMessage}` });
       res.end();
@@ -1023,6 +1068,7 @@ app.post('/api/copilot/stream', async (req, res) => {
   }
   
   // Unknown mode
+  console.error(`[Sidecar] Unknown mode requested: ${mode}`);
   sendEvent('error', { message: `Unknown mode: ${mode}` });
   res.end();
 });
@@ -1031,21 +1077,28 @@ app.post('/api/copilot/stream', async (req, res) => {
 app.post('/api/copilot/chat', async (req, res) => {
   const { mode, message, workspaceRoot, contextFiles, conversationContext } = req.body;
   
-  console.log(`[Sidecar] Chat request - mode: ${mode}, message: ${message?.substring(0, 50)}...`);
+  console.log('[Sidecar] ========================================');
+  console.log(`[Sidecar] Non-streaming chat request received`);
+  console.log(`[Sidecar] Mode: ${mode}`);
+  console.log(`[Sidecar] Message: ${message?.substring(0, 100)}${message && message.length > 100 ? '...' : ''}`);
+  console.log(`[Sidecar] Workspace: ${workspaceRoot || 'not specified'}`);
   if (conversationContext) {
-    console.log(`[Sidecar] Conversation context: ${conversationContext.totalMessageCount} total messages, summary: ${conversationContext.summary ? 'yes' : 'no'}`);
+    console.log(`[Sidecar] Conversation context: ${conversationContext.totalMessageCount} total messages, summary: ${conversationContext.summary ? 'present' : 'none'}`);
   }
+  console.log('[Sidecar] ========================================');
   
   // For Analyzing mode, return stub response (not ready yet)
   if (mode === 'Analyzing') {
+    console.log('[Sidecar] Analyzing mode - returning stub response');
     return res.json({
       replyText: 'Analyzing coming soon',
       actions: []
     });
   }
   
-  // For Planning and Building modes, use Copilot SDK
-  if (mode === 'Planning' || mode === 'Building') {
+  // For Auto, Planning and Building modes, use Copilot SDK
+  if (mode === 'Auto' || mode === 'Planning' || mode === 'Building') {
+    console.log(`[Sidecar] Processing ${mode} mode request...`);
     // Check if Copilot is initialized
     if (!copilotReady || !copilotClient) {
       const initResult = await initializeCopilot();
@@ -1071,32 +1124,39 @@ app.post('/api/copilot/chat', async (req, res) => {
       
       const workspace = workspaceRoot || process.cwd();
       
+      console.log('[Sidecar] Loading system prompts...');
       // 1-2) Load system prompts from naide app repository (base + mode)
       let fullSystemPrompt = loadSystemPrompts(mode);
+      console.log(`[Sidecar] System prompts loaded: ${fullSystemPrompt.length} chars`);
       
+      console.log('[Sidecar] Loading spec and feature files...');
       // 3) Load spec and feature files from user's project
       const specs = loadSpecFiles(workspace);
       const features = loadFeatureFiles(workspace);
       fullSystemPrompt += specs;
       fullSystemPrompt += features;
+      console.log(`[Sidecar] Specs and features loaded: ${specs.length + features.length} chars added`);
       
       // 5) Add conversation summary (mid-term memory)
       if (conversationContext?.summary) {
         const summaryPrompt = formatConversationSummary(conversationContext.summary);
         fullSystemPrompt += summaryPrompt;
+        console.log(`[Sidecar] Conversation summary added: ${summaryPrompt.length} chars`);
       }
       
       // 6) Add recent messages (short-term memory)
       if (conversationContext?.recentMessages && conversationContext.recentMessages.length > 0) {
         const messagesPrompt = formatRecentMessages(conversationContext.recentMessages);
         fullSystemPrompt += messagesPrompt;
+        console.log(`[Sidecar] Recent messages added: ${conversationContext.recentMessages.length} messages, ${messagesPrompt.length} chars`);
       }
       
       console.log(`[Sidecar] Full prompt assembled, total length: ${fullSystemPrompt.length} chars`);
       
       // Create a new session for each request to avoid conflicts
-      console.log('[Sidecar] Creating new Copilot session for Planning mode');
+      console.log(`[Sidecar] Creating new Copilot session for ${mode} mode`);
       console.log(`[Sidecar] Workspace directory: ${workspace}`);
+      console.log(`[Sidecar] Model: gpt-4o`);
       const session = await copilotClient!.createSession({
         model: 'gpt-4o',
         workingDirectory: workspace,
@@ -1307,7 +1367,10 @@ app.post('/api/copilot/chat', async (req, res) => {
         
         // Session becomes idle - this is our completion signal
         unsubscribeFns.push(session.on('session.idle', () => {
+          console.log('[Sidecar] ========================================');
           console.log('[Sidecar] Session idle - request complete');
+          console.log(`[Sidecar] Total response length: ${responseChunks.join('').length} chars`);
+          console.log('[Sidecar] ========================================');
           clearTimeout(timeoutHandle);
           cleanupListeners();
           
@@ -1322,7 +1385,9 @@ app.post('/api/copilot/chat', async (req, res) => {
         
         // Session error
         unsubscribeFns.push(session.on('session.error', (event) => {
-          console.error('[Sidecar] Session error:', event.data.message);
+          console.error('[Sidecar] ========================================');
+          console.error('[Sidecar] SESSION ERROR:', event.data.message);
+          console.error('[Sidecar] ========================================');
           clearTimeout(timeoutHandle);
           cleanupListeners();
           
@@ -1337,10 +1402,13 @@ app.post('/api/copilot/chat', async (req, res) => {
       });
       
       // Send the message AFTER setting up listeners
+      console.log('[Sidecar] Sending message to Copilot session...');
       await session.send({ prompt: message });
+      console.log('[Sidecar] Message sent, waiting for response...');
       
       // Wait for the response
       const replyText = await responsePromise;
+      console.log('[Sidecar] Response received');
       
       const response = {
         replyText: replyText || 'No response from Copilot',
@@ -1349,7 +1417,10 @@ app.post('/api/copilot/chat', async (req, res) => {
       
       return res.json(response);
     } catch (error: unknown) {
-      console.error('[Sidecar] Error calling Copilot:', error);
+      console.error('[Sidecar] ========================================');
+      console.error('[Sidecar] ERROR CALLING COPILOT:');
+      console.error('[Sidecar]', error);
+      console.error('[Sidecar] ========================================');
       const errorMessage = error instanceof Error ? error.message : String(error);
       return res.status(500).json({
         error: 'Failed to communicate with Copilot',
@@ -1359,6 +1430,7 @@ app.post('/api/copilot/chat', async (req, res) => {
   }
   
   // Unknown mode
+  console.error(`[Sidecar] Unknown mode requested: ${mode}`);
   return res.status(400).json({
     error: `Unknown mode: ${mode}`,
     replyText: `Unknown mode: ${mode}`
