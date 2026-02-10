@@ -83,6 +83,44 @@ src/naide-desktop/
 - [Test Documentation](../../.prompts/tech/testing.md) - Testing infrastructure details
 - [Project Requirements](../../.prompts/naide-prototype.overview.md) - Project specifications
 
+## Features
+
+### Project File Link Interception
+
+Naide automatically intercepts links to project files in chat messages and markdown previews. When you click a link that points to a project file, it opens directly in the editor instead of trying to open in a browser.
+
+**Supported link formats:**
+- `http://localhost:5173/src/App.tsx` - localhost URLs (any port)
+- `http://127.0.0.1:3000/README.md` - 127.0.0.1 URLs (any port)
+- `src/App.tsx` or `.prompts/features/feature.md` - absolute paths from project root
+- `./other-file.md` - relative to current file (in feature file markdown)
+- `../plan/overview.md` - relative parent directory (in feature file markdown)
+- Custom domain URLs (configure via `projectLinkDomains` setting)
+
+**Relative links in markdown files:**
+When viewing a feature file like `.prompts/features/auth.md`, relative links work as expected:
+- `./login.md` → opens `.prompts/features/login.md`
+- `../plan/overview.md` → opens `.prompts/plan/overview.md`
+- Links without `./` or `../` prefix are treated as project-root relative
+
+**How to configure custom domains:**
+
+Edit your global settings file (location shown via "Get Settings Path" in the app) and add a `projectLinkDomains` array:
+
+```json
+{
+  "version": 1,
+  "last_used_project": { ... },
+  "recent_projects": [ ... ],
+  "projectLinkDomains": ["myapp.local", "dev.example.com"]
+}
+```
+
+Custom domains are matched case-insensitively. After editing, restart the app for changes to take effect.
+
+**File not found:**
+If a linked file doesn't exist, a red tooltip appears briefly showing "File not found: {path}".
+
 ---
 
 # React + TypeScript + Vite

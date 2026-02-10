@@ -1,14 +1,20 @@
 import React from 'react';
 import MessageContent from './MessageContent';
+import { ProjectLinkProvider } from '../context/ProjectLinkContext';
+import { useProjectLinkContext } from '../context/ProjectLinkContext';
 
 interface MarkdownPreviewProps {
   content: string | null;
   fileName: string | null;
+  filePath?: string | null; // Path of the markdown file being rendered
   onEdit?: () => void;
   canEdit?: boolean;
 }
 
-const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content, fileName, onEdit, canEdit }) => {
+const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content, fileName, filePath, onEdit, canEdit }) => {
+  // Get the current context values
+  const { projectPath, projectLinkDomains, onOpenProjectFile } = useProjectLinkContext();
+  
   if (!content || !fileName) {
     return (
       <div className="h-full flex items-center justify-center text-gray-500 text-sm">
@@ -44,7 +50,15 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content, fileName, on
         )}
       </div>
       <div className="prose prose-invert prose-sm max-w-none">
-        <MessageContent content={content} role="assistant" />
+        {/* Provide a new context with the current file path for relative link resolution */}
+        <ProjectLinkProvider
+          projectPath={projectPath}
+          projectLinkDomains={projectLinkDomains}
+          currentFilePath={filePath}
+          onOpenProjectFile={onOpenProjectFile}
+        >
+          <MessageContent content={content} role="assistant" />
+        </ProjectLinkProvider>
       </div>
     </div>
   );

@@ -44,6 +44,7 @@ const FeatureFileTab: React.FC<FeatureFileTabProps> = ({
         // Don't reset hasUnsavedChanges here - it's managed separately
       } catch (err) {
         console.error('[FeatureFileTab] Error reading file:', err);
+        console.error('[FeatureFileTab] Context:', { projectPath, filePath, isActive, isEditing });
         setLoadError('Failed to load file content');
         setFileContent(null);
       }
@@ -208,6 +209,7 @@ const FeatureFileTab: React.FC<FeatureFileTabProps> = ({
           <MarkdownPreview
             content={fileContent}
             fileName={fileName}
+            filePath={`.prompts/features/${filePath}`}
             onEdit={handleToggleEdit}
             canEdit={!!fileContent}
           />

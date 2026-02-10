@@ -26,6 +26,9 @@ import { getRecentProjects, saveLastProject, removeRecentProject, type LastProje
 import { logInfo, logError } from '../utils/logger';
 import { loadOpenTabs, saveOpenTabs, type PersistedTab } from '../utils/tabPersistence';
 import { loadFavoriteSessions, toggleFavoriteSession } from '../utils/favoritePersistence';
+import { ProjectLinkProvider } from '../context/ProjectLinkContext';
+import { getTabType } from '../utils/projectLinkUtils';
+import { invoke } from '@tauri-apps/api/core';
 import { Square, Star } from 'lucide-react';
 
 export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
@@ -120,6 +123,8 @@ const GenerateAppScreen: React.FC = () => {
   // Favorite sessions state
   const [favoriteSessions, setFavoriteSessions] = useState<string[]>([]);
   const [currentChatFilename, setCurrentChatFilename] = useState<string | null>(null);
+  // Project link domains for link interception
+  const [projectLinkDomains, setProjectLinkDomains] = useState<string[]>([]);
   // Feature file popup state
   const [visualIntensity, setVisualIntensity] = useState<number>(1.0);
   
@@ -278,6 +283,21 @@ const GenerateAppScreen: React.FC = () => {
       setRecentProjects(projects);
     };
     loadRecentProjects();
+  }, []);
+
+  // Load project link domains on startup
+  useEffect(() => {
+    const loadDomains = async () => {
+      try {
+        const domains = await invoke<string[]>('get_project_link_domains');
+        setProjectLinkDomains(domains);
+        logInfo(`[GenerateApp] Loaded ${domains.length} project link domains`);
+      } catch (error) {
+        logError('Failed to load project link domains:', error);
+        setProjectLinkDomains([]);
+      }
+    };
+    loadDomains();
   }, []);
 
   // Load favorite sessions when project changes
@@ -1225,6 +1245,37 @@ const GenerateAppScreen: React.FC = () => {
     setActiveTabId(tabId);
   };
 
+  // Handle opening a file from a link click
+  const handleOpenFileFromLink = (relativePath: string) => {
+    const tabType = getTabType(relativePath);
+    // Normalize path separators to forward slashes and extract filename
+    const normalizedPath = relativePath.replace(/\\/g, '/');
+    const fileName = normalizedPath.split('/').pop() || relativePath;
+    
+    if (tabType === 'feature-file') {
+      // Feature files: strip .prompts/features/ prefix since backend expects path relative to features dir
+      const featureRelativePath = normalizedPath.startsWith('.prompts/features/')
+        ? normalizedPath.substring('.prompts/features/'.length)
+        : normalizedPath;
+      
+      // Open as feature file tab
+      const featureFile: FeatureFileNode = {
+        name: fileName,
+        path: featureRelativePath,
+        type: 'file',
+      };
+      handleOpenFeatureTab(featureFile);
+    } else {
+      // Open as project file tab
+      const projectFile: ProjectFileNode = {
+        name: fileName,
+        path: relativePath,
+        type: 'file',
+      };
+      handleOpenProjectTab(projectFile);
+    }
+  };
+
   const handleTabSelect = (tabId: string) => {
     setActiveTabId(tabId);
     const tab = tabs.find(t => t.id === tabId);
@@ -1787,7 +1838,12 @@ const GenerateAppScreen: React.FC = () => {
         </div>
 
         {/* Center: Tabbed Area (Chat + Feature Files) */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <ProjectLinkProvider
+          projectPath={state.projectPath}
+          projectLinkDomains={projectLinkDomains}
+          onOpenProjectFile={handleOpenFileFromLink}
+        >
+          <div className="flex-1 flex flex-col overflow-hidden">
           {/* Tab Bar */}
           <TabBar
             tabs={tabs}
@@ -2187,7 +2243,8 @@ const GenerateAppScreen: React.FC = () => {
               )}
             </div>
           ))}
-        </div>
+          </div>
+        </ProjectLinkProvider>
 
         {/* Right: Running App Preview */}
         <div 

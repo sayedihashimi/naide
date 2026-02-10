@@ -231,6 +231,7 @@ const ProjectFileTab: React.FC<ProjectFileTabProps> = ({
           <MarkdownPreview
             content={fileContent}
             fileName={fileName}
+            filePath={filePath}
             onEdit={handleToggleEdit}
             canEdit={!!fileContent}
           />
