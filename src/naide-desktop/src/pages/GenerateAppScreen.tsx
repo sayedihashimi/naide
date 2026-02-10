@@ -31,9 +31,10 @@ import { getTabType } from '../utils/projectLinkUtils';
 import { invoke } from '@tauri-apps/api/core';
 import { Square, Star } from 'lucide-react';
 
-export type CopilotMode = 'Planning' | 'Building' | 'Analyzing';
+export type CopilotMode = 'Auto' | 'Planning' | 'Building' | 'Analyzing';
 
 const MODE_DESCRIPTIONS: Record<CopilotMode, string> = {
+  Auto: '',
   Planning: '(Create/update specs only)',
   Building: '(Update code and specs)',
   Analyzing: '(Coming soon)',
@@ -45,6 +46,21 @@ const getWelcomeMessages = (mode: CopilotMode): ChatMessage[] => {
   const timestamp = new Date().toISOString();
   
   switch (mode) {
+    case 'Auto':
+      return [
+        {
+          id: 'welcome-auto-1',
+          role: 'assistant',
+          content: "Welcome to Naide! 👋",
+          timestamp,
+        },
+        {
+          id: 'welcome-auto-2',
+          role: 'assistant',
+          content: "Just tell me what you'd like to do — I'll figure out whether we need to plan first or jump straight to building.\n\nYou can describe a new feature, ask me to fix something, or just brainstorm ideas. I'll always check with you before taking action.",
+          timestamp,
+        },
+      ];
     case 'Planning':
       return [
         {
@@ -112,7 +128,8 @@ const GenerateAppScreen: React.FC = () => {
   const [expandedHeight, setExpandedHeight] = useState<number>(160); // Default 160px (h-40)
   const [isLoading, setIsLoading] = useState(false);
   const [chatInitialized, setChatInitialized] = useState(false);
-  const [copilotMode, setCopilotMode] = useState<CopilotMode>('Planning');
+  const [copilotMode, setCopilotMode] = useState<CopilotMode>('Auto');
+  const [autoModeInferredBehavior, setAutoModeInferredBehavior] = useState<'planning' | 'building' | null>(null);
   // Conversation summary for mid-term memory (persisted in state, not disk)
   const [conversationSummary, setConversationSummary] = useState<ConversationSummary | null>(null);
   // Recent projects dropdown state
@@ -147,6 +164,14 @@ const GenerateAppScreen: React.FC = () => {
     
     return () => clearInterval(timerId);
   }, [isLoading]);
+  
+  // Debug logging for autoModeInferredBehavior changes
+  useEffect(() => {
+    logInfo(`[GenerateApp] autoModeInferredBehavior changed to: ${autoModeInferredBehavior}`);
+    logInfo(`[GenerateApp] copilotMode is: ${copilotMode}`);
+    logInfo(`[GenerateApp] Should show indicator: ${copilotMode === 'Auto' && autoModeInferredBehavior !== null}`);
+  }, [autoModeInferredBehavior, copilotMode]);
+  
   const iframeRef = useRef<HTMLIFrameElement>(null);
   // Ref to track current iframe URL (for immediate access in click handlers)
   const currentIframeUrlRef = useRef<string | null>(null);
@@ -553,6 +578,12 @@ const GenerateAppScreen: React.FC = () => {
       setChatInitialized(true);
     }
 
+    // Reset auto mode inferred behavior on new message
+    setAutoModeInferredBehavior(null);
+
+    logInfo(`[GenerateApp] Sending message in ${copilotMode} mode`);
+    logInfo(`[GenerateApp] Message: ${messageInput.trim().substring(0, 100)}${messageInput.trim().length > 100 ? '...' : ''}`);
+
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       role: 'user',
@@ -652,6 +683,7 @@ const GenerateAppScreen: React.FC = () => {
         const decoder = new TextDecoder();
         let buffer = '';
         let accumulatedContent = '';
+        let autoModeMarkerFound = false; // Track if we've already found the marker for this response
         
         if (!reader) {
           throw new Error('Response body is not readable');
@@ -682,10 +714,25 @@ const GenerateAppScreen: React.FC = () => {
                     // Accumulate content and update the message
                     if (eventData.data?.content) {
                       accumulatedContent += eventData.data.content;
+                      
+                      // Parse AUTO_MODE marker if in Auto mode (only once per response)
+                      if (copilotMode === 'Auto' && !autoModeMarkerFound) {
+                        const autoModeMatch = accumulatedContent.match(/<!-- AUTO_MODE: (planning|building) -->/);
+                        if (autoModeMatch) {
+                          logInfo(`[GenerateApp] AUTO_MODE marker detected: ${autoModeMatch[1]}`);
+                          setAutoModeInferredBehavior(autoModeMatch[1] as 'planning' | 'building');
+                          autoModeMarkerFound = true;
+                          logInfo(`[GenerateApp] Set autoModeInferredBehavior to: ${autoModeMatch[1]}`);
+                        }
+                      }
+                      
+                      // Clean content for display (remove markers) but keep raw for parsing
+                      const displayContent = cleanResponseForDisplay(accumulatedContent);
+                      
                       setMessages(prev => 
                         prev.map(m => 
                           m.id === assistantMessageId 
-                            ? { ...m, content: accumulatedContent }
+                            ? { ...m, content: displayContent }
                             : m
                         )
                       );
@@ -911,6 +958,8 @@ const GenerateAppScreen: React.FC = () => {
 
   const handleModeChange = (newMode: CopilotMode) => {
     setCopilotMode(newMode);
+    // Reset auto mode inferred behavior when mode changes
+    setAutoModeInferredBehavior(null);
     // Reset chat with new welcome messages for the mode
     if (!chatInitialized) {
       setMessages(getWelcomeMessages(newMode));
@@ -949,6 +998,7 @@ const GenerateAppScreen: React.FC = () => {
     setMessages(getWelcomeMessages(copilotMode));
     setConversationSummary(null);
     setCurrentChatFilename(null); // New chat has no filename yet
+    setAutoModeInferredBehavior(null); // Reset auto mode inferred behavior
     
     // Focus the textarea
     if (textareaRef.current) {
@@ -2075,13 +2125,21 @@ const GenerateAppScreen: React.FC = () => {
                     onChange={(e) => handleModeChange(e.target.value as CopilotMode)}
                     className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="Auto">Auto</option>
                     <option value="Planning">Planning</option>
                     <option value="Building">Building</option>
                     <option value="Analyzing">Analyzing</option>
                   </select>
-                  <span className="text-xs text-gray-500">
-                    {MODE_DESCRIPTIONS[copilotMode]}
-                  </span>
+                  {copilotMode === 'Auto' && autoModeInferredBehavior && (
+                    <span className="text-xs text-zinc-500 ml-1">
+                      · {autoModeInferredBehavior === 'planning' ? 'Planning' : 'Building'}
+                    </span>
+                  )}
+                  {copilotMode !== 'Auto' && MODE_DESCRIPTIONS[copilotMode] && (
+                    <span className="text-xs text-gray-500">
+                      {MODE_DESCRIPTIONS[copilotMode]}
+                    </span>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1 flex flex-col">

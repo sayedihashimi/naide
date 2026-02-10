@@ -261,25 +261,30 @@ export function parseSummaryFromResponse(response: string): Partial<Conversation
 }
 
 /**
- * Removes the summary markers from the AI response for display
+ * Removes the summary markers and AUTO_MODE markers from the AI response for display
  * 
  * @param response - The AI response text
- * @returns Response with summary markers removed
+ * @returns Response with markers removed
  */
 export function cleanResponseForDisplay(response: string): string {
+  let cleaned = response;
+  
+  // Remove CONVERSATION_SUMMARY block
   const summaryMarkerStart = '<!-- CONVERSATION_SUMMARY_START -->';
   const summaryMarkerEnd = '<!-- CONVERSATION_SUMMARY_END -->';
   
-  const startIdx = response.indexOf(summaryMarkerStart);
-  const endIdx = response.indexOf(summaryMarkerEnd);
+  const startIdx = cleaned.indexOf(summaryMarkerStart);
+  const endIdx = cleaned.indexOf(summaryMarkerEnd);
   
-  if (startIdx === -1 || endIdx === -1) {
-    return response;
+  if (startIdx !== -1 && endIdx !== -1) {
+    cleaned = (
+      cleaned.substring(0, startIdx) +
+      cleaned.substring(endIdx + summaryMarkerEnd.length)
+    ).trim();
   }
   
-  // Remove the summary block from the response
-  return (
-    response.substring(0, startIdx) +
-    response.substring(endIdx + summaryMarkerEnd.length)
-  ).trim();
+  // Remove AUTO_MODE marker (used for mode selection indicator)
+  cleaned = cleaned.replace(/<!-- AUTO_MODE: (planning|building) -->\n?/g, '');
+  
+  return cleaned;
 }

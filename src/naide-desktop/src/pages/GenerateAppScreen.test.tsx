@@ -85,8 +85,8 @@ describe('GenerateAppScreen', () => {
     expect(screen.getByRole('heading', { name: 'Generate App' })).toBeInTheDocument();
     expect(screen.getByText(/Talk to Naide to generate and refine your app/i)).toBeInTheDocument();
     
-    // Wait for welcome messages to load (Planning mode by default)
-    expect(await screen.findByText(/I'm in Planning Mode/i)).toBeInTheDocument();
+    // Wait for welcome messages to load (Auto mode by default)
+    expect(await screen.findByText(/Welcome to Naide!/i)).toBeInTheDocument();
     
     expect(screen.getByPlaceholderText(/Type your message.../i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
@@ -138,12 +138,12 @@ describe('GenerateAppScreen', () => {
   it('displays placeholder assistant messages', async () => {
     renderGenerateAppScreen();
 
-    // Wait for welcome messages to load (Planning mode by default)
-    expect(await screen.findByText(/I'm in Planning Mode/i)).toBeInTheDocument();
-    expect(screen.getByText(/What would you like to plan or refine in your specifications?/i)).toBeInTheDocument();
+    // Wait for welcome messages to load (Auto mode by default)
+    expect(await screen.findByText(/Welcome to Naide!/i)).toBeInTheDocument();
+    expect(screen.getByText(/Just tell me what you'd like to do/i)).toBeInTheDocument();
   });
 
-  it('has mode selector dropdown with three options', async () => {
+  it('has mode selector dropdown with four options', async () => {
     renderGenerateAppScreen();
 
     await screen.findByLabelText(/Mode:/i);
@@ -151,24 +151,26 @@ describe('GenerateAppScreen', () => {
     const modeSelect = screen.getByLabelText(/Mode:/i);
     expect(modeSelect).toBeInTheDocument();
     
-    // Check all three options exist
+    // Check all four options exist
     const options = Array.from(modeSelect.querySelectorAll('option'));
-    expect(options).toHaveLength(3);
-    expect(options[0]).toHaveTextContent('Planning');
-    expect(options[1]).toHaveTextContent('Building');
-    expect(options[2]).toHaveTextContent('Analyzing');
+    expect(options).toHaveLength(4);
+    expect(options[0]).toHaveTextContent('Auto');
+    expect(options[1]).toHaveTextContent('Planning');
+    expect(options[2]).toHaveTextContent('Building');
+    expect(options[3]).toHaveTextContent('Analyzing');
   });
 
-  it('defaults to Planning mode', async () => {
+  it('defaults to Auto mode', async () => {
     renderGenerateAppScreen();
 
     await screen.findByLabelText(/Mode:/i);
 
     const modeSelect = screen.getByLabelText(/Mode:/i) as HTMLSelectElement;
-    expect(modeSelect.value).toBe('Planning');
+    expect(modeSelect.value).toBe('Auto');
     
-    // Check Planning mode description is shown
-    expect(screen.getByText(/Create\/update specs only/i)).toBeInTheDocument();
+    // Check no description is shown for Auto mode (empty string)
+    const descSpans = screen.queryAllByText(/Create\/update specs only/i);
+    expect(descSpans).toHaveLength(0);
   });
 
   it('changes welcome messages when mode is changed', async () => {
@@ -179,8 +181,15 @@ describe('GenerateAppScreen', () => {
 
     const modeSelect = screen.getByLabelText(/Mode:/i);
 
-    // Initially Planning mode messages
+    // Initially Auto mode messages
+    expect(await screen.findByText(/Welcome to Naide!/i)).toBeInTheDocument();
+
+    // Switch to Planning mode
+    await user.selectOptions(modeSelect, 'Planning');
+
+    // Should see Planning mode messages
     expect(await screen.findByText(/I'm in Planning Mode/i)).toBeInTheDocument();
+    expect(screen.getByText(/What would you like to plan or refine in your specifications?/i)).toBeInTheDocument();
 
     // Switch to Building mode
     await user.selectOptions(modeSelect, 'Building');
@@ -198,8 +207,13 @@ describe('GenerateAppScreen', () => {
 
     const modeSelect = screen.getByLabelText(/Mode:/i);
 
-    // Planning mode
-    expect(screen.getByText(/Create\/update specs only/i)).toBeInTheDocument();
+    // Auto mode - no description shown
+    expect(screen.queryByText(/Create\/update specs only/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Update code and specs/i)).not.toBeInTheDocument();
+
+    // Switch to Planning mode
+    await user.selectOptions(modeSelect, 'Planning');
+    expect(await screen.findByText(/Create\/update specs only/i)).toBeInTheDocument();
 
     // Switch to Building mode
     await user.selectOptions(modeSelect, 'Building');
@@ -221,8 +235,8 @@ describe('GenerateAppScreen', () => {
 
     await screen.findByLabelText(/Mode:/i);
 
-    // Mock fetch to return a Planning mode streaming response
-    (global.fetch as any).mockResolvedValueOnce(createStreamingResponse('Planning mode response'));
+    // Mock fetch to return a Auto mode streaming response
+    (global.fetch as any).mockResolvedValueOnce(createStreamingResponse('Auto mode response'));
 
     // Send a message to initialize the chat
     const messageInput = screen.getByPlaceholderText(/Type your message.../i);
@@ -231,7 +245,7 @@ describe('GenerateAppScreen', () => {
 
     // Wait for user message and response
     expect(await screen.findByText('Test message')).toBeInTheDocument();
-    expect(await screen.findByText('Planning mode response')).toBeInTheDocument();
+    expect(await screen.findByText('Auto mode response')).toBeInTheDocument();
 
     // Now change the mode
     const modeSelect = screen.getByLabelText(/Mode:/i);
@@ -239,10 +253,10 @@ describe('GenerateAppScreen', () => {
 
     // The original messages should still be there
     expect(screen.getByText('Test message')).toBeInTheDocument();
-    expect(screen.getByText('Planning mode response')).toBeInTheDocument();
+    expect(screen.getByText('Auto mode response')).toBeInTheDocument();
     
-    // The Planning mode welcome messages should still be visible
-    expect(screen.getByText(/I'm in Planning Mode/i)).toBeInTheDocument();
+    // The Auto mode welcome messages should still be visible
+    expect(screen.getByText(/Welcome to Naide!/i)).toBeInTheDocument();
     
     // The Building mode welcome messages should NOT appear
     expect(screen.queryByText(/I'm in Building Mode/i)).not.toBeInTheDocument();
@@ -815,6 +829,147 @@ describe('GenerateAppScreen', () => {
       expect(cancelMessage).toHaveClass('text-zinc-500');
       expect(cancelMessage).toHaveClass('italic');
       expect(cancelMessage).toHaveClass('text-sm');
+    });
+  });
+
+  describe('Auto Mode', () => {
+    it('shows Auto mode welcome messages', async () => {
+      renderGenerateAppScreen();
+
+      // Wait for Auto mode welcome messages
+      expect(await screen.findByText(/Welcome to Naide!/i)).toBeInTheDocument();
+      expect(screen.getByText(/Just tell me what you'd like to do/i)).toBeInTheDocument();
+    });
+
+    it('does not show description for Auto mode', async () => {
+      renderGenerateAppScreen();
+
+      await screen.findByLabelText(/Mode:/i);
+
+      // Auto mode should not show a description
+      expect(screen.queryByText(/Create\/update specs only/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Update code and specs/i)).not.toBeInTheDocument();
+    });
+
+    it('shows visual indicator when AUTO_MODE marker is in response', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // Mock fetch to return a response with AUTO_MODE marker for planning
+      const responseWithMarker = '<!-- AUTO_MODE: planning -->\n\nI understand you want to plan a feature...';
+      (global.fetch as any).mockResolvedValueOnce(createStreamingResponse(responseWithMarker));
+
+      // Send a message
+      await user.type(messageInput, 'Plan a feature');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Wait for response
+      await screen.findByText(/I understand you want to plan a feature/i);
+
+      // Check that the visual indicator shows "Planning"
+      expect(screen.getByText('· Planning')).toBeInTheDocument();
+    });
+
+    it('shows building indicator when AUTO_MODE marker is building', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // Mock fetch to return a response with AUTO_MODE marker for building
+      const responseWithMarker = '<!-- AUTO_MODE: building -->\n\nI see you want to implement a feature...';
+      (global.fetch as any).mockResolvedValueOnce(createStreamingResponse(responseWithMarker));
+
+      // Send a message
+      await user.type(messageInput, 'Build a feature');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Wait for response
+      await screen.findByText(/I see you want to implement a feature/i);
+
+      // Check that the visual indicator shows "Building"
+      expect(screen.getByText('· Building')).toBeInTheDocument();
+    });
+
+    it('hides visual indicator when not in Auto mode', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByLabelText(/Mode:/i);
+      
+      const modeSelect = screen.getByLabelText(/Mode:/i);
+
+      // Switch to Planning mode
+      await user.selectOptions(modeSelect, 'Planning');
+
+      // Visual indicator should not be shown
+      expect(screen.queryByText('· Planning')).not.toBeInTheDocument();
+      expect(screen.queryByText('· Building')).not.toBeInTheDocument();
+    });
+
+    it('resets visual indicator on new message', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // First message with planning marker
+      const responseWithMarker1 = '<!-- AUTO_MODE: planning -->\n\nPlanning response';
+      (global.fetch as any).mockResolvedValueOnce(createStreamingResponse(responseWithMarker1));
+
+      await user.type(messageInput, 'First message');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Wait for indicator
+      await screen.findByText('· Planning');
+
+      // Second message with building marker
+      const responseWithMarker2 = '<!-- AUTO_MODE: building -->\n\nBuilding response';
+      (global.fetch as any).mockResolvedValueOnce(createStreamingResponse(responseWithMarker2));
+
+      await user.type(messageInput, 'Second message');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Wait for new indicator
+      await screen.findByText('· Building');
+
+      // Only the building indicator should be shown (planning should be gone)
+      expect(screen.queryAllByText('· Planning')).toHaveLength(0);
+      expect(screen.getByText('· Building')).toBeInTheDocument();
+    });
+
+    it('resets visual indicator when mode is changed', async () => {
+      const user = userEvent.setup();
+      renderGenerateAppScreen();
+
+      await screen.findByPlaceholderText(/Type your message.../i);
+      
+      const messageInput = screen.getByPlaceholderText(/Type your message.../i);
+
+      // Send a message with marker
+      const responseWithMarker = '<!-- AUTO_MODE: planning -->\n\nPlanning response';
+      (global.fetch as any).mockResolvedValueOnce(createStreamingResponse(responseWithMarker));
+
+      await user.type(messageInput, 'Test message');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+
+      // Wait for indicator
+      await screen.findByText('· Planning');
+
+      // Change mode
+      const modeSelect = screen.getByLabelText(/Mode:/i);
+      await user.selectOptions(modeSelect, 'Planning');
+
+      // Indicator should be gone
+      expect(screen.queryByText('· Planning')).not.toBeInTheDocument();
     });
   });
 });

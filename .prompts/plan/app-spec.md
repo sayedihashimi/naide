@@ -13,7 +13,17 @@ Naide is a Tauri desktop application with a React + Vite frontend that helps non
 
 ## Core Features
 
-### 1. Planning Mode
+### 1. Auto Mode (Default)
+- Intelligent intent-based mode selection
+- Copilot infers whether user needs planning or building assistance
+- Proposes action plan and asks for confirmation before proceeding
+- Loads base, auto, planning, and building system prompts together
+- Shows visual indicator (Auto · Planning or Auto · Building) based on inferred behavior
+- Detects `<!-- AUTO_MODE: planning|building -->` marker in responses
+- Defaults to planning behavior when intent is ambiguous
+- Seamless switching between planning and building within same conversation
+
+### 2. Planning Mode
 - AI-assisted planning and specification creation
 - Updates files under `.prompts/plan/**` and `.prompts/features/**`
 - Reads and applies learnings from `.prompts/learnings/**` via `search_learnings` tool
@@ -21,14 +31,14 @@ Naide is a Tauri desktop application with a React + Vite frontend that helps non
 - Interactive chat interface with Copilot integration
 - Streaming responses via Server-Sent Events (SSE)
 
-### 2. Building Mode
+### 3. Building Mode
 - AI-assisted code implementation and maintenance
 - Updates both application code and specification files
 - Uses Copilot SDK with building-specific system prompt
 - Code placement rules: new apps in `src/`, existing apps follow patterns
 - Safe file writes with path allowlisting
 
-### 3. Analyzing Mode (Stub)
+### 4. Analyzing Mode (Stub)
 - Returns "Analyzing coming soon" message
 - Will eventually analyze code and provide insights
 
