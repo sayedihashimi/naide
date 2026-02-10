@@ -126,10 +126,10 @@ function loadSystemPrompts(mode: string): string {
   
   try {
     const basePath = join(promptsDir, 'base.system.md');
-    const modePath = join(promptsDir, `${mode.toLowerCase()}.system.md`);
     
     let systemPrompt = '';
     
+    // Always load base prompt
     if (existsSync(basePath)) {
       systemPrompt += readFileSync(basePath, 'utf-8') + '\n\n';
       console.log(`[Sidecar] Loaded base system prompt from: ${basePath}`);
@@ -137,11 +137,42 @@ function loadSystemPrompts(mode: string): string {
       console.warn(`[Sidecar] Base system prompt not found at: ${basePath}`);
     }
     
-    if (existsSync(modePath)) {
-      systemPrompt += readFileSync(modePath, 'utf-8') + '\n\n';
-      console.log(`[Sidecar] Loaded ${mode} system prompt from: ${modePath}`);
+    // Handle Auto mode specially - load auto, planning, and building prompts
+    if (mode.toLowerCase() === 'auto') {
+      const autoPath = join(promptsDir, 'auto.system.md');
+      const planningPath = join(promptsDir, 'planning.system.md');
+      const buildingPath = join(promptsDir, 'building.system.md');
+      
+      if (existsSync(autoPath)) {
+        systemPrompt += readFileSync(autoPath, 'utf-8') + '\n\n';
+        console.log(`[Sidecar] Loaded auto system prompt from: ${autoPath}`);
+      } else {
+        console.warn(`[Sidecar] Auto system prompt not found at: ${autoPath}`);
+      }
+      
+      if (existsSync(planningPath)) {
+        systemPrompt += readFileSync(planningPath, 'utf-8') + '\n\n';
+        console.log(`[Sidecar] Loaded planning system prompt from: ${planningPath}`);
+      } else {
+        console.warn(`[Sidecar] Planning system prompt not found at: ${planningPath}`);
+      }
+      
+      if (existsSync(buildingPath)) {
+        systemPrompt += readFileSync(buildingPath, 'utf-8') + '\n\n';
+        console.log(`[Sidecar] Loaded building system prompt from: ${buildingPath}`);
+      } else {
+        console.warn(`[Sidecar] Building system prompt not found at: ${buildingPath}`);
+      }
     } else {
-      console.warn(`[Sidecar] Mode system prompt not found at: ${modePath}`);
+      // For other modes, load the specific mode prompt
+      const modePath = join(promptsDir, `${mode.toLowerCase()}.system.md`);
+      
+      if (existsSync(modePath)) {
+        systemPrompt += readFileSync(modePath, 'utf-8') + '\n\n';
+        console.log(`[Sidecar] Loaded ${mode} system prompt from: ${modePath}`);
+      } else {
+        console.warn(`[Sidecar] Mode system prompt not found at: ${modePath}`);
+      }
     }
     
     // Add conversation memory instructions
