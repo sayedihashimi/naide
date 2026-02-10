@@ -92,8 +92,16 @@ Naide automatically intercepts links to project files in chat messages and markd
 **Supported link formats:**
 - `http://localhost:5173/src/App.tsx` - localhost URLs (any port)
 - `http://127.0.0.1:3000/README.md` - 127.0.0.1 URLs (any port)
-- `src/App.tsx` or `.prompts/features/feature.md` - relative paths
+- `src/App.tsx` or `.prompts/features/feature.md` - absolute paths from project root
+- `./other-file.md` - relative to current file (in feature file markdown)
+- `../plan/overview.md` - relative parent directory (in feature file markdown)
 - Custom domain URLs (configure via `projectLinkDomains` setting)
+
+**Relative links in markdown files:**
+When viewing a feature file like `.prompts/features/auth.md`, relative links work as expected:
+- `./login.md` → opens `.prompts/features/login.md`
+- `../plan/overview.md` → opens `.prompts/plan/overview.md`
+- Links without `./` or `../` prefix are treated as project-root relative
 
 **How to configure custom domains:**
 
