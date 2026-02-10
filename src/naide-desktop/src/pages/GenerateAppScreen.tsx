@@ -672,6 +672,7 @@ const GenerateAppScreen: React.FC = () => {
         const decoder = new TextDecoder();
         let buffer = '';
         let accumulatedContent = '';
+        let autoModeMarkerFound = false; // Track if we've already found the marker for this response
         
         if (!reader) {
           throw new Error('Response body is not readable');
@@ -703,11 +704,12 @@ const GenerateAppScreen: React.FC = () => {
                     if (eventData.data?.content) {
                       accumulatedContent += eventData.data.content;
                       
-                      // Parse AUTO_MODE marker if in Auto mode
-                      if (copilotMode === 'Auto') {
+                      // Parse AUTO_MODE marker if in Auto mode (only once per response)
+                      if (copilotMode === 'Auto' && !autoModeMarkerFound) {
                         const autoModeMatch = accumulatedContent.match(/<!-- AUTO_MODE: (planning|building) -->/);
                         if (autoModeMatch) {
                           setAutoModeInferredBehavior(autoModeMatch[1] as 'planning' | 'building');
+                          autoModeMarkerFound = true;
                         }
                       }
                       

@@ -26,6 +26,8 @@ const COMMAND_TOOLS = ['bash', 'run_command', 'execute_command', 'run_in_termina
 // Streaming timeout constants
 const RESPONSE_TIMEOUT_MS = 180000; // 3 minutes - initial timeout before any response
 const ACTIVITY_TIMEOUT_MS = 120000; // 2 minutes - timeout once streaming starts
+// Mode constants
+const AUTO_MODE = 'auto';
 
 // =============================================================================
 // Types for Conversation Memory
@@ -138,7 +140,7 @@ function loadSystemPrompts(mode: string): string {
     }
     
     // Handle Auto mode specially - load auto, planning, and building prompts
-    if (mode.toLowerCase() === 'auto') {
+    if (mode.toLowerCase() === AUTO_MODE) {
       const autoPath = join(promptsDir, 'auto.system.md');
       const planningPath = join(promptsDir, 'planning.system.md');
       const buildingPath = join(promptsDir, 'building.system.md');
