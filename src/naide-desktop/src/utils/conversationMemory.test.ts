@@ -372,5 +372,54 @@ The actual response.`;
       
       expect(cleaned).toBe('The actual response.');
     });
+
+    it('should remove AUTO_MODE planning marker', () => {
+      const response = `<!-- AUTO_MODE: planning -->
+I understand you want to plan a feature.`;
+      
+      const cleaned = cleanResponseForDisplay(response);
+      
+      expect(cleaned).not.toContain('AUTO_MODE');
+      expect(cleaned).not.toContain('<!--');
+      expect(cleaned).toBe('I understand you want to plan a feature.');
+    });
+
+    it('should remove AUTO_MODE building marker', () => {
+      const response = `<!-- AUTO_MODE: building -->
+I will implement the feature.`;
+      
+      const cleaned = cleanResponseForDisplay(response);
+      
+      expect(cleaned).not.toContain('AUTO_MODE');
+      expect(cleaned).toBe('I will implement the feature.');
+    });
+
+    it('should remove AUTO_MODE marker in middle of response', () => {
+      const response = `Here is some text.
+<!-- AUTO_MODE: planning -->
+More text after marker.`;
+      
+      const cleaned = cleanResponseForDisplay(response);
+      
+      expect(cleaned).not.toContain('AUTO_MODE');
+      expect(cleaned).toContain('Here is some text.');
+      expect(cleaned).toContain('More text after marker.');
+    });
+
+    it('should handle both AUTO_MODE and CONVERSATION_SUMMARY markers', () => {
+      const response = `<!-- AUTO_MODE: planning -->
+Response text here.
+<!-- CONVERSATION_SUMMARY_START -->
+{"decisions": []}
+<!-- CONVERSATION_SUMMARY_END -->
+More text.`;
+      
+      const cleaned = cleanResponseForDisplay(response);
+      
+      expect(cleaned).not.toContain('AUTO_MODE');
+      expect(cleaned).not.toContain('CONVERSATION_SUMMARY');
+      expect(cleaned).toContain('Response text here.');
+      expect(cleaned).toContain('More text.');
+    });
   });
 });

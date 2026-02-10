@@ -726,10 +726,13 @@ const GenerateAppScreen: React.FC = () => {
                         }
                       }
                       
+                      // Clean content for display (remove markers) but keep raw for parsing
+                      const displayContent = cleanResponseForDisplay(accumulatedContent);
+                      
                       setMessages(prev => 
                         prev.map(m => 
                           m.id === assistantMessageId 
-                            ? { ...m, content: accumulatedContent }
+                            ? { ...m, content: displayContent }
                             : m
                         )
                       );
