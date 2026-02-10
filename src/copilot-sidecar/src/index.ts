@@ -737,6 +737,9 @@ app.post('/api/copilot/stream', async (req, res) => {
       // Track all unsubscribe functions for cleanup
       const unsubscribeFns: Array<() => void> = [];
       
+      // Track if we've already detected and logged AUTO_MODE marker
+      let autoModeMarkerDetected = false;
+      
       // Helper function to extract command from tool arguments
       const extractCommandFromArgs = (args: Record<string, any>): string | null => {
         // Try common argument names for commands, in order of specificity
@@ -777,6 +780,20 @@ app.post('/api/copilot/stream', async (req, res) => {
         if (event.data.content) {
           responseBuffer.push(event.data.content);
           sendEvent('delta', { content: event.data.content });
+          
+          // For Auto mode, detect and log AUTO_MODE marker
+          if (mode === 'Auto' && !autoModeMarkerDetected) {
+            const fullResponse = responseBuffer.join('');
+            const markerMatch = fullResponse.match(/<!-- AUTO_MODE: (planning|building) -->/);
+            if (markerMatch) {
+              console.log(`[Sidecar] ========================================`);
+              console.log(`[Sidecar] AUTO MODE SELECTION DETECTED: ${markerMatch[1].toUpperCase()}`);
+              console.log(`[Sidecar] The AI has chosen ${markerMatch[1]} mode for this request`);
+              console.log(`[Sidecar] ========================================`);
+              autoModeMarkerDetected = true;
+            }
+          }
+          
           resetTimeout('assistant.message received');
         }
       }));
@@ -786,6 +803,20 @@ app.post('/api/copilot/stream', async (req, res) => {
         if (event.data.deltaContent) {
           responseBuffer.push(event.data.deltaContent);
           sendEvent('delta', { content: event.data.deltaContent });
+          
+          // For Auto mode, detect and log AUTO_MODE marker
+          if (mode === 'Auto' && !autoModeMarkerDetected) {
+            const fullResponse = responseBuffer.join('');
+            const markerMatch = fullResponse.match(/<!-- AUTO_MODE: (planning|building) -->/);
+            if (markerMatch) {
+              console.log(`[Sidecar] ========================================`);
+              console.log(`[Sidecar] AUTO MODE SELECTION DETECTED: ${markerMatch[1].toUpperCase()}`);
+              console.log(`[Sidecar] The AI has chosen ${markerMatch[1]} mode for this request`);
+              console.log(`[Sidecar] ========================================`);
+              autoModeMarkerDetected = true;
+            }
+          }
+          
           // Emit status: streaming response (only once at start)
           if (responseBuffer.length === 1) {
             statusEmitter.emitApiCall('Streaming response...', 'in_progress');
@@ -1003,6 +1034,13 @@ app.post('/api/copilot/stream', async (req, res) => {
         console.log('[Sidecar] ========================================');
         console.log('[Sidecar] Session idle - streaming complete');
         console.log(`[Sidecar] Total response length: ${responseBuffer.join('').length} chars`);
+        
+        // Warn if Auto mode didn't produce a marker
+        if (mode === 'Auto' && !autoModeMarkerDetected) {
+          console.warn('[Sidecar] WARNING: Auto mode response completed but no AUTO_MODE marker was detected');
+          console.warn('[Sidecar] This may indicate the AI did not follow the auto mode system prompt');
+        }
+        
         console.log('[Sidecar] ========================================');
         clearTimeout(timeoutHandle);
         cleanupListeners();
@@ -1210,6 +1248,9 @@ app.post('/api/copilot/chat', async (req, res) => {
       // Track tool calls for status reporting
       const toolCalls = new Map<string, { toolName: string; toolArgs: any }>();
       
+      // Track if we've already detected and logged AUTO_MODE marker
+      let autoModeMarkerDetected = false;
+      
       // Set up event listeners for the response BEFORE sending
       const responsePromise = new Promise<string>((resolve, reject) => {
         let timeoutHandle: NodeJS.Timeout;
@@ -1251,6 +1292,20 @@ app.post('/api/copilot/chat', async (req, res) => {
         unsubscribeFns.push(session.on('assistant.message', (event) => {
           if (event.data.content) {
             responseChunks.push(event.data.content);
+            
+            // For Auto mode, detect and log AUTO_MODE marker
+            if (mode === 'Auto' && !autoModeMarkerDetected) {
+              const fullResponse = responseChunks.join('');
+              const markerMatch = fullResponse.match(/<!-- AUTO_MODE: (planning|building) -->/);
+              if (markerMatch) {
+                console.log(`[Sidecar] ========================================`);
+                console.log(`[Sidecar] AUTO MODE SELECTION DETECTED: ${markerMatch[1].toUpperCase()}`);
+                console.log(`[Sidecar] The AI has chosen ${markerMatch[1]} mode for this request`);
+                console.log(`[Sidecar] ========================================`);
+                autoModeMarkerDetected = true;
+              }
+            }
+            
             resetTimeout('assistant.message received');
           }
         }));
@@ -1370,6 +1425,13 @@ app.post('/api/copilot/chat', async (req, res) => {
           console.log('[Sidecar] ========================================');
           console.log('[Sidecar] Session idle - request complete');
           console.log(`[Sidecar] Total response length: ${responseChunks.join('').length} chars`);
+          
+          // Warn if Auto mode didn't produce a marker
+          if (mode === 'Auto' && !autoModeMarkerDetected) {
+            console.warn('[Sidecar] WARNING: Auto mode response completed but no AUTO_MODE marker was detected');
+            console.warn('[Sidecar] This may indicate the AI did not follow the auto mode system prompt');
+          }
+          
           console.log('[Sidecar] ========================================');
           clearTimeout(timeoutHandle);
           cleanupListeners();

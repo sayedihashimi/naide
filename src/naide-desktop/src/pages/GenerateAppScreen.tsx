@@ -167,9 +167,9 @@ const GenerateAppScreen: React.FC = () => {
   
   // Debug logging for autoModeInferredBehavior changes
   useEffect(() => {
-    console.log(`[GenerateApp] autoModeInferredBehavior changed to: ${autoModeInferredBehavior}`);
-    console.log(`[GenerateApp] copilotMode is: ${copilotMode}`);
-    console.log(`[GenerateApp] Should show indicator: ${copilotMode === 'Auto' && autoModeInferredBehavior !== null}`);
+    logInfo(`[GenerateApp] autoModeInferredBehavior changed to: ${autoModeInferredBehavior}`);
+    logInfo(`[GenerateApp] copilotMode is: ${copilotMode}`);
+    logInfo(`[GenerateApp] Should show indicator: ${copilotMode === 'Auto' && autoModeInferredBehavior !== null}`);
   }, [autoModeInferredBehavior, copilotMode]);
   
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -581,8 +581,8 @@ const GenerateAppScreen: React.FC = () => {
     // Reset auto mode inferred behavior on new message
     setAutoModeInferredBehavior(null);
 
-    console.log(`[GenerateApp] Sending message in ${copilotMode} mode`);
-    console.log(`[GenerateApp] Message: ${messageInput.trim().substring(0, 100)}${messageInput.trim().length > 100 ? '...' : ''}`);
+    logInfo(`[GenerateApp] Sending message in ${copilotMode} mode`);
+    logInfo(`[GenerateApp] Message: ${messageInput.trim().substring(0, 100)}${messageInput.trim().length > 100 ? '...' : ''}`);
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -719,10 +719,10 @@ const GenerateAppScreen: React.FC = () => {
                       if (copilotMode === 'Auto' && !autoModeMarkerFound) {
                         const autoModeMatch = accumulatedContent.match(/<!-- AUTO_MODE: (planning|building) -->/);
                         if (autoModeMatch) {
-                          console.log(`[GenerateApp] AUTO_MODE marker detected: ${autoModeMatch[1]}`);
+                          logInfo(`[GenerateApp] AUTO_MODE marker detected: ${autoModeMatch[1]}`);
                           setAutoModeInferredBehavior(autoModeMatch[1] as 'planning' | 'building');
                           autoModeMarkerFound = true;
-                          console.log(`[GenerateApp] Set autoModeInferredBehavior to: ${autoModeMatch[1]}`);
+                          logInfo(`[GenerateApp] Set autoModeInferredBehavior to: ${autoModeMatch[1]}`);
                         }
                       }
                       
