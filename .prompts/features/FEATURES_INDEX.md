@@ -47,6 +47,7 @@ This index provides a chronological overview of all feature files in `.prompts/f
 | [2026-02-08-monaco-editor-integration.md](./2026-02-08-monaco-editor-integration.md) | Monaco Editor for syntax highlighting, line numbers, and rich editing | planned |
 | [2026-02-08-terminal-command-output-in-chat.md](./2026-02-08-terminal-command-output-in-chat.md) | Show terminal command output inline in chat as collapsible blocks | planned |
 | [2026-02-09-project-file-link-interception.md](./2026-02-09-project-file-link-interception.md) | Intercept project file links in chat/previews and open in editor tabs | planned |
+| [2026-02-10-auto-mode.md](./2026-02-10-auto-mode.md) | Auto mode — Copilot infers planning vs building intent | planned |
 
 ## Superseded Features
 

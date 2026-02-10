@@ -105,7 +105,7 @@ struct ProjectFileNode {
 ### Copilot API Request
 ```typescript
 interface CopilotRequest {
-  mode: 'Planning' | 'Building' | 'Analyzing';
+  mode: 'Auto' | 'Planning' | 'Building' | 'Analyzing';
   message: string;
   workspaceRoot: string;
   contextFiles?: string[];            // Optional context files

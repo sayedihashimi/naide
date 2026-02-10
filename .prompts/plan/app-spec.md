@@ -45,7 +45,7 @@ The app launches directly into the Generate App screen (single-screen app). Scre
   - **Tab bar**: Generate App tab (always first, never closable) + feature file tabs + project file tabs
   - **Chat interface**: Markdown rendering, streaming responses, conversation memory
   - **Activity status bar**: Real-time AI operation status (file reads/writes, API calls) via WebSocket
-  - **Mode selector dropdown**: Planning / Building / Analyzing
+  - **Mode selector dropdown**: Auto (default) / Planning / Building / Analyzing
   - **New Chat button** (+): Archives current chat, starts fresh
   - **Chat History button** (clock): Dropdown to load/delete archived chats
   - **Resizable textarea**: Drag handle for custom height, expand/collapse toggle
@@ -70,9 +70,10 @@ The app launches directly into the Generate App screen (single-screen app). Scre
 - Middle-click to close
 
 ### Mode Selector
-Dropdown with three options:
-- Planning (Create/update specs only) — Default
-- Building (Update code and specs) — Functional
+Dropdown with four options:
+- Auto — Default (Copilot infers planning vs building, proposes actions, asks for confirmation)
+- Planning (Create/update specs only)
+- Building (Update code and specs)
 - Analyzing — Coming soon
 
 ### Project Management
