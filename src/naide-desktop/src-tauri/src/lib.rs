@@ -118,6 +118,33 @@ async fn clear_last_project(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// Tauri command: Save selected model to global settings
+#[tauri::command]
+async fn save_selected_model(app: tauri::AppHandle, model: String) -> Result<(), String> {
+    println!("[Settings] save_selected_model called with model: {}", model);
+    
+    let mut settings = read_settings(&app).unwrap_or_default();
+    settings.selected_model = Some(model.clone());
+    
+    write_settings(&app, &settings)?;
+    println!("[Settings] Saved selected model: {}", model);
+    Ok(())
+}
+
+// Tauri command: Load selected model from global settings
+#[tauri::command]
+async fn load_selected_model(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let settings = read_settings(&app)?;
+    
+    if let Some(model) = settings.selected_model {
+        println!("[Settings] Loaded selected model: {}", model);
+        Ok(Some(model))
+    } else {
+        println!("[Settings] No selected model found");
+        Ok(None)
+    }
+}
+
 // Tauri command: Get the settings file path (for debugging)
 #[tauri::command]
 async fn get_settings_file_path(app: tauri::AppHandle) -> Result<String, String> {
@@ -1186,6 +1213,8 @@ pub fn run() {
       save_last_project,
       load_last_project,
       clear_last_project,
+      save_selected_model,
+      load_selected_model,
       get_settings_file_path,
       get_recent_projects,
       add_recent_project_cmd,
