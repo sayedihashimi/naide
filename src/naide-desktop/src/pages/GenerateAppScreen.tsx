@@ -790,7 +790,7 @@ const GenerateAppScreen: React.FC = () => {
                     }, 2000);
                     
                     // Store timeout so we can clean it up if needed
-                    commandCollapseTimeoutsRef.current.set(commandId, timeoutId);
+                    commandCollapseTimeoutsRef.current.set(commandId, timeoutId as unknown as number);
                     break;
                   }
                     
@@ -1301,8 +1301,11 @@ const GenerateAppScreen: React.FC = () => {
       // Open as feature file tab
       const featureFile: FeatureFileNode = {
         name: fileName,
+        full_name: fileName,
         path: featureRelativePath,
-        type: 'file',
+        date: null,
+        is_folder: false,
+        children: null,
       };
       handleOpenFeatureTab(featureFile);
     } else {
@@ -1310,7 +1313,7 @@ const GenerateAppScreen: React.FC = () => {
       const projectFile: ProjectFileNode = {
         name: fileName,
         path: relativePath,
-        type: 'file',
+        is_folder: false,
       };
       handleOpenProjectTab(projectFile);
     }
