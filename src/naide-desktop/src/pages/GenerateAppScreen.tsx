@@ -113,6 +113,10 @@ const GenerateAppScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [chatInitialized, setChatInitialized] = useState(false);
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('Planning');
+  // Model selection state
+  const [availableModels, setAvailableModels] = useState<Array<{id: string, friendlyName: string}>>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [modelLoadError, setModelLoadError] = useState<boolean>(false);
   // Conversation summary for mid-term memory (persisted in state, not disk)
   const [conversationSummary, setConversationSummary] = useState<ConversationSummary | null>(null);
   // Recent projects dropdown state
@@ -311,6 +315,41 @@ const GenerateAppScreen: React.FC = () => {
     };
     loadFavorites();
   }, [state.projectPath]);
+
+  // Fetch available models on mount
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        logInfo('[GenerateApp] Fetching available models from sidecar');
+        const response = await fetch('http://localhost:3001/api/models');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        logInfo(`[GenerateApp] Fetched ${data.models.length} models, default: ${data.defaultModel}`);
+        setAvailableModels(data.models);
+        
+        // Load saved model selection
+        const { loadSelectedModel } = await import('../utils/globalSettings');
+        const saved = await loadSelectedModel();
+        
+        if (saved && data.models.some((m: any) => m.id === saved)) {
+          logInfo(`[GenerateApp] Using saved model: ${saved}`);
+          setSelectedModel(saved);
+        } else {
+          logInfo(`[GenerateApp] Using default model: ${data.defaultModel}`);
+          setSelectedModel(data.defaultModel);
+        }
+      } catch (error) {
+        logError(`[GenerateApp] Failed to fetch models: ${error}`);
+        setModelLoadError(true);
+      }
+    };
+    
+    fetchModels();
+  }, []); // Run once on mount
 
   // Click outside handler to close dropdown
   useEffect(() => {
@@ -625,6 +664,7 @@ const GenerateAppScreen: React.FC = () => {
             message: userInput,
             workspaceRoot: projectPath,
             conversationContext,
+            model: selectedModel, // Include selected model
           }),
           signal: controller.signal,
         });
@@ -750,7 +790,7 @@ const GenerateAppScreen: React.FC = () => {
                     }, 2000);
                     
                     // Store timeout so we can clean it up if needed
-                    commandCollapseTimeoutsRef.current.set(commandId, timeoutId);
+                    commandCollapseTimeoutsRef.current.set(commandId, timeoutId as unknown as number);
                     break;
                   }
                     
@@ -1261,8 +1301,11 @@ const GenerateAppScreen: React.FC = () => {
       // Open as feature file tab
       const featureFile: FeatureFileNode = {
         name: fileName,
+        full_name: fileName,
         path: featureRelativePath,
-        type: 'file',
+        date: null,
+        is_folder: false,
+        children: null,
       };
       handleOpenFeatureTab(featureFile);
     } else {
@@ -1270,7 +1313,7 @@ const GenerateAppScreen: React.FC = () => {
       const projectFile: ProjectFileNode = {
         name: fileName,
         path: relativePath,
-        type: 'file',
+        is_folder: false,
       };
       handleOpenProjectTab(projectFile);
     }
@@ -2066,6 +2109,36 @@ const GenerateAppScreen: React.FC = () => {
                       />
                     </button>
                   )}
+                  
+                  {/* Model selector */}
+                  <label htmlFor="model-select" className="text-sm text-gray-400">
+                    Model:
+                  </label>
+                  {modelLoadError ? (
+                    <span className="text-xs text-red-400">Error</span>
+                  ) : availableModels.length === 0 ? (
+                    <span className="text-xs text-gray-500">Loading...</span>
+                  ) : (
+                    <select
+                      id="model-select"
+                      value={selectedModel}
+                      onChange={async (e) => {
+                        const newModel = e.target.value;
+                        setSelectedModel(newModel);
+                        // Save selection to global settings
+                        const { saveSelectedModel } = await import('../utils/globalSettings');
+                        await saveSelectedModel(newModel);
+                        logInfo(`[GenerateApp] Model changed to: ${newModel}`);
+                      }}
+                      className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {availableModels.map(m => (
+                        <option key={m.id} value={m.id}>{m.friendlyName}</option>
+                      ))}
+                    </select>
+                  )}
+                  
+                  {/* Mode selector */}
                   <label htmlFor="mode-select" className="text-sm text-gray-400">
                     Mode:
                   </label>

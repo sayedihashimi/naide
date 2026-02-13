@@ -117,3 +117,37 @@ export async function removeRecentProject(path: string): Promise<void> {
     console.error('[GlobalSettings] Error removing from recent projects:', error);
   }
 }
+
+/**
+ * Save the selected AI model to global settings.
+ * @param model - Model ID (e.g., 'claude-opus-4.5', 'gpt-4o')
+ */
+export async function saveSelectedModel(model: string): Promise<void> {
+  try {
+    await invoke('save_selected_model', { model });
+    console.log('[GlobalSettings] Saved selected model:', model);
+  } catch (error) {
+    console.error('[GlobalSettings] Error saving selected model:', error);
+    // Non-fatal: log but don't throw to allow app to continue
+  }
+}
+
+/**
+ * Load the selected AI model from global settings.
+ * Returns null if no model is stored.
+ * @returns The model ID if stored, or null
+ */
+export async function loadSelectedModel(): Promise<string | null> {
+  try {
+    const model = await invoke<string | null>('load_selected_model');
+    if (model) {
+      console.log('[GlobalSettings] Loaded selected model:', model);
+    } else {
+      console.log('[GlobalSettings] No selected model found');
+    }
+    return model;
+  } catch (error) {
+    console.error('[GlobalSettings] Error loading selected model:', error);
+    return null;
+  }
+}

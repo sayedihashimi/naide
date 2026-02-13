@@ -205,6 +205,56 @@ IMPORTANT:
   }
 }
 
+// =============================================================================
+// Model Selection Helper Functions
+// =============================================================================
+
+/**
+ * Maps model IDs to friendly display names
+ */
+function getFriendlyModelName(modelId: string): string {
+  const knownNames: Record<string, string> = {
+    'gpt-4o': 'GPT-4o',
+    'gpt-4': 'GPT-4',
+    'gpt-4-turbo': 'GPT-4 Turbo',
+    'gpt-3.5-turbo': 'GPT-3.5 Turbo',
+    'claude-opus-4.5': 'Claude Opus 4.5',
+    'claude-opus-4': 'Claude Opus 4',
+    'claude-sonnet-4.5': 'Claude Sonnet 4.5',
+    'claude-sonnet-4': 'Claude Sonnet 4',
+    'o1-preview': 'O1 Preview',
+    'o1-mini': 'O1 Mini',
+  };
+  return knownNames[modelId] || modelId;
+}
+
+/**
+ * Determines the default model to use based on available models.
+ * Priority: Claude Opus 4.5 → highest Claude Opus → SDK default (empty string)
+ */
+function getDefaultModel(availableModelIds: string[]): string {
+  // 1. Prefer Claude Opus 4.5
+  if (availableModelIds.includes('claude-opus-4.5')) {
+    return 'claude-opus-4.5';
+  }
+  
+  // 2. Find highest Claude Opus version
+  const opusModels = availableModelIds
+    .filter(m => m.startsWith('claude-opus'))
+    .sort()
+    .reverse();
+  if (opusModels.length > 0) {
+    return opusModels[0];
+  }
+  
+  // 3. SDK default (don't specify model, let SDK choose)
+  return '';
+}
+
+// =============================================================================
+// Learning Search Functions
+// =============================================================================
+
 // Search learnings from .prompts/learnings/ by keywords
 // Returns learnings that match any of the provided keywords (case-insensitive)
 function searchLearnings(workspaceRoot: string, keywords: string[]): string {
@@ -573,11 +623,69 @@ function safeFileRead(workspaceRoot: string, relativePath: string): string | nul
   }
 }
 
+// =============================================================================
+// Model Discovery Endpoint
+// =============================================================================
+
+/**
+ * GET /api/models
+ * Returns list of available models from the Copilot SDK with friendly names
+ */
+app.get('/api/models', async (req, res) => {
+  try {
+    console.log('[Sidecar] GET /api/models - fetching available models');
+    
+    // Check if Copilot is initialized
+    if (!copilotReady || !copilotClient) {
+      console.log('[Sidecar] Copilot not ready, initializing...');
+      const initResult = await initializeCopilot();
+      if (!initResult.success) {
+        console.error('[Sidecar] Failed to initialize Copilot:', initResult.error);
+        return res.status(500).json({ 
+          error: 'Failed to initialize Copilot',
+          details: initResult.error 
+        });
+      }
+    }
+    
+    // Fetch models from Copilot SDK
+    const models = await copilotClient!.listModels();
+    console.log(`[Sidecar] Retrieved ${models.length} models from Copilot SDK`);
+    
+    // Map to friendly format
+    const modelList = models.map(m => ({
+      id: m.id,
+      friendlyName: getFriendlyModelName(m.id),
+      name: m.name, // Original name from SDK
+    }));
+    
+    // Determine default model
+    const defaultModel = getDefaultModel(models.map(m => m.id));
+    console.log(`[Sidecar] Default model selected: ${defaultModel || '(SDK default)'}`);
+    
+    res.json({ 
+      models: modelList,
+      defaultModel: defaultModel || models[0]?.id || '' // Fallback to first model or empty
+    });
+  } catch (error: unknown) {
+    console.error('[Sidecar] Error fetching models:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ 
+      error: 'Failed to fetch available models',
+      details: errorMessage 
+    });
+  }
+});
+
+// =============================================================================
+// Chat Endpoints
+// =============================================================================
+
 // Streaming chat endpoint using Server-Sent Events (SSE)
 app.post('/api/copilot/stream', async (req, res) => {
-  const { mode, message, workspaceRoot, contextFiles, conversationContext } = req.body;
+  const { mode, message, workspaceRoot, contextFiles, conversationContext, model } = req.body;
   
-  console.log(`[Sidecar] Streaming chat request - mode: ${mode}, message: ${message?.substring(0, 50)}...`);
+  console.log(`[Sidecar] Streaming chat request - mode: ${mode}, message: ${message?.substring(0, 50)}..., model: ${model || '(default)'}`);
   if (conversationContext) {
     console.log(`[Sidecar] Conversation context: ${conversationContext.totalMessageCount} total messages, summary: ${conversationContext.summary ? 'yes' : 'no'}`);
   }
@@ -636,11 +744,25 @@ app.post('/api/copilot/stream', async (req, res) => {
       
       console.log(`[Sidecar] Full prompt assembled for streaming, total length: ${fullSystemPrompt.length} chars`);
       
+      // Determine which model to use
+      let sessionModel = model;
+      if (!sessionModel) {
+        // If no model specified, fetch available models and get default
+        try {
+          const models = await copilotClient!.listModels();
+          sessionModel = getDefaultModel(models.map(m => m.id));
+          console.log(`[Sidecar] No model specified, using default: ${sessionModel || '(SDK default)'}`);
+        } catch (error) {
+          console.warn('[Sidecar] Failed to get default model, will use SDK default:', error);
+          sessionModel = '';
+        }
+      }
+      
       // Create a new session for streaming
-      console.log('[Sidecar] Creating new Copilot session for streaming Planning mode');
+      console.log(`[Sidecar] Creating new Copilot session for streaming ${mode} mode with model: ${sessionModel || '(SDK default)'}`);
       console.log(`[Sidecar] Workspace directory: ${workspace}`);
-      const session = await copilotClient!.createSession({
-        model: 'gpt-4o',
+      
+      const sessionConfig: any = {
         workingDirectory: workspace,
         systemMessage: {
           content: fullSystemPrompt
@@ -648,7 +770,7 @@ app.post('/api/copilot/stream', async (req, res) => {
         tools: [createLearningsTool(workspace)],
         hooks: {
           // Hook to add footer to markdown files after they're written by the AI
-          onPostToolUse: async (input) => {
+          onPostToolUse: async (input: any) => {
             const toolName = (input.toolName as string | undefined)?.toLowerCase() || '';
             
             if (FILE_WRITE_TOOLS.some(t => toolName.includes(t))) {
@@ -675,7 +797,14 @@ app.post('/api/copilot/stream', async (req, res) => {
             return {};
           }
         }
-      });
+      };
+      
+      // Only add model to config if one is specified
+      if (sessionModel) {
+        sessionConfig.model = sessionModel;
+      }
+      
+      const session = await copilotClient!.createSession(sessionConfig);
       
       // Buffer for safety - we still collect the full response for file operations
       const responseBuffer: string[] = [];
@@ -996,9 +1125,9 @@ app.post('/api/copilot/stream', async (req, res) => {
 
 // Main chat endpoint
 app.post('/api/copilot/chat', async (req, res) => {
-  const { mode, message, workspaceRoot, contextFiles, conversationContext } = req.body;
+  const { mode, message, workspaceRoot, contextFiles, conversationContext, model } = req.body;
   
-  console.log(`[Sidecar] Chat request - mode: ${mode}, message: ${message?.substring(0, 50)}...`);
+  console.log(`[Sidecar] Chat request - mode: ${mode}, message: ${message?.substring(0, 50)}..., model: ${model || '(default)'}`);
   if (conversationContext) {
     console.log(`[Sidecar] Conversation context: ${conversationContext.totalMessageCount} total messages, summary: ${conversationContext.summary ? 'yes' : 'no'}`);
   }
@@ -1061,11 +1190,25 @@ app.post('/api/copilot/chat', async (req, res) => {
       
       console.log(`[Sidecar] Full prompt assembled, total length: ${fullSystemPrompt.length} chars`);
       
+      // Determine which model to use
+      let sessionModel = model;
+      if (!sessionModel) {
+        // If no model specified, fetch available models and get default
+        try {
+          const models = await copilotClient!.listModels();
+          sessionModel = getDefaultModel(models.map(m => m.id));
+          console.log(`[Sidecar] No model specified, using default: ${sessionModel || '(SDK default)'}`);
+        } catch (error) {
+          console.warn('[Sidecar] Failed to get default model, will use SDK default:', error);
+          sessionModel = '';
+        }
+      }
+      
       // Create a new session for each request to avoid conflicts
-      console.log('[Sidecar] Creating new Copilot session for Planning mode');
+      console.log(`[Sidecar] Creating new Copilot session for ${mode} mode with model: ${sessionModel || '(SDK default)'}`);
       console.log(`[Sidecar] Workspace directory: ${workspace}`);
-      const session = await copilotClient!.createSession({
-        model: 'gpt-4o',
+      
+      const sessionConfig: any = {
         workingDirectory: workspace,
         systemMessage: {
           content: fullSystemPrompt
@@ -1073,7 +1216,7 @@ app.post('/api/copilot/chat', async (req, res) => {
         tools: [createLearningsTool(workspace)],
         hooks: {
           // Hook to add footer to markdown files after they're written by the AI
-          onPostToolUse: async (input) => {
+          onPostToolUse: async (input: any) => {
             // Check if this was a file write operation
             const toolName = (input.toolName as string | undefined)?.toLowerCase() || '';
             
@@ -1109,7 +1252,14 @@ app.post('/api/copilot/chat', async (req, res) => {
             return {};
           }
         }
-      });
+      };
+      
+      // Only add model to config if one is specified
+      if (sessionModel) {
+        sessionConfig.model = sessionModel;
+      }
+      
+      const session = await copilotClient!.createSession(sessionConfig);
       
       // 7) Send current user message and collect response
       const responseChunks: string[] = [];
