@@ -10,12 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Conversation context support: Extension now maintains full conversation history within a chat session
 - Previous messages from the same chat are included when sending requests to the language model
+- LICENSE file added to extension directory (resolves packaging warning)
 
 ### Changed
 - System prompts are now bundled with the extension instead of being loaded from workspace
 - Removed `naide.systemPromptsPath` configuration setting (system prompts are always bundled)
 - Default mode is now Planning (when no slash command is specified)
-- Package size increased slightly to 35.97 KB (from 35.54 KB) due to conversation history handling
+- Package size increased to 36.84 KB (from initial 15.91 KB)
 
 ### Removed
 - Auto mode support and `auto.system.md` system prompt
