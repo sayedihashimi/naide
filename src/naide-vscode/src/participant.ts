@@ -302,11 +302,13 @@ async function handleLanguageModelConversation(
         logInfo(`[Naide]   Input: ${JSON.stringify(toolCall.input)}`);
         stream.progress(`Executing ${toolCall.name}...`);
         
+        // Chat participants should pass undefined for toolInvocationToken
+        // Only language model tools use toolInvocationToken when calling other tools
         const toolResult = await vscode.lm.invokeTool(
           toolCall.name,
           {
             input: toolCall.input,
-            toolInvocationToken: request.toolInvocationToken
+            toolInvocationToken: undefined
           },
           token
         );
