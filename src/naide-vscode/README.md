@@ -5,6 +5,7 @@ A spec-driven AI development assistant that integrates with GitHub Copilot Chat.
 ## Features
 
 - **Chat Participant**: Type `@naide` in the Copilot Chat panel to interact
+- **Conversation Context**: Maintains full conversation history within a chat session
 - **Multiple Modes**: 
   - `/plan` — Create or update specifications without modifying code
   - `/build` — Implement code changes based on specifications

@@ -76,10 +76,60 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
       console.warn('[Naide] search_learnings tool not found');
     }
 
-    // Prepare the messages with system instructions prepended to the user's prompt
-    // In VS Code Chat API, system instructions are provided as part of the user message
-    const fullPrompt = `${instructions}\n\n---\n\nUser Request: ${request.prompt}`;
-    const messages = [vscode.LanguageModelChatMessage.User(fullPrompt)];
+    // Build conversation history from context
+    const messages: vscode.LanguageModelChatMessage[] = [];
+    
+    // Add previous conversation history if available
+    if (context.history && context.history.length > 0) {
+      console.log(`[Naide] Including ${context.history.length} previous turns in conversation`);
+      
+      // Convert chat history to language model messages
+      for (const turn of context.history) {
+        if (turn instanceof vscode.ChatRequestTurn) {
+          // User message
+          messages.push(vscode.LanguageModelChatMessage.User(turn.prompt));
+        } else if (turn instanceof vscode.ChatResponseTurn) {
+          // Assistant message - extract text from response
+          const responseText = turn.response.map(part => {
+            if (part instanceof vscode.ChatResponseMarkdownPart) {
+              return part.value.value;
+            }
+            return '';
+          }).join('');
+          
+          if (responseText) {
+            messages.push(vscode.LanguageModelChatMessage.Assistant(responseText));
+          }
+        }
+      }
+    }
+
+    // Add system instructions with the current user message
+    // System instructions are prepended to the first user message in the conversation
+    // or to the current message if this is the first turn
+    const fullPrompt = messages.length === 0 
+      ? `${instructions}\n\n---\n\nUser Request: ${request.prompt}`
+      : request.prompt;
+    
+    // If we have history, prepend instructions to the first message
+    if (messages.length > 0 && messages[0].role === vscode.LanguageModelChatMessageRole.User) {
+      const firstMessage = messages[0];
+      // Extract text from the first message's content
+      let firstMessageText = '';
+      for (const part of firstMessage.content) {
+        if (part instanceof vscode.LanguageModelTextPart) {
+          firstMessageText += part.value;
+        }
+      }
+      messages[0] = vscode.LanguageModelChatMessage.User(
+        `${instructions}\n\n---\n\n${firstMessageText}`
+      );
+    }
+    
+    // Add the current user message
+    messages.push(vscode.LanguageModelChatMessage.User(fullPrompt));
+    
+    console.log(`[Naide] Sending ${messages.length} messages to language model`);
 
     // Select language model
     stream.progress('Requesting language model...');
