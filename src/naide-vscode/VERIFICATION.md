@@ -17,13 +17,9 @@ This document verifies that the VS Code extension implementation meets all requi
   - ✅ Implemented in `src/modes.ts` - `getModeFromCommand('build')` returns 'Building'
   - ✅ Loads `building.system.md` prompt
   
-- [x] **`/analyze` slash command activates Analyzing mode**
-  - ✅ Implemented in `src/modes.ts` - `getModeFromCommand('analyze')` returns 'Analyzing'
-  - ✅ Loads `analyzing.system.md` prompt
-  
-- [x] **No slash command defaults to Auto mode**
-  - ✅ Implemented in `src/modes.ts` - `getModeFromCommand(undefined)` returns 'Auto'
-  - ✅ Loads `auto.system.md`, `planning.system.md`, and `building.system.md`
+- [x] **No slash command defaults to Planning mode**
+  - ✅ Implemented in `src/modes.ts` - `getModeFromCommand(undefined)` returns 'Planning'
+  - ✅ Loads `base.system.md` and `planning.system.md`
   
 - [x] **System prompts load from extension's bundled directory**
   - ✅ Implemented in `src/prompts.ts` - `loadSystemPrompts()` function
@@ -60,10 +56,6 @@ This document verifies that the VS Code extension implementation meets all requi
     3. Conversation memory instructions
     4. Learnings tool instructions
   - ✅ `src/participant.ts` combines: systemPrompt + specs + features
-  
-- [x] **Auto mode loads both planning and building prompts**
-  - ✅ Implemented in `src/modes.ts` - `getSystemPromptFiles('Auto')` returns:
-    - `['base.system.md', 'auto.system.md', 'planning.system.md', 'building.system.md']`
   
 - [x] **Missing prompt files are handled gracefully (warning, not error)**
   - ✅ Implemented in `src/prompts.ts` - try/catch blocks with console.warn()
@@ -118,8 +110,8 @@ This document verifies that the VS Code extension implementation meets all requi
 - [x] Verified context is loaded
 
 ### Phase 3: Slash Commands & Modes ✅
-- [x] Implemented `/plan`, `/build`, `/analyze` slash commands
-- [x] Auto mode (no command) loads auto + both mode prompts
+- [x] Implemented `/plan`, `/build` slash commands
+- [x] Planning mode is default when no command specified
 - [x] Verified mode-specific behavior
 
 ### Phase 4: search_learnings Tool ✅
@@ -171,7 +163,7 @@ The implementation matches the architecture diagram from the spec:
 
 ✅ Extension internals:
    ✅ @naide Chat Participant
-   ✅ Slash commands: /plan /build /analyze
+   ✅ Slash commands: /plan /build
    ✅ System prompt loader
    ✅ Spec/feature file loader
    ✅ search_learnings tool

@@ -1,7 +1,7 @@
 {
   "name": "naide",
   "displayName": "Naide",
-  "description": "Spec-driven AI development assistant — plan, build, and analyze with project context",
+  "description": "Spec-driven AI development assistant — plan and build with project context",
   "version": "0.1.0",
   "publisher": "naide",
   "repository": {
@@ -36,10 +36,6 @@
           {
             "name": "build",
             "description": "Implement code changes based on specifications"
-          },
-          {
-            "name": "analyze",
-            "description": "Analyze code quality, architecture, and patterns"
           }
         ]
       }

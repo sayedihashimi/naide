@@ -79,7 +79,6 @@ The extension works best with a properly structured Naide project:
    @naide help me understand this project
    @naide /plan add a user authentication system
    @naide /build implement the login form
-   @naide /analyze review this code for security issues
    ```
 
 ## Configuration (Optional)

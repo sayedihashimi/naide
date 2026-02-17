@@ -1,15 +1,13 @@
 # Naide VS Code Extension
 
-A spec-driven AI development assistant that integrates with GitHub Copilot Chat. Naide helps professional developers plan, build, and analyze applications with full project context from specifications, features, and past learnings.
+A spec-driven AI development assistant that integrates with GitHub Copilot Chat. Naide helps professional developers plan and build applications with full project context from specifications, features, and past learnings.
 
 ## Features
 
 - **Chat Participant**: Type `@naide` in the Copilot Chat panel to interact
 - **Multiple Modes**: 
-  - Auto mode (default) — AI infers whether to plan or build
   - `/plan` — Create or update specifications without modifying code
   - `/build` — Implement code changes based on specifications
-  - `/analyze` — Analyze code quality, architecture, and patterns
 - **Project Context**: Automatically loads:
   - System prompts (bundled with extension)
   - Specifications from `.prompts/plan/` (in your workspace)
@@ -62,7 +60,6 @@ Or use slash commands for specific modes:
 ```
 @naide /plan design an authentication system
 @naide /build implement the dark mode toggle from the spec
-@naide /analyze review the API error handling
 ```
 
 ## Extension Settings
@@ -79,25 +76,16 @@ This extension contributes the following settings:
 
 ### Modes
 
-**Auto Mode** (default)
-- The AI infers whether to plan or build based on your request
-- Automatically loads appropriate system prompts (bundled with extension)
-- Best for general requests
-
 **Planning Mode** (`/plan`)
 - Creates or updates specifications only
 - Does not modify code
 - Use when you want to think through a feature before implementing
+- Default mode when no slash command is specified
 
 **Building Mode** (`/build`)
 - Implements code changes based on specifications
 - Updates specs as needed
 - Use when you're ready to implement
-
-**Analyzing Mode** (`/analyze`)
-- Analyzes code quality, architecture, patterns
-- Provides insights and recommendations
-- Use for code reviews or architectural analysis
 
 ### Project Context
 

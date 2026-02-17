@@ -10,15 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - System prompts are now bundled with the extension instead of being loaded from workspace
 - Removed `naide.systemPromptsPath` configuration setting (system prompts are always bundled)
-- Updated package size from 15.91 KB to 41.6 KB (includes 5 system prompt files)
+- Default mode is now Planning (when no slash command is specified)
+
+### Removed
+- Auto mode support and `auto.system.md` system prompt
+- Analyzing mode support and `analyzing.system.md` system prompt
+- `/analyze` slash command
+- Package size reduced from 41.6 KB to approximately 29 KB (removed 2 system prompt files)
 
 ## [0.1.0] - 2026-02-17
 
 ### Added
 - Initial release of Naide VS Code extension
 - Chat participant registration (`@naide`)
-- Slash commands: `/plan`, `/build`, `/analyze`
-- Auto mode (default when no slash command is used)
+- Slash commands: `/plan`, `/build`
 - System prompt loading (bundled with extension)
 - Specification file loading from `.prompts/plan/`
 - Feature file loading from `.prompts/features/`

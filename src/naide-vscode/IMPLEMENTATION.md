@@ -34,10 +34,8 @@ src/naide-vscode/
 - Streams responses back to chat panel
 
 #### 2. Mode System (`modes.ts`)
-- **Auto** (default): Infers planning vs building
-- **Planning** (`/plan`): Specs only, no code changes
+- **Planning** (`/plan`): Specs only, no code changes (default)
 - **Building** (`/build`): Code changes + spec updates
-- **Analyzing** (`/analyze`): Code analysis and insights
 
 #### 3. Prompt Loading (`prompts.ts`)
 - Loads system prompts from extension's bundled `.prompts/system/`
@@ -134,7 +132,7 @@ The extension can be tested by:
 2. Opening a workspace with `.prompts/` structure
 3. Opening Copilot Chat panel
 4. Typing `@naide` to invoke the participant
-5. Using slash commands: `/plan`, `/build`, `/analyze`
+5. Using slash commands: `/plan`, `/build`
 
 ## Future Enhancements
 
