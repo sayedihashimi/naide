@@ -1,10 +1,14 @@
 # Intent
 
 ## Project Vision
-Naide ("Not An IDE") is a desktop application for non-professional developers to create and maintain applications using AI assistance. It is spec-driven: repo prompt/spec files are the durable source of truth, not the chat transcript.
+Naide ("Not An IDE") is a spec-driven AI development assistant that helps developers create and maintain applications. It exists in two forms:
+- **Desktop App** (Tauri + React): Targets non-professional developers with a standalone UI
+- **VS Code Extension**: Targets professional developers as a native Copilot Chat participant (`@naide`)
+
+Both share the same spec-driven workflow: `.prompts/plan/**`, `.prompts/features/**`, `.prompts/learnings/**` are the durable source of truth.
 
 ## Current Intent
-The core platform is built and functional. Planning and Building modes work with Copilot SDK integration. The focus is now on enhancing the development experience: app running/preview, file browsing, and UI polish.
+The desktop app's core platform is built and functional. The current focus is building the **VS Code extension** — a native Copilot Chat participant that brings Naide's spec-driven workflow to professional developers using VS Code's built-in UI for file viewing, editing, and chat.
 
 ## Completed Goals
 - ✅ Planning mode with Copilot-backed behavior (streaming, conversation memory)
@@ -21,6 +25,7 @@ The core platform is built and functional. Planning and Building modes work with
 - ✅ Persistent file logging (shared between Rust and Node.js)
 
 ## Open Goals
+- VS Code extension (`@naide` Copilot Chat participant) — in progress
 - Stub Analyzing mode — not yet implemented
 - Adaptive learnings index — planned for large projects with many learnings
 - Project file watcher — auto-detect new runnable apps during Building mode

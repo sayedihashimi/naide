@@ -2,7 +2,7 @@
 
 This index provides a chronological overview of all feature files in `.prompts/features/`. Features are listed from oldest to newest based on creation date.
 
-**Last Updated**: 2026-02-08
+**Last Updated**: 2026-02-17
 
 ---
 
@@ -48,6 +48,7 @@ This index provides a chronological overview of all feature files in `.prompts/f
 | [2026-02-08-terminal-command-output-in-chat.md](./2026-02-08-terminal-command-output-in-chat.md) | Show terminal command output inline in chat as collapsible blocks | planned |
 | [2026-02-09-project-file-link-interception.md](./2026-02-09-project-file-link-interception.md) | Intercept project file links in chat/previews and open in editor tabs | planned |
 | [2026-02-10-auto-mode.md](./2026-02-10-auto-mode.md) | Auto mode — Copilot infers planning vs building intent | planned |
+| [2026-02-17-naide-vscode-extension.md](./2026-02-17-naide-vscode-extension.md) | Naide as a VS Code Copilot Chat participant extension | planned |
 
 ## Superseded Features
 
