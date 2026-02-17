@@ -178,6 +178,47 @@ Naide requires a workspace folder to function. Open a folder in VS Code before u
 
 ### No `.prompts/` directory
 
+Create the directory structure in your workspace:
+
+```bash
+mkdir -p .prompts/{plan,features,learnings}
+```
+
+### Viewing Diagnostic Logs
+
+To see detailed diagnostic information about what the extension is doing:
+
+1. Open the **Output** panel: `View > Output` (or `Ctrl+Shift+U` / `Cmd+Shift+U`)
+2. Select **"GitHub Copilot Chat"** from the dropdown
+3. You'll see detailed logs including:
+   - Request details (mode, prompt, workspace)
+   - Context loading (system prompts, specs, features)
+   - Available tools
+   - Conversation history
+   - Tool call detection and invocation
+   - Tool results and errors
+
+**Example log output:**
+```
+[Naide] ===== NEW CHAT REQUEST =====
+[Naide] Command: (none - default mode)
+[Naide] Prompt: create a spec for a calculator
+[Naide] Mode determined: Planning
+[Naide] Total tools available: 15
+[Naide]   - naide_searchLearnings
+[Naide]   - vscode_listFilesInWorkspace
+[Naide]   ... (other VS Code tools)
+[Naide] -------- Round 1/10 --------
+[Naide]   ⚡ Tool call detected: vscode_createOrUpdateFile (callId: abc123)
+[Naide]   ✓ Tool vscode_createOrUpdateFile completed successfully
+```
+
+These logs help diagnose issues like:
+- Missing tools
+- Failed tool invocations
+- File creation problems
+- Context loading issues
+
 If your project doesn't have a `.prompts/` directory, you can:
 1. Create it manually with the structure shown above
 2. Ask `@naide` to initialize the structure for you
