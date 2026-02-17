@@ -84,12 +84,13 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
       logInfo(`[Naide]   - ${tool.name}`);
     });
     
+    // Check if our custom search_learnings tool is registered
     const learningsTool = allTools.filter((tool) => tool.name === 'naide_searchLearnings');
 
     if (learningsTool.length > 0) {
       logInfo('[Naide] search_learnings tool available');
     } else {
-      logWarn('[Naide] search_learnings tool not found');
+      logWarn('[Naide] search_learnings tool not found (but other tools are available)');
     }
 
     // Build conversation history from context
@@ -167,17 +168,19 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     }
 
     logInfo(`[Naide] Selected model: ${models[0].id} (${models[0].name})`);
-    logInfo(`[Naide] Tools to pass to model: ${learningsTool.length}`);
+    logInfo(`[Naide] Passing all ${allTools.length} tools to model`);
 
     // Send request to language model
     stream.progress('Generating response...');
     logInfo('[Naide] Calling handleLanguageModelConversation...');
     
     // Handle the language model conversation with tool support
+    // Pass ALL tools so the model can use file creation tools
+    // Convert readonly array to mutable array
     await handleLanguageModelConversation(
       models[0],
       messages,
-      learningsTool,
+      [...allTools],
       request,
       stream,
       token

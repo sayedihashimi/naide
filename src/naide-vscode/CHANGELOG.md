@@ -20,9 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - System prompts are now bundled with the extension instead of being loaded from workspace
 - Removed `naide.systemPromptsPath` configuration setting (system prompts are always bundled)
 - Default mode is now Planning (when no slash command is specified)
-- Package size increased to 40.12 KB (from initial 15.91 KB)
+- Package size increased to 40.32 KB (from initial 15.91 KB)
 - Switched from streaming `.text` to `.stream` to handle both text and tool call parts
 - All `console.log()` statements replaced with OutputChannel logging for user visibility
+- **Pass all available tools to language model** (not just naide_searchLearnings)
+
+### Fixed
+- **File creation now works**: Language model receives all VS Code tools (copilot_createFile, copilot_editFiles, etc.)
+- Previously only passed empty array when naide_searchLearnings wasn't registered
 
 ### Removed
 - Auto mode support and `auto.system.md` system prompt
