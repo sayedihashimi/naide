@@ -4,6 +4,10 @@
   "description": "Spec-driven AI development assistant — plan, build, and analyze with project context",
   "version": "0.1.0",
   "publisher": "naide",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sayedihashimi/naide"
+  },
   "engines": {
     "vscode": "^1.99.0"
   },
