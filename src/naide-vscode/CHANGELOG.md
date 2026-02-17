@@ -11,12 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Conversation context support: Extension now maintains full conversation history within a chat session
 - Previous messages from the same chat are included when sending requests to the language model
 - LICENSE file added to extension directory (resolves packaging warning)
+- **Tool invocation support**: Language model can now create and edit files in the workspace
+- Multi-round tool execution: Handles tool calls from the language model and returns results
 
 ### Changed
 - System prompts are now bundled with the extension instead of being loaded from workspace
 - Removed `naide.systemPromptsPath` configuration setting (system prompts are always bundled)
 - Default mode is now Planning (when no slash command is specified)
-- Package size increased to 36.84 KB (from initial 15.91 KB)
+- Package size increased to 37.62 KB (from initial 15.91 KB)
+- Switched from streaming `.text` to `.stream` to handle both text and tool call parts
 
 ### Removed
 - Auto mode support and `auto.system.md` system prompt

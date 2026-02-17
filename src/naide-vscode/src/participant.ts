@@ -147,23 +147,18 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
 
     // Send request to language model
     stream.progress('Generating response...');
-    const chatRequest = await models[0].sendRequest(
+    
+    // Handle the language model conversation with tool support
+    await handleLanguageModelConversation(
+      models[0],
       messages,
-      {
-        justification: 'Naide provides spec-driven development assistance with project context',
-        tools: learningsTool
-      },
+      learningsTool,
+      request,
+      stream,
       token
     );
 
-    // Stream the response
-    let responseLength = 0;
-    for await (const fragment of chatRequest.text) {
-      stream.markdown(fragment);
-      responseLength += fragment.length;
-    }
-
-    console.log(`[Naide] Response completed: ${responseLength} characters`);
+    console.log(`[Naide] Conversation completed`);
   } catch (error) {
     console.error('[Naide] Error handling chat request:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -180,4 +175,122 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     }
   }
 };
+}
+
+/**
+ * Handles the language model conversation with tool invocation support
+ * This function manages the back-and-forth with the LM when tools are called
+ */
+async function handleLanguageModelConversation(
+  model: vscode.LanguageModelChat,
+  messages: vscode.LanguageModelChatMessage[],
+  tools: vscode.LanguageModelChatTool[],
+  request: vscode.ChatRequest,
+  stream: vscode.ChatResponseStream,
+  token: vscode.CancellationToken
+): Promise<void> {
+  // Keep track of the conversation messages
+  const conversationMessages = [...messages];
+  
+  // Maximum number of tool invocation rounds to prevent infinite loops
+  const maxRounds = 10;
+  let round = 0;
+  
+  while (round < maxRounds && !token.isCancellationRequested) {
+    round++;
+    console.log(`[Naide] Language model round ${round}`);
+    
+    const chatRequest = await model.sendRequest(
+      conversationMessages,
+      {
+        justification: 'Naide provides spec-driven development assistance with project context',
+        tools: tools
+      },
+      token
+    );
+
+    const toolCalls: vscode.LanguageModelToolCallPart[] = [];
+
+    // Process the response stream
+    for await (const part of chatRequest.stream) {
+      if (part instanceof vscode.LanguageModelTextPart) {
+        // Stream text to the user
+        stream.markdown(part.value);
+      } else if (part instanceof vscode.LanguageModelToolCallPart) {
+        // Collect tool calls for invocation
+        toolCalls.push(part);
+        console.log(`[Naide] Tool call requested: ${part.name} (${part.callId})`);
+      }
+    }
+
+    // If there are no tool calls, we're done
+    if (toolCalls.length === 0) {
+      console.log(`[Naide] No tool calls, conversation complete`);
+      break;
+    }
+
+    // Add assistant message with tool calls to conversation
+    conversationMessages.push(
+      vscode.LanguageModelChatMessage.Assistant(toolCalls)
+    );
+
+    // Invoke each tool and collect results
+    const toolResults: vscode.LanguageModelToolResultPart[] = [];
+    
+    for (const toolCall of toolCalls) {
+      try {
+        console.log(`[Naide] Invoking tool: ${toolCall.name}`);
+        stream.progress(`Executing ${toolCall.name}...`);
+        
+        const toolResult = await vscode.lm.invokeTool(
+          toolCall.name,
+          {
+            input: toolCall.input,
+            toolInvocationToken: request.toolInvocationToken
+          },
+          token
+        );
+
+        // Collect the tool result content
+        const resultContent: string[] = [];
+        for await (const contentPart of toolResult.content) {
+          if (contentPart instanceof vscode.LanguageModelTextPart) {
+            resultContent.push(contentPart.value);
+          }
+        }
+
+        toolResults.push(
+          new vscode.LanguageModelToolResultPart(
+            toolCall.callId,
+            resultContent.map(content => new vscode.LanguageModelTextPart(content))
+          )
+        );
+
+        console.log(`[Naide] Tool ${toolCall.name} completed`);
+      } catch (error) {
+        console.error(`[Naide] Error invoking tool ${toolCall.name}:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Add error as tool result
+        toolResults.push(
+          new vscode.LanguageModelToolResultPart(
+            toolCall.callId,
+            [new vscode.LanguageModelTextPart(`Error: ${errorMessage}`)]
+          )
+        );
+      }
+    }
+
+    // Add tool results as a user message
+    conversationMessages.push(
+      vscode.LanguageModelChatMessage.User(toolResults)
+    );
+
+    console.log(`[Naide] Tool results added, continuing conversation`);
+  }
+
+  if (round >= maxRounds) {
+    console.warn(`[Naide] Reached maximum rounds (${maxRounds}), stopping`);
+    stream.markdown('\n\n*Note: Reached maximum tool invocation rounds.*');
+  }
 }
