@@ -7,18 +7,17 @@ import * as path from 'path';
 import { getSystemPromptFiles, NaideMode } from './modes';
 
 /**
- * Loads system prompts from the .prompts/system directory
- * @param workspaceRoot - The workspace root URI
+ * Loads system prompts from the extension's bundled .prompts/system directory
+ * @param extensionContext - The extension context
  * @param mode - The Naide mode
  * @returns The assembled system prompt content
  */
 export async function loadSystemPrompts(
-  workspaceRoot: vscode.Uri,
+  extensionContext: vscode.ExtensionContext,
   mode: NaideMode
 ): Promise<string> {
-  const config = vscode.workspace.getConfiguration('naide');
-  const systemPromptsPath = config.get<string>('systemPromptsPath', '.prompts/system');
-  const promptsDir = vscode.Uri.joinPath(workspaceRoot, systemPromptsPath);
+  // System prompts are bundled with the extension, not in the workspace
+  const promptsDir = vscode.Uri.joinPath(extensionContext.extensionUri, '.prompts', 'system');
   
   const files = getSystemPromptFiles(mode);
   let systemPrompt = '';

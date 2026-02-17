@@ -69,11 +69,6 @@
     "configuration": {
       "title": "Naide",
       "properties": {
-        "naide.systemPromptsPath": {
-          "type": "string",
-          "default": ".prompts/system",
-          "description": "Path to system prompts directory relative to workspace root"
-        },
         "naide.specsPath": {
           "type": "string",
           "default": ".prompts/plan",

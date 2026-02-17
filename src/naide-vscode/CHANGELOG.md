@@ -5,6 +5,13 @@ All notable changes to the Naide VS Code extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- System prompts are now bundled with the extension instead of being loaded from workspace
+- Removed `naide.systemPromptsPath` configuration setting (system prompts are always bundled)
+- Updated package size from 15.91 KB to 41.6 KB (includes 5 system prompt files)
+
 ## [0.1.0] - 2026-02-17
 
 ### Added
@@ -12,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Chat participant registration (`@naide`)
 - Slash commands: `/plan`, `/build`, `/analyze`
 - Auto mode (default when no slash command is used)
-- System prompt loading from `.prompts/system/`
+- System prompt loading (bundled with extension)
 - Specification file loading from `.prompts/plan/`
 - Feature file loading from `.prompts/features/`
 - `search_learnings` language model tool

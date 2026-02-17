@@ -40,9 +40,9 @@ src/naide-vscode/
 - **Analyzing** (`/analyze`): Code analysis and insights
 
 #### 3. Prompt Loading (`prompts.ts`)
-- Loads system prompts from `.prompts/system/`
-- Loads specs from `.prompts/plan/`
-- Loads features from `.prompts/features/`
+- Loads system prompts from extension's bundled `.prompts/system/`
+- Loads specs from workspace `.prompts/plan/`
+- Loads features from workspace `.prompts/features/`
 - Recursive directory reading with filtering
 - Assembles full context for language model
 

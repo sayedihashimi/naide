@@ -55,27 +55,19 @@ The extension works best with a properly structured Naide project:
 
 1. Create a `.prompts/` directory in your workspace root:
    ```bash
-   mkdir -p .prompts/{system,plan,features,learnings}
+   mkdir -p .prompts/{plan,features,learnings}
    ```
 
-2. Add system prompts to `.prompts/system/`:
-   - `base.system.md` (required)
-   - `planning.system.md`
-   - `building.system.md`
-   - `analyzing.system.md`
-   - `auto.system.md`
-
-3. Optionally add project specs to `.prompts/plan/`:
+2. Optionally add project specs to `.prompts/plan/`:
    - `intent.md`
    - `app-spec.md`
    - `data-spec.md`
    - `rules.md`
    - `tasks.json`
 
-4. Add feature specifications to `.prompts/features/` as needed
+3. Add feature specifications to `.prompts/features/` as needed
 
-You can copy system prompts from the main Naide repository:
-https://github.com/sayedihashimi/naide/tree/main/.prompts/system
+**Note**: System prompts are bundled with the extension - you don't need to copy them to your workspace.
 
 ## First Use
 

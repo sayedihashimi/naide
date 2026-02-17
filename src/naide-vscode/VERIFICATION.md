@@ -25,9 +25,9 @@ This document verifies that the VS Code extension implementation meets all requi
   - ✅ Implemented in `src/modes.ts` - `getModeFromCommand(undefined)` returns 'Auto'
   - ✅ Loads `auto.system.md`, `planning.system.md`, and `building.system.md`
   
-- [x] **System prompts load from `.prompts/system/` in the workspace**
+- [x] **System prompts load from extension's bundled directory**
   - ✅ Implemented in `src/prompts.ts` - `loadSystemPrompts()` function
-  - ✅ Reads from configurable path (default: `.prompts/system`)
+  - ✅ Reads from extension's `.prompts/system/` directory (bundled with extension)
   - ✅ Loads base.system.md + mode-specific prompts
   
 - [x] **Spec files load from `.prompts/plan/`**

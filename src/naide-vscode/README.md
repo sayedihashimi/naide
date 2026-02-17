@@ -11,9 +11,9 @@ A spec-driven AI development assistant that integrates with GitHub Copilot Chat.
   - `/build` — Implement code changes based on specifications
   - `/analyze` — Analyze code quality, architecture, and patterns
 - **Project Context**: Automatically loads:
-  - System prompts from `.prompts/system/`
-  - Specifications from `.prompts/plan/`
-  - Feature files from `.prompts/features/`
+  - System prompts (bundled with extension)
+  - Specifications from `.prompts/plan/` (in your workspace)
+  - Feature files from `.prompts/features/` (in your workspace)
 - **Learning Search**: Uses the `search_learnings` tool to retrieve relevant learnings from past interactions
 
 ## Requirements
@@ -39,12 +39,13 @@ Open a workspace folder that contains a `.prompts/` directory with the following
 ```
 your-project/
 ├── .prompts/
-│   ├── system/          # System prompts (auto, planning, building, analyzing)
 │   ├── plan/            # Project specifications (intent.md, app-spec.md, etc.)
 │   ├── features/        # Feature specifications
 │   └── learnings/       # Project learnings from past interactions
 └── ... (your code)
 ```
+
+**Note**: System prompts are bundled with the extension - you don't need to copy them to your workspace.
 
 If you don't have this structure, you can initialize it manually or ask `@naide` to help set it up.
 
@@ -68,10 +69,11 @@ Or use slash commands for specific modes:
 
 This extension contributes the following settings:
 
-- `naide.systemPromptsPath`: Path to system prompts directory (default: `.prompts/system`)
 - `naide.specsPath`: Path to specifications directory (default: `.prompts/plan`)
 - `naide.featuresPath`: Path to features directory (default: `.prompts/features`)
 - `naide.learningsPath`: Path to learnings directory (default: `.prompts/learnings`)
+
+**Note**: System prompts are bundled with the extension and cannot be customized via settings.
 
 ## How It Works
 
@@ -79,7 +81,7 @@ This extension contributes the following settings:
 
 **Auto Mode** (default)
 - The AI infers whether to plan or build based on your request
-- Loads both planning and building system prompts
+- Automatically loads appropriate system prompts (bundled with extension)
 - Best for general requests
 
 **Planning Mode** (`/plan`)

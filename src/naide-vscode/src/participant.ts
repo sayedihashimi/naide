@@ -8,28 +8,34 @@ import { getModeFromCommand } from './modes';
 
 /**
  * Registers the @naide chat participant
- * @param context - The extension context
+ * @param extensionContext - The extension context
  */
-export function registerNaideParticipant(context: vscode.ExtensionContext): void {
+export function registerNaideParticipant(extensionContext: vscode.ExtensionContext): void {
+  // Create handler with access to extension context
+  const handler = createHandler(extensionContext);
+  
   const participant = vscode.chat.createChatParticipant('naide.chat', handler);
   
   // Set the icon if available
-  const iconPath = vscode.Uri.joinPath(context.extensionUri, 'icon.png');
+  const iconPath = vscode.Uri.joinPath(extensionContext.extensionUri, 'icon.png');
   participant.iconPath = iconPath;
   
-  context.subscriptions.push(participant);
+  extensionContext.subscriptions.push(participant);
   console.log('[Naide] Registered @naide chat participant');
 }
 
 /**
- * Handles chat requests to @naide
+ * Creates a chat request handler with access to extension context
+ * @param extensionContext - The extension context
+ * @returns Chat request handler
  */
-const handler: vscode.ChatRequestHandler = async (
-  request: vscode.ChatRequest,
-  context: vscode.ChatContext,
-  stream: vscode.ChatResponseStream,
-  token: vscode.CancellationToken
-) => {
+function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRequestHandler {
+  return async (
+    request: vscode.ChatRequest,
+    context: vscode.ChatContext,
+    stream: vscode.ChatResponseStream,
+    token: vscode.CancellationToken
+  ) => {
   // Check for workspace
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
   if (!workspaceRoot) {
@@ -47,7 +53,7 @@ const handler: vscode.ChatRequestHandler = async (
 
     // Load system prompts and context
     stream.progress('Loading system prompts...');
-    const systemPrompt = await loadSystemPrompts(workspaceRoot, mode);
+    const systemPrompt = await loadSystemPrompts(extensionContext, mode);
 
     stream.progress('Loading project specifications...');
     const specs = await loadSpecFiles(workspaceRoot);
@@ -124,3 +130,4 @@ const handler: vscode.ChatRequestHandler = async (
     }
   }
 };
+}
