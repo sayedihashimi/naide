@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import { logInfo, logError } from './logger';
 
 /**
  * Registers the search_learnings language model tool
@@ -27,7 +28,7 @@ export function registerLearningsTool(context: vscode.ExtensionContext): void {
         ]);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('[Naide] Error in search_learnings tool:', errorMessage);
+        logError('[Naide] Error in search_learnings tool:', errorMessage);
         return new vscode.LanguageModelToolResult([
           new vscode.LanguageModelTextPart(`Error searching learnings: ${errorMessage}`)
         ]);
@@ -36,7 +37,7 @@ export function registerLearningsTool(context: vscode.ExtensionContext): void {
   });
 
   context.subscriptions.push(tool);
-  console.log('[Naide] Registered search_learnings tool');
+  logInfo('[Naide] Registered search_learnings tool');
 }
 
 /**
@@ -129,7 +130,7 @@ async function searchLearnings(
 
     return result;
   } catch (error) {
-    console.error('[Naide] Error searching learnings:', error);
+    logError('[Naide] Error searching learnings:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return `Error searching learnings: ${errorMessage}`;
   }

@@ -13,20 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LICENSE file added to extension directory (resolves packaging warning)
 - **Tool invocation support**: Language model can now create and edit files in the workspace
 - Multi-round tool execution: Handles tool calls from the language model and returns results
-- **Comprehensive diagnostic logging**: Detailed console logs for debugging tool invocation and file creation
-  - Request details (mode, prompt, workspace, history)
-  - Context loading (system prompts, specs, features)
-  - All available tools listed
-  - Stream processing (text parts, tool calls)
-  - Tool invocation details (input, output, errors)
-  - Round-by-round progress tracking
+- **Dedicated "Naide" output channel**: All diagnostic logs now visible in Output panel under "Naide"
+- Logger utility module for consistent logging across extension
 
 ### Changed
 - System prompts are now bundled with the extension instead of being loaded from workspace
 - Removed `naide.systemPromptsPath` configuration setting (system prompts are always bundled)
 - Default mode is now Planning (when no slash command is specified)
-- Package size increased to 38.71 KB (from initial 15.91 KB)
+- Package size increased to 40.12 KB (from initial 15.91 KB)
 - Switched from streaming `.text` to `.stream` to handle both text and tool call parts
+- All `console.log()` statements replaced with OutputChannel logging for user visibility
 
 ### Removed
 - Auto mode support and `auto.system.md` system prompt

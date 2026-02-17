@@ -189,7 +189,7 @@ mkdir -p .prompts/{plan,features,learnings}
 To see detailed diagnostic information about what the extension is doing:
 
 1. Open the **Output** panel: `View > Output` (or `Ctrl+Shift+U` / `Cmd+Shift+U`)
-2. Select **"GitHub Copilot Chat"** from the dropdown
+2. Select **"Naide"** from the dropdown (appears automatically when extension is activated)
 3. You'll see detailed logs including:
    - Request details (mode, prompt, workspace)
    - Context loading (system prompts, specs, features)
@@ -198,8 +198,13 @@ To see detailed diagnostic information about what the extension is doing:
    - Tool call detection and invocation
    - Tool results and errors
 
+**Tip**: Keep the Output panel open while using `@naide` to watch logs in real-time.
+
 **Example log output:**
 ```
+[Naide] Activating extension...
+[Naide] TIP: View diagnostic logs in Output panel > "Naide" dropdown
+[Naide] Registered @naide chat participant
 [Naide] ===== NEW CHAT REQUEST =====
 [Naide] Command: (none - default mode)
 [Naide] Prompt: create a spec for a calculator
@@ -214,10 +219,10 @@ To see detailed diagnostic information about what the extension is doing:
 ```
 
 These logs help diagnose issues like:
-- Missing tools
-- Failed tool invocations
-- File creation problems
-- Context loading issues
+- Missing tools (check "Total tools available" list)
+- Failed tool invocations (look for ✗ errors)
+- File creation problems (look for ⚡ tool call detection)
+- Context loading issues (check character counts)
 
 If your project doesn't have a `.prompts/` directory, you can:
 1. Create it manually with the structure shown above

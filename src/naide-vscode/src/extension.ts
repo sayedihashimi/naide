@@ -8,13 +8,22 @@
 import * as vscode from 'vscode';
 import { registerNaideParticipant } from './participant';
 import { registerLearningsTool } from './learnings';
+import { initializeLogger, logInfo, logError } from './logger';
 
 /**
  * Extension activation function
  * Called when the extension is activated
  */
 export function activate(context: vscode.ExtensionContext): void {
-  console.log('[Naide] Activating extension...');
+  // Create output channel for diagnostic logs
+  const outputChannel = vscode.window.createOutputChannel('Naide');
+  context.subscriptions.push(outputChannel);
+  
+  // Initialize logger
+  initializeLogger(outputChannel);
+  
+  logInfo('[Naide] Activating extension...');
+  logInfo('[Naide] TIP: View diagnostic logs in Output panel > "Naide" dropdown');
 
   try {
     // Register the @naide chat participant
@@ -23,9 +32,9 @@ export function activate(context: vscode.ExtensionContext): void {
     // Register the search_learnings language model tool
     registerLearningsTool(context);
 
-    console.log('[Naide] Extension activated successfully');
+    logInfo('[Naide] Extension activated successfully');
   } catch (error) {
-    console.error('[Naide] Error activating extension:', error);
+    logError('[Naide] Error activating extension', error);
     vscode.window.showErrorMessage(`Failed to activate Naide extension: ${error}`);
   }
 }
@@ -35,5 +44,5 @@ export function activate(context: vscode.ExtensionContext): void {
  * Called when the extension is deactivated
  */
 export function deactivate(): void {
-  console.log('[Naide] Deactivating extension...');
+  logInfo('[Naide] Deactivating extension...');
 }
