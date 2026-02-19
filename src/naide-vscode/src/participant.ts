@@ -442,7 +442,6 @@ async function handleLanguageModelConversation(
 
         // Collect the tool result content with robust handling
         const resultContent: string[] = [];
-        let hasContent = false;
         
         try {
           // Set a timeout for result processing
@@ -457,7 +456,6 @@ async function handleLanguageModelConversation(
             
             if (contentPart instanceof vscode.LanguageModelTextPart) {
               resultContent.push(contentPart.value);
-              hasContent = true;
               logInfo(`[Naide]     Result: ${contentPart.value.substring(0, 150)}${contentPart.value.length > 150 ? '...' : ''}`);
             } else {
               logInfo(`[Naide]     Result part type: ${contentPart?.constructor?.name || typeof contentPart}`);
@@ -553,7 +551,7 @@ function resolveToolPaths(input: any, workspaceRoot: string, toolName: string): 
       if (!normalizedPath.startsWith(normalizedWorkspaceRoot)) {
         // Absolute path outside workspace - extract relative part and re-resolve
         // Try to find .prompts or other recognizable patterns
-        const promptsMatch = filePath.match(/[\\\/]\.prompts[\\\/].*/i);
+        const promptsMatch = filePath.match(/[\\/]\.prompts[\\/].*/i);
         if (promptsMatch) {
           // Extract from .prompts onwards and treat as relative
           const relativePart = promptsMatch[0].substring(1); // Remove leading slash
@@ -583,7 +581,7 @@ function resolveToolPaths(input: any, workspaceRoot: string, toolName: string): 
       // Path is absolute - check if it's within workspace
       if (!normalizedPath.startsWith(normalizedWorkspaceRoot)) {
         // Absolute path outside workspace - extract relative part and re-resolve
-        const promptsMatch = dirPath.match(/[\\\/]\.prompts[\\\/]?.*/i);
+        const promptsMatch = dirPath.match(/[\\/]\.prompts[\\/]?.*/i);
         if (promptsMatch) {
           // Extract from .prompts onwards and treat as relative
           const relativePart = promptsMatch[0].substring(1); // Remove leading slash

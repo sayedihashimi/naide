@@ -16,7 +16,8 @@ export default [
       globals: {
         console: 'readonly',
         process: 'readonly',
-        TextDecoder: 'readonly'
+        TextDecoder: 'readonly',
+        TextEncoder: 'readonly'
       }
     },
     plugins: {
