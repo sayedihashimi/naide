@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { loadSystemPrompts, loadSpecFiles, loadFeatureFiles } from './prompts';
 import { getModeFromCommand } from './modes';
 import { logInfo, logError, logWarn } from './logger';
@@ -38,18 +39,21 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     token: vscode.CancellationToken
   ) => {
   // Check for workspace
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-  if (!workspaceRoot) {
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+  if (!workspaceFolder) {
     stream.markdown('❌ Please open a workspace folder to use @naide.');
     return;
   }
+  
+  // Get workspace root as string for path resolution
+  const workspaceRoot = workspaceFolder.uri.fsPath;
 
   try {
     logInfo('='.repeat(80));
     logInfo('[Naide] ===== NEW CHAT REQUEST =====');
     logInfo(`[Naide] Command: ${request.command || '(none - default mode)'}`);
     logInfo(`[Naide] Prompt: ${request.prompt}`);
-    logInfo(`[Naide] Workspace: ${workspaceRoot.fsPath}`);
+    logInfo(`[Naide] Workspace: ${workspaceRoot}`);
     logInfo(`[Naide] History length: ${context.history?.length || 0}`);
     
     // Determine mode from slash command
@@ -65,11 +69,11 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     logInfo(`[Naide] System prompts loaded: ${systemPrompt.length} characters`);
 
     stream.progress('Loading project specifications...');
-    const specs = await loadSpecFiles(workspaceRoot);
+    const specs = await loadSpecFiles(workspaceFolder.uri);
     logInfo(`[Naide] Specs loaded: ${specs.length} characters`);
 
     stream.progress('Loading feature files...');
-    const features = await loadFeatureFiles(workspaceRoot);
+    const features = await loadFeatureFiles(workspaceFolder.uri);
     logInfo(`[Naide] Features loaded: ${features.length} characters`);
 
     // Assemble full instructions
@@ -154,17 +158,7 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     logInfo(`[Naide] Built message array with ${messages.length} messages`);
     logInfo(`[Naide] Current request prompt: "${request.prompt.substring(0, 100)}${request.prompt.length > 100 ? '...' : ''}"`);
 
-    // Get workspace root for path resolution
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    const workspaceRoot = workspaceFolders && workspaceFolders.length > 0 
-      ? workspaceFolders[0].uri.fsPath 
-      : undefined;
-    
-    if (workspaceRoot) {
-      logInfo(`[Naide] Workspace root: ${workspaceRoot}`);
-    } else {
-      logWarn(`[Naide] ⚠ No workspace folder open - file operations may fail`);
-    }
+    // Note: workspaceRoot is already defined and logged earlier in the function
 
     // Select language model - prefer Claude Opus, fallback to any available
     stream.progress('Requesting language model...');
