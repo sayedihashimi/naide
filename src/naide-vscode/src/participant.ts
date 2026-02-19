@@ -262,6 +262,27 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
 }
 
 /**
+ * Manually create a file using VS Code's file system API.
+ * This is a workaround for the copilot_createFile tool bug that causes "Invalid stream" errors.
+ */
+async function manuallyCreateFile(filePath: string, content: string): Promise<void> {
+  logInfo(`[Naide]   🔧 Manual file creation (workaround for copilot_createFile bug)`);
+  logInfo(`[Naide]   Creating: ${filePath}`);
+  
+  const fileUri = vscode.Uri.file(filePath);
+  const dirUri = vscode.Uri.file(path.dirname(filePath));
+  
+  // Ensure parent directory exists (recursive creation)
+  await vscode.workspace.fs.createDirectory(dirUri);
+  
+  // Convert content string to bytes and write file
+  const contentBytes = new TextEncoder().encode(content);
+  await vscode.workspace.fs.writeFile(fileUri, contentBytes);
+  
+  logInfo(`[Naide]   ✅ File created successfully using VS Code file system API`);
+}
+
+/**
  * Handles the language model conversation with tool invocation support
  * This function manages the back-and-forth with the LM when tools are called
  */
@@ -371,6 +392,41 @@ async function handleLanguageModelConversation(
         logInfo(`[Naide]   Input: ${JSON.stringify(resolvedInput).substring(0, 200)}`);
         stream.progress(`Executing ${toolCall.name}...`);
         
+        // Workaround for copilot_createFile bug: handle file creation manually
+        if (toolCall.name === 'copilot_createFile' && 
+            (resolvedInput as any).filePath && 
+            (resolvedInput as any).content) {
+          try {
+            await manuallyCreateFile(
+              (resolvedInput as any).filePath, 
+              (resolvedInput as any).content
+            );
+            
+            // Return success result without invoking the broken tool
+            toolResults.push(
+              new vscode.LanguageModelToolResultPart(
+                toolCall.callId,
+                [new vscode.LanguageModelTextPart(
+                  `File created at ${(resolvedInput as any).filePath}`
+                )]
+              )
+            );
+            logInfo(`[Naide]   ✓ Tool copilot_createFile completed (via manual implementation)`);
+          } catch (fileError: any) {
+            logError(`[Naide]   ✗ Error in manual file creation: ${fileError.message}`);
+            toolResults.push(
+              new vscode.LanguageModelToolResultPart(
+                toolCall.callId,
+                [new vscode.LanguageModelTextPart(
+                  `Error creating file: ${fileError.message}`
+                )]
+              )
+            );
+          }
+          continue; // Skip standard tool invocation for this tool
+        }
+        
+        // All other tools: use standard invocation
         // Chat participants should pass undefined for toolInvocationToken
         // Only language model tools use toolInvocationToken when calling other tools
         const toolResult = await vscode.lm.invokeTool(
