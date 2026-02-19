@@ -79,6 +79,11 @@
           "type": "string",
           "default": ".prompts/learnings",
           "description": "Path to learnings directory relative to workspace root"
+        },
+        "naide.maxFeaturesChars": {
+          "type": "number",
+          "default": 50000,
+          "description": "Maximum number of characters to load from feature files. Feature content exceeding this limit will be truncated. Increase if you need more feature context (may hit model token limits)."
         }
       }
     }

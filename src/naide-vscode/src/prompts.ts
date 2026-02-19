@@ -132,6 +132,7 @@ export async function loadSpecFiles(workspaceRoot: vscode.Uri): Promise<string> 
 export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<string> {
   const config = vscode.workspace.getConfiguration('naide');
   const featuresPath = config.get<string>('featuresPath', '.prompts/features');
+  const maxChars = config.get<number>('maxFeaturesChars', 50000);
   const featuresDir = vscode.Uri.joinPath(workspaceRoot, featuresPath);
   
   try {
@@ -151,6 +152,7 @@ export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<strin
     
     let features = '';
     let hasContent = false;
+    let truncated = false;
     
     for (const file of featureFiles) {
       const filePath = vscode.Uri.file(file);
@@ -159,7 +161,14 @@ export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<strin
         const text = new TextDecoder('utf-8').decode(content);
         // Get relative path for display
         const relativePath = path.relative(featuresDir.fsPath, file);
-        features += `### ${relativePath}\n\`\`\`\n${text}\n\`\`\`\n\n`;
+        const entry = `### ${relativePath}\n\`\`\`\n${text}\n\`\`\`\n\n`;
+        
+        if (features.length + entry.length > maxChars) {
+          truncated = true;
+          break;
+        }
+        
+        features += entry;
         hasContent = true;
       } catch {
         // Skip files that can't be read
@@ -170,7 +179,11 @@ export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<strin
       return '';
     }
     
-    return `\n\n# FEATURE SPECIFICATIONS\n\n${features}`;
+    const truncationNote = truncated
+      ? `\n> ⚠️ **Feature files truncated**: Only the first ${maxChars.toLocaleString()} characters were loaded to stay within model token limits. Increase \`naide.maxFeaturesChars\` in settings to load more.\n\n`
+      : '';
+    
+    return `\n\n# FEATURE SPECIFICATIONS\n\n${truncationNote}${features}`;
   } catch {
     // Features directory doesn't exist
     return '';
