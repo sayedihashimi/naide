@@ -231,7 +231,8 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
       [...allTools],
       request,
       stream,
-      token
+      token,
+      workspaceRoot
     );
 
     logInfo('[Naide] ===== CONVERSATION COMPLETED =====');
