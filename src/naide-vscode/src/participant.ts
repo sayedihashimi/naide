@@ -154,6 +154,18 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     logInfo(`[Naide] Built message array with ${messages.length} messages`);
     logInfo(`[Naide] Current request prompt: "${request.prompt.substring(0, 100)}${request.prompt.length > 100 ? '...' : ''}"`);
 
+    // Get workspace root for path resolution
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const workspaceRoot = workspaceFolders && workspaceFolders.length > 0 
+      ? workspaceFolders[0].uri.fsPath 
+      : undefined;
+    
+    if (workspaceRoot) {
+      logInfo(`[Naide] Workspace root: ${workspaceRoot}`);
+    } else {
+      logWarn(`[Naide] ⚠ No workspace folder open - file operations may fail`);
+    }
+
     // Select language model - prefer Claude Opus, fallback to any available
     stream.progress('Requesting language model...');
     
@@ -258,7 +270,8 @@ async function handleLanguageModelConversation(
   tools: vscode.LanguageModelChatTool[],
   request: vscode.ChatRequest,
   stream: vscode.ChatResponseStream,
-  token: vscode.CancellationToken
+  token: vscode.CancellationToken,
+  workspaceRoot?: string
 ): Promise<void> {
   logInfo('[Naide] --- Starting language model conversation handler ---');
   logInfo(`[Naide] Initial messages: ${messages.length}`);
@@ -341,7 +354,17 @@ async function handleLanguageModelConversation(
       try {
         logInfo(`[Naide] [${i + 1}/${toolCalls.length}] Invoking tool: ${toolCall.name}`);
         logInfo(`[Naide]   Call ID: ${toolCall.callId}`);
-        logInfo(`[Naide]   Input: ${JSON.stringify(toolCall.input)}`);
+        
+        // Resolve relative paths to absolute paths for file/directory operations
+        let resolvedInput = toolCall.input;
+        if (workspaceRoot && (toolCall.name === 'copilot_createFile' || toolCall.name === 'copilot_createDirectory')) {
+          resolvedInput = resolveToolPaths(toolCall.input, workspaceRoot, toolCall.name);
+          if (resolvedInput !== toolCall.input) {
+            logInfo(`[Naide]   🔄 Path resolved (relative → absolute)`);
+          }
+        }
+        
+        logInfo(`[Naide]   Input: ${JSON.stringify(resolvedInput).substring(0, 200)}`);
         stream.progress(`Executing ${toolCall.name}...`);
         
         // Chat participants should pass undefined for toolInvocationToken
@@ -349,7 +372,7 @@ async function handleLanguageModelConversation(
         const toolResult = await vscode.lm.invokeTool(
           toolCall.name,
           {
-            input: toolCall.input,
+            input: resolvedInput,
             toolInvocationToken: undefined
           },
           token
@@ -439,4 +462,39 @@ async function handleLanguageModelConversation(
     logInfo(`[Naide] Conversation ended naturally after ${round} rounds`);
   }
   logInfo('[Naide] --- Language model conversation handler complete ---');
+}
+
+/**
+ * Resolve relative paths in tool inputs to absolute paths based on workspace root
+ */
+function resolveToolPaths(input: any, workspaceRoot: string, toolName: string): any {
+  if (!input || typeof input !== 'object') {
+    return input;
+  }
+
+  const resolved = { ...input };
+
+  // Handle copilot_createFile - has 'filePath' property
+  if (toolName === 'copilot_createFile' && typeof resolved.filePath === 'string') {
+    const originalPath = resolved.filePath;
+    // Check if path is relative (doesn't start with / or drive letter like C:)
+    if (!path.isAbsolute(originalPath)) {
+      resolved.filePath = path.join(workspaceRoot, originalPath);
+      logInfo(`[Naide]     Original: ${originalPath}`);
+      logInfo(`[Naide]     Resolved: ${resolved.filePath}`);
+    }
+  }
+
+  // Handle copilot_createDirectory - has 'dirPath' property
+  if (toolName === 'copilot_createDirectory' && typeof resolved.dirPath === 'string') {
+    const originalPath = resolved.dirPath;
+    // Check if path is relative
+    if (!path.isAbsolute(originalPath)) {
+      resolved.dirPath = path.join(workspaceRoot, originalPath);
+      logInfo(`[Naide]     Original: ${originalPath}`);
+      logInfo(`[Naide]     Resolved: ${resolved.dirPath}`);
+    }
+  }
+
+  return resolved;
 }

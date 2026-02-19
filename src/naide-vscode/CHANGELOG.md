@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Model Selection**: Improved Claude Opus detection - now checks both family and name fields
 - **Tool Result Handling**: Robust processing of tool results with timeout and error recovery
+- **Path Resolution**: Relative paths automatically converted to absolute paths based on workspace root (fixes file creation errors)
 - **Logging**: Enhanced model selection logging shows all available models with full details
 - Tool invocation now handles tools that succeed without returning content
 - **Dedicated "Naide" output channel**: All diagnostic logs now visible in Output panel under "Naide"
