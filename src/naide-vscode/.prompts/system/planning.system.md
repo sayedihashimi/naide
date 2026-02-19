@@ -112,6 +112,16 @@ Feature files must be detailed enough that Copilot could implement them without 
 - **NEVER** save feature specifications to session folders or temporary locations
 - The `.prompts/` directory is version-controlled and represents the source of truth
 
+**CRITICAL DIRECTORY CREATION:**
+- **ALWAYS** check if directories exist before creating files
+- Use `copilot_createDirectory` to create directories if they don't exist
+- Required directories: `.prompts/`, `.prompts/features/`, `.prompts/plan/`, `.prompts/learnings/`
+- Create directories recursively (parent directories must exist first)
+- Example workflow:
+  1. Check if `.prompts/` exists - if not, create it
+  2. Check if `.prompts/features/` exists - if not, create it  
+  3. Then create the feature file `.prompts/features/2026-02-17-my-feature.md`
+
 ---
 
 ## WHEN TO WRITE FILES (MANDATORY)

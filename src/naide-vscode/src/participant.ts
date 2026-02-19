@@ -154,12 +154,40 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     logInfo(`[Naide] Built message array with ${messages.length} messages`);
     logInfo(`[Naide] Current request prompt: "${request.prompt.substring(0, 100)}${request.prompt.length > 100 ? '...' : ''}"`);
 
-    // Select language model
+    // Select language model - prefer Claude Opus 4.5, fallback to any available
     stream.progress('Requesting language model...');
-    const models = await vscode.lm.selectChatModels({
+    
+    // Try to get Claude Opus 4.5 first
+    let models = await vscode.lm.selectChatModels({
       vendor: 'copilot',
-      family: 'gpt-4o'
+      family: 'claude-opus'
     });
+    
+    // If no Claude Opus models, try any Claude model
+    if (models.length === 0) {
+      logInfo('[Naide] Claude Opus not available, trying any Claude model...');
+      models = await vscode.lm.selectChatModels({
+        vendor: 'copilot',
+        family: 'claude'
+      });
+    }
+    
+    // If no Claude models, fallback to GPT-4o
+    if (models.length === 0) {
+      logInfo('[Naide] No Claude models available, falling back to GPT-4o...');
+      models = await vscode.lm.selectChatModels({
+        vendor: 'copilot',
+        family: 'gpt-4o'
+      });
+    }
+    
+    // If still no models, try any Copilot model
+    if (models.length === 0) {
+      logInfo('[Naide] No specific models available, trying any Copilot model...');
+      models = await vscode.lm.selectChatModels({
+        vendor: 'copilot'
+      });
+    }
 
     if (models.length === 0) {
       logError('[Naide] No language models available!');

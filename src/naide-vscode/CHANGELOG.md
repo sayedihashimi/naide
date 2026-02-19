@@ -15,25 +15,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-round tool execution: Handles tool calls from the language model and returns results
 - **Dedicated "Naide" output channel**: All diagnostic logs now visible in Output panel under "Naide"
 - Logger utility module for consistent logging across extension
+- **Directory creation instructions**: System prompts now instruct model to create directories before files
 
 ### Changed
 - System prompts are now bundled with the extension instead of being loaded from workspace
 - Removed `naide.systemPromptsPath` configuration setting (system prompts are always bundled)
 - Default mode is now Planning (when no slash command is specified)
-- Package size increased to 40.48 KB (from initial 15.91 KB)
+- Package size increased to 40.87 KB (from initial 15.91 KB)
 - Switched from streaming `.text` to `.stream` to handle both text and tool call parts
 - All `console.log()` statements replaced with OutputChannel logging for user visibility
 - **Pass all available tools to language model** (not just naide_searchLearnings)
+- **Model selection now prefers Claude Opus 4.5**: Falls back to Claude, then GPT-4o, then any Copilot model
+- **Simplified tool invocation**: Removed manual tool invocation code - let VS Code handle it automatically
 
 ### Fixed
 - **File creation now works**: Language model receives all VS Code tools (copilot_createFile, copilot_editFiles, etc.)
 - Previously only passed empty array when naide_searchLearnings wasn't registered
 - **Tool invocation "Invalid stream" error fixed**: Pass `undefined` for toolInvocationToken (chat participants don't have tokens)
+- **Model selection fixed**: No longer hardcoded to GPT-4o, now prefers Claude Opus 4.5 as intended
+- **Directory creation**: System prompts now explicitly instruct to create directories before files
 
 ### Removed
 - Auto mode support and `auto.system.md` system prompt
 - Analyzing mode support and `analyzing.system.md` system prompt
 - `/analyze` slash command
+- Manual tool invocation code (VS Code handles this automatically)
 
 ## [0.1.0] - 2026-02-17
 
