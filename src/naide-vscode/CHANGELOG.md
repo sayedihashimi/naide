@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LICENSE file added to extension directory (resolves packaging warning)
 - **Tool invocation support**: Language model can now create and edit files in the workspace
 - Multi-round tool execution: Handles tool calls from the language model and returns results
+
+### Fixed
+- **Model Selection**: Improved Claude Opus detection - now checks both family and name fields
+- **Tool Result Handling**: Robust processing of tool results with timeout and error recovery
+- **Logging**: Enhanced model selection logging shows all available models with full details
+- Tool invocation now handles tools that succeed without returning content
 - **Dedicated "Naide" output channel**: All diagnostic logs now visible in Output panel under "Naide"
 - Logger utility module for consistent logging across extension
 - **Directory creation instructions**: System prompts now instruct model to create directories before files

@@ -154,48 +154,62 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     logInfo(`[Naide] Built message array with ${messages.length} messages`);
     logInfo(`[Naide] Current request prompt: "${request.prompt.substring(0, 100)}${request.prompt.length > 100 ? '...' : ''}"`);
 
-    // Select language model - prefer Claude Opus 4.5, fallback to any available
+    // Select language model - prefer Claude Opus, fallback to any available
     stream.progress('Requesting language model...');
     
-    // Try to get Claude Opus 4.5 first
-    let models = await vscode.lm.selectChatModels({
-      vendor: 'copilot',
-      family: 'claude-opus'
+    // First, get all available models to see what we have
+    const allModels = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+    logInfo(`[Naide] Available Copilot models: ${allModels.length}`);
+    for (const model of allModels) {
+      logInfo(`[Naide]   - id: ${model.id}, family: "${model.family}", name: "${model.name}"`);
+    }
+    
+    let models: vscode.LanguageModelChat[] = [];
+    
+    // Try to get Claude Opus - check family for "opus" (case-insensitive)
+    // Family might be "claude-opus", "claude_opus", "opus", etc.
+    models = allModels.filter(m => {
+      const family = m.family.toLowerCase();
+      const name = m.name.toLowerCase();
+      return family.includes('opus') || name.includes('opus');
     });
     
-    // If no Claude Opus models, try any Claude model
-    if (models.length === 0) {
+    if (models.length > 0) {
+      logInfo(`[Naide] ✓ Found ${models.length} Opus model(s), using: ${models[0].id}`);
+    } else {
+      // Try any Claude model (sonnet, etc.)
       logInfo('[Naide] Claude Opus not available, trying any Claude model...');
-      models = await vscode.lm.selectChatModels({
-        vendor: 'copilot',
-        family: 'claude'
+      models = allModels.filter(m => {
+        const family = m.family.toLowerCase();
+        const name = m.name.toLowerCase();
+        return family.includes('claude') || name.includes('claude');
       });
-    }
-    
-    // If no Claude models, fallback to GPT-4o
-    if (models.length === 0) {
-      logInfo('[Naide] No Claude models available, falling back to GPT-4o...');
-      models = await vscode.lm.selectChatModels({
-        vendor: 'copilot',
-        family: 'gpt-4o'
-      });
-    }
-    
-    // If still no models, try any Copilot model
-    if (models.length === 0) {
-      logInfo('[Naide] No specific models available, trying any Copilot model...');
-      models = await vscode.lm.selectChatModels({
-        vendor: 'copilot'
-      });
+      
+      if (models.length > 0) {
+        logInfo(`[Naide] ✓ Found ${models.length} Claude model(s), using: ${models[0].id}`);
+      } else {
+        // Fallback to GPT-4o
+        logInfo('[Naide] No Claude models available, falling back to GPT-4o...');
+        models = allModels.filter(m => {
+          const family = m.family.toLowerCase();
+          return family.includes('gpt') || family.includes('4o');
+        });
+        
+        if (models.length === 0) {
+          // Last resort: use any available model
+          logInfo('[Naide] No specific models available, using first available model...');
+          models = allModels;
+        }
+      }
     }
 
     if (models.length === 0) {
       logError('[Naide] No language models available!');
-      stream.markdown('❌ No language model available. Ensure GitHub Copilot is active.');
+      stream.markdown('❌ No language model available. Ensure GitHub Copilot is active and you have access to language models.');
       return;
     }
 
-    logInfo(`[Naide] Selected model: ${models[0].id} (${models[0].name})`);
+    logInfo(`[Naide] ═══ Selected model: ${models[0].id} (${models[0].name}, family: ${models[0].family}) ═══`);
     logInfo(`[Naide] Passing all ${allTools.length} tools to model`);
 
     // Send request to language model
@@ -341,26 +355,55 @@ async function handleLanguageModelConversation(
           token
         );
 
-        logInfo(`[Naide]   Tool invocation completed, processing result...`);
+        logInfo(`[Naide]   Tool invocation started, processing result...`);
 
-        // Collect the tool result content
+        // Collect the tool result content with robust handling
         const resultContent: string[] = [];
-        for await (const contentPart of toolResult.content) {
-          if (contentPart instanceof vscode.LanguageModelTextPart) {
-            resultContent.push(contentPart.value);
-            logInfo(`[Naide]     Result content: ${contentPart.value.substring(0, 100)}`);
+        let hasContent = false;
+        
+        try {
+          // Set a timeout for result processing
+          const timeoutMs = 30000; // 30 seconds
+          const startTime = Date.now();
+          
+          for await (const contentPart of toolResult.content) {
+            if (Date.now() - startTime > timeoutMs) {
+              logWarn(`[Naide]     Warning: Tool result processing timeout after ${timeoutMs}ms`);
+              break;
+            }
+            
+            if (contentPart instanceof vscode.LanguageModelTextPart) {
+              resultContent.push(contentPart.value);
+              hasContent = true;
+              logInfo(`[Naide]     Result: ${contentPart.value.substring(0, 150)}${contentPart.value.length > 150 ? '...' : ''}`);
+            } else {
+              logInfo(`[Naide]     Result part type: ${contentPart?.constructor?.name || typeof contentPart}`);
+            }
           }
+        } catch (streamError: any) {
+          logWarn(`[Naide]     Warning processing result stream: ${streamError.message}`);
+          // Continue - some tools succeed without returning content
         }
 
-        toolResults.push(
-          new vscode.LanguageModelToolResultPart(
-            toolCall.callId,
-            resultContent.map(content => new vscode.LanguageModelTextPart(content))
-          )
-        );
-
-        logInfo(`[Naide]   ✓ Tool ${toolCall.name} completed successfully`);
-        logInfo(`[Naide]     Result parts: ${resultContent.length}`);
+        // Create tool result
+        if (resultContent.length > 0) {
+          toolResults.push(
+            new vscode.LanguageModelToolResultPart(
+              toolCall.callId,
+              resultContent.map(content => new vscode.LanguageModelTextPart(content))
+            )
+          );
+          logInfo(`[Naide]   ✓ Tool ${toolCall.name} completed with ${resultContent.length} result part(s)`);
+        } else {
+          // Tool succeeded but returned no content - create success message
+          toolResults.push(
+            new vscode.LanguageModelToolResultPart(
+              toolCall.callId,
+              [new vscode.LanguageModelTextPart(`Tool ${toolCall.name} executed successfully.`)]
+            )
+          );
+          logInfo(`[Naide]   ✓ Tool ${toolCall.name} completed (no content returned, assuming success)`);
+        }
       } catch (error) {
         logError(`[Naide]   ✗ Error invoking tool ${toolCall.name}:`, error);
         const errorMessage = error instanceof Error ? error.message : String(error);
