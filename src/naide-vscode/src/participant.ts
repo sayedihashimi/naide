@@ -7,6 +7,7 @@ import * as path from 'path';
 import { loadSystemPrompts, loadSpecFiles, loadFeatureFiles } from './prompts';
 import { getModeFromCommand } from './modes';
 import { logInfo, logError, logWarn } from './logger';
+import { searchLearnings } from './learnings';
 
 /**
  * Registers the @naide chat participant
@@ -82,20 +83,47 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     logInfo(`[Naide] Total assembled instructions: ${instructions.length} characters`);
 
     // Reference the search_learnings tool so Copilot can use it
-    const allTools = await vscode.lm.tools;
-    logInfo(`[Naide] Total tools available: ${allTools.length}`);
-    allTools.forEach(tool => {
+    const vscodeLmTools = await vscode.lm.tools;
+    logInfo(`[Naide] Total tools available: ${vscodeLmTools.length}`);
+    vscodeLmTools.forEach(tool => {
       logInfo(`[Naide]   - ${tool.name}`);
     });
     
     // Check if our custom search_learnings tool is registered
-    const learningsTool = allTools.filter((tool) => tool.name === 'naide_searchLearnings');
+    const hasLearningsTool = vscodeLmTools.some((tool) => tool.name === 'naide_searchLearnings');
 
-    if (learningsTool.length > 0) {
-      logInfo('[Naide] search_learnings tool available');
+    // Build mutable tools array, ensuring naide_searchLearnings is always included.
+    // The tool implementation is registered via registerTool() but VS Code may not expose
+    // an extension's own tools in vscode.lm.tools, so we add the descriptor manually.
+    const allTools: vscode.LanguageModelChatTool[] = [...vscodeLmTools];
+
+    if (hasLearningsTool) {
+      logInfo('[Naide] naide_searchLearnings found in vscode.lm.tools ✓');
     } else {
-      logWarn('[Naide] search_learnings tool not found (but other tools are available)');
+      logWarn('[Naide] naide_searchLearnings NOT found in vscode.lm.tools - adding descriptor manually');
+      allTools.push({
+        name: 'naide_searchLearnings',
+        description: 'Search project learnings (.prompts/learnings/) for relevant context based on keywords. Returns matching learnings that contain corrections, constraints, and past decisions.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            keywords: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Keywords to search for in learnings (e.g., [\'react\', \'testing\'])'
+            }
+          },
+          required: ['keywords']
+        }
+      });
+      logInfo(`[Naide] naide_searchLearnings descriptor added manually (allTools now has ${allTools.length} tools)`);
     }
+
+    // Log the final tool list that will be passed to the model
+    const hasLearningsInFinal = allTools.some(t => t.name === 'naide_searchLearnings');
+    logInfo(`[Naide] Final tool list for model: ${allTools.length} tools, naide_searchLearnings included: ${hasLearningsInFinal}`);
+    logInfo(`[Naide] Final tool names: ${allTools.map(t => t.name).join(', ')}`);
+
 
     // Build conversation history from context
     const messages: vscode.LanguageModelChatMessage[] = [];
@@ -391,6 +419,36 @@ async function handleLanguageModelConversation(
         
         logInfo(`[Naide]   Input: ${JSON.stringify(resolvedInput).substring(0, 200)}`);
         stream.progress(`Executing ${toolCall.name}...`);
+        
+        // naide_searchLearnings: invoke directly because vscode.lm.invokeTool() cannot
+        // invoke a tool that was added manually to the tools list (not from vscode.lm.tools).
+        if (toolCall.name === 'naide_searchLearnings') {
+          try {
+            const input = resolvedInput as { keywords?: string[] };
+            const keywords = Array.isArray(input?.keywords) ? input.keywords : [];
+            logInfo(`[Naide]   Invoking searchLearnings directly, keywords: ${JSON.stringify(keywords)}`);
+            const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+            const learningsResult = workspaceUri
+              ? await searchLearnings(workspaceUri, keywords)
+              : 'No workspace open.';
+            toolResults.push(
+              new vscode.LanguageModelToolResultPart(
+                toolCall.callId,
+                [new vscode.LanguageModelTextPart(learningsResult)]
+              )
+            );
+            logInfo(`[Naide]   ✓ naide_searchLearnings completed (${learningsResult.length} chars)`);
+          } catch (learningsError: any) {
+            logError(`[Naide]   ✗ Error in naide_searchLearnings: ${learningsError.message}`);
+            toolResults.push(
+              new vscode.LanguageModelToolResultPart(
+                toolCall.callId,
+                [new vscode.LanguageModelTextPart(`Error searching learnings: ${learningsError.message}`)]
+              )
+            );
+          }
+          continue; // Skip standard tool invocation for this tool
+        }
         
         // Workaround for copilot_createFile bug: handle file creation manually
         if (toolCall.name === 'copilot_createFile' && 
