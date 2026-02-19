@@ -7,6 +7,7 @@ import * as path from 'path';
 import { loadSystemPrompts, loadSpecFiles, loadFeatureFiles } from './prompts';
 import { getModeFromCommand } from './modes';
 import { logInfo, logError, logWarn } from './logger';
+import { searchLearnings } from './learnings';
 
 /**
  * Registers the @naide chat participant
@@ -418,6 +419,36 @@ async function handleLanguageModelConversation(
         
         logInfo(`[Naide]   Input: ${JSON.stringify(resolvedInput).substring(0, 200)}`);
         stream.progress(`Executing ${toolCall.name}...`);
+        
+        // naide_searchLearnings: invoke directly because vscode.lm.invokeTool() cannot
+        // invoke a tool that was added manually to the tools list (not from vscode.lm.tools).
+        if (toolCall.name === 'naide_searchLearnings') {
+          try {
+            const input = resolvedInput as { keywords?: string[] };
+            const keywords = Array.isArray(input?.keywords) ? input.keywords : [];
+            logInfo(`[Naide]   Invoking searchLearnings directly, keywords: ${JSON.stringify(keywords)}`);
+            const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+            const learningsResult = workspaceUri
+              ? await searchLearnings(workspaceUri, keywords)
+              : 'No workspace open.';
+            toolResults.push(
+              new vscode.LanguageModelToolResultPart(
+                toolCall.callId,
+                [new vscode.LanguageModelTextPart(learningsResult)]
+              )
+            );
+            logInfo(`[Naide]   ✓ naide_searchLearnings completed (${learningsResult.length} chars)`);
+          } catch (learningsError: any) {
+            logError(`[Naide]   ✗ Error in naide_searchLearnings: ${learningsError.message}`);
+            toolResults.push(
+              new vscode.LanguageModelToolResultPart(
+                toolCall.callId,
+                [new vscode.LanguageModelTextPart(`Error searching learnings: ${learningsError.message}`)]
+              )
+            );
+          }
+          continue; // Skip standard tool invocation for this tool
+        }
         
         // Workaround for copilot_createFile bug: handle file creation manually
         if (toolCall.name === 'copilot_createFile' && 

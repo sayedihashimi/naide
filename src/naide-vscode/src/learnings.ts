@@ -54,7 +54,7 @@ export function registerLearningsTool(context: vscode.ExtensionContext): void {
  * @param keywords - Keywords to search for
  * @returns Formatted search results
  */
-async function searchLearnings(
+export async function searchLearnings(
   workspaceRoot: vscode.Uri,
   keywords: string[]
 ): Promise<string> {
