@@ -115,3 +115,7 @@ Each learning entry includes:
 - The sidecar is designed to be simple and minimal
 - Currently uses a placeholder for Copilot SDK integration
 - Full SDK integration coming in future updates
+
+## License
+
+MIT License - see [LICENSE](../../LICENSE) for details.

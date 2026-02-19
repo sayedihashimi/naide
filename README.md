@@ -238,9 +238,7 @@ npm run lint
 
 ## License
 
-Copyright (c) 2026 Sayed Ibrahim Hashimi. All rights reserved.
-
-This software is proprietary and confidential. See [LICENSE](LICENSE) for full details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Contributing
 
