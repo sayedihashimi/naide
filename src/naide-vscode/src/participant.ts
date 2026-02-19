@@ -427,13 +427,14 @@ async function handleLanguageModelConversation(
         }
         
         // All other tools: use standard invocation
-        // Chat participants should pass undefined for toolInvocationToken
-        // Only language model tools use toolInvocationToken when calling other tools
+        // Pass request.toolInvocationToken to associate invocations with the chat context.
+        // This ensures tool confirmations (e.g. "Run command?") are shown inside the
+        // Copilot chat panel rather than as native OS dialog pop-ups.
         const toolResult = await vscode.lm.invokeTool(
           toolCall.name,
           {
             input: resolvedInput,
-            toolInvocationToken: undefined
+            toolInvocationToken: request.toolInvocationToken
           },
           token
         );
