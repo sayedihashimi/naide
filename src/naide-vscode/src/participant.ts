@@ -82,19 +82,39 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     logInfo(`[Naide] Total assembled instructions: ${instructions.length} characters`);
 
     // Reference the search_learnings tool so Copilot can use it
-    const allTools = await vscode.lm.tools;
-    logInfo(`[Naide] Total tools available: ${allTools.length}`);
-    allTools.forEach(tool => {
+    const vscodeLmTools = await vscode.lm.tools;
+    logInfo(`[Naide] Total tools available: ${vscodeLmTools.length}`);
+    vscodeLmTools.forEach(tool => {
       logInfo(`[Naide]   - ${tool.name}`);
     });
     
     // Check if our custom search_learnings tool is registered
-    const learningsTool = allTools.filter((tool) => tool.name === 'naide_searchLearnings');
+    const hasLearningsTool = vscodeLmTools.some((tool) => tool.name === 'naide_searchLearnings');
 
-    if (learningsTool.length > 0) {
+    // Build mutable tools array, ensuring naide_searchLearnings is always included.
+    // The tool implementation is registered via registerTool() but VS Code may not expose
+    // an extension's own tools in vscode.lm.tools, so we add the descriptor manually.
+    const allTools: vscode.LanguageModelChatTool[] = [...vscodeLmTools];
+
+    if (hasLearningsTool) {
       logInfo('[Naide] search_learnings tool available');
     } else {
-      logWarn('[Naide] search_learnings tool not found (but other tools are available)');
+      logWarn('[Naide] search_learnings tool not found in vscode.lm.tools, adding descriptor manually');
+      allTools.push({
+        name: 'naide_searchLearnings',
+        description: 'Search project learnings (.prompts/learnings/) for relevant context based on keywords. Returns matching learnings that contain corrections, constraints, and past decisions.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            keywords: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Keywords to search for in learnings (e.g., [\'react\', \'testing\'])'
+            }
+          },
+          required: ['keywords']
+        }
+      });
     }
 
     // Build conversation history from context
