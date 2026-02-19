@@ -1,0 +1,102 @@
+{
+  "name": "naide",
+  "displayName": "Naide",
+  "description": "Spec-driven AI development assistant — plan and build with project context",
+  "version": "0.1.0",
+  "publisher": "naide",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sayedihashimi/naide"
+  },
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "extensionDependencies": [
+    "github.copilot-chat"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "naide.chat",
+        "name": "naide",
+        "fullName": "Naide",
+        "description": "Spec-driven AI development assistant",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "plan",
+            "description": "Create or update specifications without modifying code"
+          },
+          {
+            "name": "build",
+            "description": "Implement code changes based on specifications"
+          }
+        ]
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "naide_searchLearnings",
+        "displayName": "Search Project Learnings",
+        "description": "Search project learnings (.prompts/learnings/) for relevant context based on keywords. Returns matching learnings that contain corrections, constraints, and past decisions.",
+        "parametersSchema": {
+          "type": "object",
+          "properties": {
+            "keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Keywords to search for in learnings (e.g., ['react', 'testing'])"
+            }
+          },
+          "required": [
+            "keywords"
+          ]
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Naide",
+      "properties": {
+        "naide.specsPath": {
+          "type": "string",
+          "default": ".prompts/plan",
+          "description": "Path to specifications directory relative to workspace root"
+        },
+        "naide.featuresPath": {
+          "type": "string",
+          "default": ".prompts/features",
+          "description": "Path to features directory relative to workspace root"
+        },
+        "naide.learningsPath": {
+          "type": "string",
+          "default": ".prompts/learnings",
+          "description": "Path to learnings directory relative to workspace root"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/vscode": "^1.99.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vscode/vsce": "^3.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.3.3"
+  }
+}
