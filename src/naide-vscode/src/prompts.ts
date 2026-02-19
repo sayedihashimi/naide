@@ -132,6 +132,7 @@ export async function loadSpecFiles(workspaceRoot: vscode.Uri): Promise<string> 
 export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<string> {
   const config = vscode.workspace.getConfiguration('naide');
   const featuresPath = config.get<string>('featuresPath', '.prompts/features');
+  const maxFeaturesCharacters = config.get<number>('maxFeaturesCharacters', 50000);
   const featuresDir = vscode.Uri.joinPath(workspaceRoot, featuresPath);
   
   try {
@@ -151,6 +152,7 @@ export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<strin
     
     let features = '';
     let hasContent = false;
+    let skippedCount = 0;
     
     for (const file of featureFiles) {
       const filePath = vscode.Uri.file(file);
@@ -159,7 +161,14 @@ export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<strin
         const text = new TextDecoder('utf-8').decode(content);
         // Get relative path for display
         const relativePath = path.relative(featuresDir.fsPath, file);
-        features += `### ${relativePath}\n\`\`\`\n${text}\n\`\`\`\n\n`;
+        const entry = `### ${relativePath}\n\`\`\`\n${text}\n\`\`\`\n\n`;
+        
+        if (features.length + entry.length > maxFeaturesCharacters) {
+          skippedCount++;
+          continue;
+        }
+        
+        features += entry;
         hasContent = true;
       } catch {
         // Skip files that can't be read
@@ -170,7 +179,11 @@ export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<strin
       return '';
     }
     
-    return `\n\n# FEATURE SPECIFICATIONS\n\n${features}`;
+    let result = `\n\n# FEATURE SPECIFICATIONS\n\n${features}`;
+    if (skippedCount > 0) {
+      result += `\n\n> **Note**: ${skippedCount} feature file(s) were omitted to stay within the context limit. Increase \`naide.maxFeaturesCharacters\` in VS Code settings to include more features.\n`;
+    }
+    return result;
   } catch {
     // Features directory doesn't exist
     return '';
