@@ -97,9 +97,9 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     const allTools: vscode.LanguageModelChatTool[] = [...vscodeLmTools];
 
     if (hasLearningsTool) {
-      logInfo('[Naide] search_learnings tool available');
+      logInfo('[Naide] naide_searchLearnings found in vscode.lm.tools ✓');
     } else {
-      logWarn('[Naide] search_learnings tool not found in vscode.lm.tools, adding descriptor manually');
+      logWarn('[Naide] naide_searchLearnings NOT found in vscode.lm.tools - adding descriptor manually');
       allTools.push({
         name: 'naide_searchLearnings',
         description: 'Search project learnings (.prompts/learnings/) for relevant context based on keywords. Returns matching learnings that contain corrections, constraints, and past decisions.',
@@ -115,7 +115,14 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
           required: ['keywords']
         }
       });
+      logInfo(`[Naide] naide_searchLearnings descriptor added manually (allTools now has ${allTools.length} tools)`);
     }
+
+    // Log the final tool list that will be passed to the model
+    const hasLearningsInFinal = allTools.some(t => t.name === 'naide_searchLearnings');
+    logInfo(`[Naide] Final tool list for model: ${allTools.length} tools, naide_searchLearnings included: ${hasLearningsInFinal}`);
+    logInfo(`[Naide] Final tool names: ${allTools.map(t => t.name).join(', ')}`);
+
 
     // Build conversation history from context
     const messages: vscode.LanguageModelChatMessage[] = [];

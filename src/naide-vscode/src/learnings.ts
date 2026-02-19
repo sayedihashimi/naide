@@ -3,26 +3,34 @@
  */
 
 import * as vscode from 'vscode';
-import { logInfo, logError } from './logger';
+import { logInfo, logError, logWarn } from './logger';
 
 /**
  * Registers the search_learnings language model tool
  * @param context - The extension context
  */
 export function registerLearningsTool(context: vscode.ExtensionContext): void {
+  logInfo('[Naide] Registering naide_searchLearnings language model tool...');
   const tool = vscode.lm.registerTool('naide_searchLearnings', {
     invoke: async (options) => {
+      logInfo('[Naide] naide_searchLearnings invoke() called');
+      logInfo(`[Naide]   raw input: ${JSON.stringify(options.input)}`);
       try {
         const params = options.input as { keywords: string[] };
+        const keywords = Array.isArray(params?.keywords) ? params.keywords : [];
+        logInfo(`[Naide]   keywords: ${JSON.stringify(keywords)}`);
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
 
         if (!workspaceRoot) {
+          logWarn('[Naide]   no workspace open, returning early');
           return new vscode.LanguageModelToolResult([
             new vscode.LanguageModelTextPart('No workspace open.')
           ]);
         }
 
-        const result = await searchLearnings(workspaceRoot, params.keywords);
+        logInfo(`[Naide]   workspace root: ${workspaceRoot.fsPath}`);
+        const result = await searchLearnings(workspaceRoot, keywords);
+        logInfo(`[Naide]   search result length: ${result.length} chars`);
         return new vscode.LanguageModelToolResult([
           new vscode.LanguageModelTextPart(result)
         ]);
@@ -37,7 +45,7 @@ export function registerLearningsTool(context: vscode.ExtensionContext): void {
   });
 
   context.subscriptions.push(tool);
-  logInfo('[Naide] Registered search_learnings tool');
+  logInfo('[Naide] Registered naide_searchLearnings tool successfully');
 }
 
 /**
@@ -54,10 +62,14 @@ async function searchLearnings(
   const learningsPath = config.get<string>('learningsPath', '.prompts/learnings');
   const learningsDir = vscode.Uri.joinPath(workspaceRoot, learningsPath);
 
+  logInfo(`[Naide]   searchLearnings: path="${learningsPath}", dir="${learningsDir.fsPath}"`);
+
   // Check if learnings directory exists
   try {
     await vscode.workspace.fs.stat(learningsDir);
+    logInfo(`[Naide]   searchLearnings: directory exists`);
   } catch {
+    logWarn(`[Naide]   searchLearnings: directory not found at ${learningsDir.fsPath}`);
     return 'No learnings directory found. This is a new project with no recorded learnings yet.';
   }
 
@@ -66,6 +78,8 @@ async function searchLearnings(
     const files = entries
       .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'))
       .map(([name]) => name);
+
+    logInfo(`[Naide]   searchLearnings: found ${entries.length} entries, ${files.length} .md files: [${files.join(', ')}]`);
 
     if (files.length === 0) {
       return 'No learnings found. This is a new project with no recorded learnings yet.';
