@@ -132,6 +132,7 @@ export async function loadSpecFiles(workspaceRoot: vscode.Uri): Promise<string> 
 export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<string> {
   const config = vscode.workspace.getConfiguration('naide');
   const featuresPath = config.get<string>('featuresPath', '.prompts/features');
+  const maxFeaturesChars = config.get<number>('maxFeaturesChars', 100000);
   const featuresDir = vscode.Uri.joinPath(workspaceRoot, featuresPath);
   
   try {
@@ -151,6 +152,7 @@ export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<strin
     
     let features = '';
     let hasContent = false;
+    let truncated = false;
     
     for (const file of featureFiles) {
       const filePath = vscode.Uri.file(file);
@@ -159,7 +161,14 @@ export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<strin
         const text = new TextDecoder('utf-8').decode(content);
         // Get relative path for display
         const relativePath = path.relative(featuresDir.fsPath, file);
-        features += `### ${relativePath}\n\`\`\`\n${text}\n\`\`\`\n\n`;
+        const entry = `### ${relativePath}\n\`\`\`\n${text}\n\`\`\`\n\n`;
+
+        if (features.length + entry.length > maxFeaturesChars) {
+          truncated = true;
+          break;
+        }
+
+        features += entry;
         hasContent = true;
       } catch {
         // Skip files that can't be read
@@ -168,6 +177,11 @@ export async function loadFeatureFiles(workspaceRoot: vscode.Uri): Promise<strin
     
     if (!hasContent) {
       return '';
+    }
+
+    if (truncated) {
+      console.warn(`[Naide] Feature files truncated at ${features.length} chars (limit: ${maxFeaturesChars}). Increase naide.maxFeaturesChars to load more.`);
+      features += `\n> **Note**: Feature files were truncated at ${maxFeaturesChars} characters to avoid exceeding the model token limit. Adjust the \`naide.maxFeaturesChars\` setting to control how much feature content is loaded.\n`;
     }
     
     return `\n\n# FEATURE SPECIFICATIONS\n\n${features}`;

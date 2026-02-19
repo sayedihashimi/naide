@@ -278,7 +278,9 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     stream.markdown(`❌ Error: ${errorMessage}\n\n`);
     
     // Provide helpful error messages
-    if (errorMessage.includes('model') || errorMessage.includes('Copilot')) {
+    if (errorMessage.includes('token limit') || errorMessage.includes('token_limit') || errorMessage.includes('context length') || errorMessage.includes('context_length')) {
+      stream.markdown('The project context is too large for the model. Try reducing the number of feature files, or lower the `naide.maxFeaturesChars` setting to load fewer feature files.');
+    } else if (errorMessage.includes('model') || errorMessage.includes('Copilot')) {
       stream.markdown('Make sure GitHub Copilot is installed and active.');
     } else if (errorMessage.includes('workspace')) {
       stream.markdown('Make sure you have a workspace folder open.');
