@@ -133,8 +133,14 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     // Add system instructions with the current user message
     // System instructions are prepended to the first user message in the conversation
     // or to the current message if this is the first turn
+    // IMPORTANT: Add workspace context to instructions
+    const workspaceContext = workspaceRoot 
+      ? `\n\n**WORKSPACE ROOT**: \`${workspaceRoot}\`\n**CRITICAL**: All file and directory paths MUST be relative to this workspace root. Use relative paths like \`.prompts/features/file.md\` (NOT absolute paths).\n`
+      : '';
+    const fullInstructions = `${instructions}${workspaceContext}`;
+    
     const fullPrompt = messages.length === 0 
-      ? `${instructions}\n\n---\n\nUser Request: ${request.prompt}`
+      ? `${fullInstructions}\n\n---\n\nUser Request: ${request.prompt}`
       : request.prompt;
     
     // If we have history, prepend instructions to the first message
@@ -148,7 +154,7 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
         }
       }
       messages[0] = vscode.LanguageModelChatMessage.User(
-        `${instructions}\n\n---\n\n${firstMessageText}`
+        `${fullInstructions}\n\n---\n\n${firstMessageText}`
       );
     }
     
@@ -352,10 +358,13 @@ async function handleLanguageModelConversation(
         
         // Resolve relative paths to absolute paths for file/directory operations
         let resolvedInput = toolCall.input;
+        let pathWasResolved = false;
         if (workspaceRoot && (toolCall.name === 'copilot_createFile' || toolCall.name === 'copilot_createDirectory')) {
-          resolvedInput = resolveToolPaths(toolCall.input, workspaceRoot, toolCall.name);
-          if (resolvedInput !== toolCall.input) {
-            logInfo(`[Naide]   🔄 Path resolved (relative → absolute)`);
+          const result = resolveToolPaths(toolCall.input, workspaceRoot, toolCall.name);
+          resolvedInput = result.input;
+          pathWasResolved = result.changed;
+          if (pathWasResolved) {
+            logInfo(`[Naide]   🔄 Path resolved to workspace: ${result.originalPath} → ${result.resolvedPath}`);
           }
         }
         
@@ -460,36 +469,84 @@ async function handleLanguageModelConversation(
 }
 
 /**
- * Resolve relative paths in tool inputs to absolute paths based on workspace root
+ * Resolve relative file paths to absolute paths based on workspace root.
+ * Also validates and corrects absolute paths that aren't within the workspace.
+ * This prevents "Invalid input path" errors from VS Code tools that require absolute paths.
  */
-function resolveToolPaths(input: any, workspaceRoot: string, toolName: string): any {
+function resolveToolPaths(input: any, workspaceRoot: string, toolName: string): { input: any; changed: boolean; originalPath?: string; resolvedPath?: string } {
   if (!input || typeof input !== 'object') {
-    return input;
+    return { input, changed: false };
   }
 
   const resolved = { ...input };
+  let changed = false;
+  let originalPath: string | undefined;
+  let resolvedPath: string | undefined;
+
+  // Normalize workspace root for comparison (handle both / and \ separators)
+  const normalizedWorkspaceRoot = workspaceRoot.toLowerCase().replace(/\\/g, '/');
 
   // Handle copilot_createFile - has 'filePath' property
   if (toolName === 'copilot_createFile' && typeof resolved.filePath === 'string') {
-    const originalPath = resolved.filePath;
-    // Check if path is relative (doesn't start with / or drive letter like C:)
-    if (!path.isAbsolute(originalPath)) {
-      resolved.filePath = path.join(workspaceRoot, originalPath);
-      logInfo(`[Naide]     Original: ${originalPath}`);
-      logInfo(`[Naide]     Resolved: ${resolved.filePath}`);
+    const filePath = resolved.filePath; // TypeScript knows this is string in this block
+    originalPath = filePath;
+    const normalizedPath = filePath.toLowerCase().replace(/\\/g, '/');
+    
+    if (path.isAbsolute(filePath)) {
+      // Path is absolute - check if it's within workspace
+      if (!normalizedPath.startsWith(normalizedWorkspaceRoot)) {
+        // Absolute path outside workspace - extract relative part and re-resolve
+        // Try to find .prompts or other recognizable patterns
+        const promptsMatch = filePath.match(/[\\\/]\.prompts[\\\/].*/i);
+        if (promptsMatch) {
+          // Extract from .prompts onwards and treat as relative
+          const relativePart = promptsMatch[0].substring(1); // Remove leading slash
+          resolved.filePath = path.join(workspaceRoot, relativePart);
+          resolvedPath = resolved.filePath;
+          changed = true;
+          logWarn(`[Naide]   ⚠ Corrected absolute path outside workspace`);
+        } else {
+          logWarn(`[Naide]   ⚠ Absolute path outside workspace - may fail: ${filePath}`);
+        }
+      }
+    } else {
+      // Path is relative - resolve to workspace
+      resolved.filePath = path.join(workspaceRoot, filePath);
+      resolvedPath = resolved.filePath;
+      changed = true;
     }
   }
 
   // Handle copilot_createDirectory - has 'dirPath' property
   if (toolName === 'copilot_createDirectory' && typeof resolved.dirPath === 'string') {
-    const originalPath = resolved.dirPath;
-    // Check if path is relative
-    if (!path.isAbsolute(originalPath)) {
-      resolved.dirPath = path.join(workspaceRoot, originalPath);
-      logInfo(`[Naide]     Original: ${originalPath}`);
-      logInfo(`[Naide]     Resolved: ${resolved.dirPath}`);
+    const dirPath = resolved.dirPath; // TypeScript knows this is string in this block
+    originalPath = dirPath;
+    const normalizedPath = dirPath.toLowerCase().replace(/\\/g, '/');
+    
+    if (path.isAbsolute(dirPath)) {
+      // Path is absolute - check if it's within workspace
+      if (!normalizedPath.startsWith(normalizedWorkspaceRoot)) {
+        // Absolute path outside workspace - extract relative part and re-resolve
+        const promptsMatch = dirPath.match(/[\\\/]\.prompts[\\\/]?.*/i);
+        if (promptsMatch) {
+          // Extract from .prompts onwards and treat as relative
+          const relativePart = promptsMatch[0].substring(1); // Remove leading slash
+          resolved.dirPath = path.join(workspaceRoot, relativePart);
+          resolvedPath = resolved.dirPath;
+          changed = true;
+          logWarn(`[Naide]   ⚠ Corrected absolute path outside workspace`);
+        } else {
+          logWarn(`[Naide]   ⚠ Absolute path outside workspace - may fail: ${dirPath}`);
+        }
+      }
+    } else {
+      // Path is relative - resolve to workspace
+      resolved.dirPath = path.join(workspaceRoot, dirPath);
+      resolvedPath = resolved.dirPath;
+      changed = true;
     }
   }
 
-  return resolved;
+  return { input: resolved, changed, originalPath, resolvedPath };
 }
+
