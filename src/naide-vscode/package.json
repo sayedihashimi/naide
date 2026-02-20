@@ -60,6 +60,26 @@
             "keywords"
           ]
         }
+      },
+      {
+        "name": "naide_searchFeatures",
+        "displayName": "Search Project Feature Specs",
+        "description": "Search project feature specifications (.prompts/features/) for relevant context based on keywords. Returns matching feature specs that contain requirements, acceptance criteria, and implementation details.",
+        "parametersSchema": {
+          "type": "object",
+          "properties": {
+            "keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Keywords to search for in feature files (e.g., ['chat', 'history', 'token'])"
+            }
+          },
+          "required": [
+            "keywords"
+          ]
+        }
       }
     ],
     "configuration": {
