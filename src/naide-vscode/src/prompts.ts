@@ -88,6 +88,28 @@ IMPORTANT:
 
 `;
 
+  // Add feature search tool instructions
+  systemPrompt += `
+FEATURE SPECIFICATIONS INSTRUCTIONS:
+You have access to the naide_searchFeatures tool to retrieve relevant feature specifications.
+
+WHEN TO USE:
+- At the START of each new task, search for relevant features using keywords from the user's request
+- When working on a topic that may have an existing feature spec
+- When you need to check acceptance criteria or implementation details for a feature
+
+HOW TO USE:
+- Call naide_searchFeatures with an array of keywords relevant to the current task
+- Example: naide_searchFeatures({ keywords: ["chat", "history"] }) for chat history work
+- Example: naide_searchFeatures({ keywords: ["token", "limit", "memory"] }) for token management
+
+IMPORTANT:
+- Feature specs contain requirements and acceptance criteria — always check before implementing
+- If a relevant feature spec exists, follow its requirements
+- If no features are found, proceed based on the user's request
+
+`;
+
   return systemPrompt;
 }
 

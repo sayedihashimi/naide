@@ -4,10 +4,11 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { loadSystemPrompts, loadSpecFiles, loadFeatureFiles } from './prompts';
+import { loadSystemPrompts, loadSpecFiles } from './prompts';
 import { getModeFromCommand } from './modes';
 import { logInfo, logError, logWarn } from './logger';
 import { searchLearnings } from './learnings';
+import { searchFeatures } from './features';
 
 /**
  * Registers the @naide chat participant
@@ -73,12 +74,11 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
     const specs = await loadSpecFiles(workspaceFolder.uri);
     logInfo(`[Naide] Specs loaded: ${specs.length} characters`);
 
-    stream.progress('Loading feature files...');
-    const features = await loadFeatureFiles(workspaceFolder.uri);
-    logInfo(`[Naide] Features loaded: ${features.length} characters`);
-
-    // Assemble full instructions
-    const instructions = [systemPrompt, specs, features].filter(Boolean).join('\n\n');
+    // Assemble system instructions (without feature files — loaded on demand via tool)
+    const workspaceContext = workspaceRoot
+      ? `\n\n**WORKSPACE ROOT**: \`${workspaceRoot}\`\n**CRITICAL**: All file and directory paths MUST be relative to this workspace root. Use relative paths like \`.prompts/features/file.md\` (NOT absolute paths).\n`
+      : '';
+    const instructions = [systemPrompt, specs, workspaceContext].filter(Boolean).join('\n\n');
 
     logInfo(`[Naide] Total assembled instructions: ${instructions.length} characters`);
 
@@ -89,12 +89,13 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
       logInfo(`[Naide]   - ${tool.name}`);
     });
     
-    // Check if our custom search_learnings tool is registered
+    // Check if our custom tools are registered
     const hasLearningsTool = vscodeLmTools.some((tool) => tool.name === 'naide_searchLearnings');
+    const hasFeaturesTool = vscodeLmTools.some((tool) => tool.name === 'naide_searchFeatures');
 
-    // Build mutable tools array, ensuring naide_searchLearnings is always included.
-    // The tool implementation is registered via registerTool() but VS Code may not expose
-    // an extension's own tools in vscode.lm.tools, so we add the descriptor manually.
+    // Build mutable tools array, ensuring naide_searchLearnings and naide_searchFeatures are always included.
+    // The tool implementations are registered via registerTool() but VS Code may not expose
+    // an extension's own tools in vscode.lm.tools, so we add the descriptors manually.
     const allTools: vscode.LanguageModelChatTool[] = [...vscodeLmTools];
 
     if (hasLearningsTool) {
@@ -119,80 +120,58 @@ function createHandler(extensionContext: vscode.ExtensionContext): vscode.ChatRe
       logInfo(`[Naide] naide_searchLearnings descriptor added manually (allTools now has ${allTools.length} tools)`);
     }
 
+    if (hasFeaturesTool) {
+      logInfo('[Naide] naide_searchFeatures found in vscode.lm.tools ✓');
+    } else {
+      logWarn('[Naide] naide_searchFeatures NOT found in vscode.lm.tools - adding descriptor manually');
+      allTools.push({
+        name: 'naide_searchFeatures',
+        description: 'Search project feature specifications (.prompts/features/) for relevant context based on keywords. Returns matching feature specs that contain requirements, acceptance criteria, and implementation details.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            keywords: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Keywords to search for in feature files (e.g., [\'chat\', \'history\', \'token\'])'
+            }
+          },
+          required: ['keywords']
+        }
+      });
+      logInfo(`[Naide] naide_searchFeatures descriptor added manually (allTools now has ${allTools.length} tools)`);
+    }
+
     // Log the final tool list that will be passed to the model
     const hasLearningsInFinal = allTools.some(t => t.name === 'naide_searchLearnings');
-    logInfo(`[Naide] Final tool list for model: ${allTools.length} tools, naide_searchLearnings included: ${hasLearningsInFinal}`);
-    logInfo(`[Naide] Final tool names: ${allTools.map(t => t.name).join(', ')}`);
+    const hasFeaturesInFinal = allTools.some(t => t.name === 'naide_searchFeatures');
+    logInfo(`[Naide] Final tool list for model: ${allTools.length} tools, naide_searchLearnings included: ${hasLearningsInFinal}, naide_searchFeatures included: ${hasFeaturesInFinal}`);
 
 
-    // Build conversation history from context
+    // Build conversation history from context (with truncation to avoid token limit)
     const messages: vscode.LanguageModelChatMessage[] = [];
-    
-    // Add previous conversation history if available
+
+    // Insert system instructions as the first dedicated message
+    messages.push(vscode.LanguageModelChatMessage.User(
+      `[SYSTEM INSTRUCTIONS]\n\n${instructions}`
+    ));
+    logInfo(`[Naide] System message inserted (${instructions.length} chars)`);
+
+    // Add previous conversation history (truncated to budget)
     if (context.history && context.history.length > 0) {
       logInfo(`[Naide] Processing ${context.history.length} previous turns`);
-      
-      // Convert chat history to language model messages
-      for (let i = 0; i < context.history.length; i++) {
-        const turn = context.history[i];
-        if (turn instanceof vscode.ChatRequestTurn) {
-          // User message
-          logInfo(`[Naide]   Turn ${i + 1}: User request - "${turn.prompt.substring(0, 50)}..."`);
-          messages.push(vscode.LanguageModelChatMessage.User(turn.prompt));
-        } else if (turn instanceof vscode.ChatResponseTurn) {
-          // Assistant message - extract text from response
-          const responseText = turn.response.map(part => {
-            if (part instanceof vscode.ChatResponseMarkdownPart) {
-              return part.value.value;
-            }
-            return '';
-          }).join('');
-          
-          if (responseText) {
-            logInfo(`[Naide]   Turn ${i + 1}: Assistant response - ${responseText.length} chars`);
-            messages.push(vscode.LanguageModelChatMessage.Assistant(responseText));
-          }
-        }
-      }
+      const historyMessages = truncateHistory(context.history);
+      messages.push(...historyMessages);
+      logInfo(`[Naide] Added ${historyMessages.length} history messages (after truncation)`);
     } else {
       logInfo('[Naide] No previous conversation history');
     }
 
-    // Add system instructions with the current user message
-    // System instructions are prepended to the first user message in the conversation
-    // or to the current message if this is the first turn
-    // IMPORTANT: Add workspace context to instructions
-    const workspaceContext = workspaceRoot 
-      ? `\n\n**WORKSPACE ROOT**: \`${workspaceRoot}\`\n**CRITICAL**: All file and directory paths MUST be relative to this workspace root. Use relative paths like \`.prompts/features/file.md\` (NOT absolute paths).\n`
-      : '';
-    const fullInstructions = `${instructions}${workspaceContext}`;
-    
-    const fullPrompt = messages.length === 0 
-      ? `${fullInstructions}\n\n---\n\nUser Request: ${request.prompt}`
-      : request.prompt;
-    
-    // If we have history, prepend instructions to the first message
-    if (messages.length > 0 && messages[0].role === vscode.LanguageModelChatMessageRole.User) {
-      const firstMessage = messages[0];
-      // Extract text from the first message's content
-      let firstMessageText = '';
-      for (const part of firstMessage.content) {
-        if (part instanceof vscode.LanguageModelTextPart) {
-          firstMessageText += part.value;
-        }
-      }
-      messages[0] = vscode.LanguageModelChatMessage.User(
-        `${fullInstructions}\n\n---\n\n${firstMessageText}`
-      );
-    }
-    
-    // Add the current user message
-    messages.push(vscode.LanguageModelChatMessage.User(fullPrompt));
+    // Add the current user message (prompt only — no instructions prepended)
+    messages.push(vscode.LanguageModelChatMessage.User(request.prompt));
     
     logInfo(`[Naide] Built message array with ${messages.length} messages`);
     logInfo(`[Naide] Current request prompt: "${request.prompt.substring(0, 100)}${request.prompt.length > 100 ? '...' : ''}"`);
-
-    // Note: workspaceRoot is already defined and logged earlier in the function
 
     // Select language model - prefer Claude Opus, fallback to any available
     stream.progress('Requesting language model...');
@@ -449,6 +428,35 @@ async function handleLanguageModelConversation(
           }
           continue; // Skip standard tool invocation for this tool
         }
+
+        // naide_searchFeatures: invoke directly (same pattern as naide_searchLearnings)
+        if (toolCall.name === 'naide_searchFeatures') {
+          try {
+            const input = resolvedInput as { keywords?: string[] };
+            const keywords = Array.isArray(input?.keywords) ? input.keywords : [];
+            logInfo(`[Naide]   Invoking searchFeatures directly, keywords: ${JSON.stringify(keywords)}`);
+            const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+            const featuresResult = workspaceUri
+              ? await searchFeatures(workspaceUri, keywords)
+              : 'No workspace open.';
+            toolResults.push(
+              new vscode.LanguageModelToolResultPart(
+                toolCall.callId,
+                [new vscode.LanguageModelTextPart(featuresResult)]
+              )
+            );
+            logInfo(`[Naide]   ✓ naide_searchFeatures completed (${featuresResult.length} chars)`);
+          } catch (featuresError: any) {
+            logError(`[Naide]   ✗ Error in naide_searchFeatures: ${featuresError.message}`);
+            toolResults.push(
+              new vscode.LanguageModelToolResultPart(
+                toolCall.callId,
+                [new vscode.LanguageModelTextPart(`Error searching features: ${featuresError.message}`)]
+              )
+            );
+          }
+          continue; // Skip standard tool invocation for this tool
+        }
         
         // Workaround for copilot_createFile bug: handle file creation manually
         if (toolCall.name === 'copilot_createFile' && 
@@ -661,5 +669,156 @@ function resolveToolPaths(input: any, workspaceRoot: string, toolName: string): 
   }
 
   return { input: resolved, changed, originalPath, resolvedPath };
+}
+
+/**
+ * Maximum total character length of conversation history (proxy for token budget).
+ * Assumes ~4 characters per token; 12,000 chars ≈ 3,000 tokens.
+ * Most models have 32K–128K token limits; this keeps history well within budget.
+ */
+const HISTORY_BUDGET_CHARS = 12000;
+
+/**
+ * Maximum character length of the generated conversation summary.
+ * ~2,000 chars ≈ 500 tokens — compact enough to preserve budget headroom.
+ */
+const MAX_SUMMARY_CHARS = 2000;
+
+/** Maximum character length of each extracted user topic snippet. */
+const MAX_TOPIC_LENGTH = 80;
+
+/** Maximum number of decision/key-point items extracted from assistant responses. */
+const MAX_DECISION_POINTS = 10;
+
+/** Maximum character length of each extracted decision/key-point item. */
+const MAX_DECISION_POINT_LENGTH = 100;
+
+/**
+ * Truncates conversation history to fit within token budget.
+ * Keeps the last 2 user turns verbatim and summarizes earlier history.
+ *
+ * @param history - The chat context history
+ * @returns Array of language model messages representing the (possibly truncated) history
+ */
+function truncateHistory(
+  history: ReadonlyArray<vscode.ChatRequestTurn | vscode.ChatResponseTurn>
+): vscode.LanguageModelChatMessage[] {
+  // Convert all turns to simple message objects
+  const rawMessages: Array<{ role: 'user' | 'assistant'; text: string }> = [];
+
+  for (const turn of history) {
+    if (turn instanceof vscode.ChatRequestTurn) {
+      rawMessages.push({ role: 'user', text: turn.prompt });
+    } else if (turn instanceof vscode.ChatResponseTurn) {
+      const responseText = turn.response
+        .map(part => (part instanceof vscode.ChatResponseMarkdownPart ? part.value.value : ''))
+        .join('');
+      if (responseText) {
+        rawMessages.push({ role: 'assistant', text: responseText });
+      }
+    }
+  }
+
+  // Measure total character length
+  const totalChars = rawMessages.reduce((sum, m) => sum + m.text.length, 0);
+  logInfo(`[Naide] History total chars: ${totalChars} (budget: ${HISTORY_BUDGET_CHARS})`);
+
+  if (totalChars <= HISTORY_BUDGET_CHARS) {
+    // Within budget — return all messages as-is
+    return rawMessages.map(m =>
+      m.role === 'user'
+        ? vscode.LanguageModelChatMessage.User(m.text)
+        : vscode.LanguageModelChatMessage.Assistant(m.text)
+    );
+  }
+
+  // Over budget: keep last 2 user turns (and their paired assistant responses)
+  // Identify the last 2 user message indices
+  const userIndices: number[] = [];
+  for (let i = rawMessages.length - 1; i >= 0 && userIndices.length < 2; i--) {
+    if (rawMessages[i].role === 'user') {
+      userIndices.unshift(i);
+    }
+  }
+
+  // The "recent" window starts at the earliest of those user turns
+  const recentStartIndex = userIndices.length > 0 ? userIndices[0] : rawMessages.length;
+  const olderMessages = rawMessages.slice(0, recentStartIndex);
+  const recentMessages = rawMessages.slice(recentStartIndex);
+
+  logInfo(`[Naide] History truncation: ${olderMessages.length} older msgs → summary, ${recentMessages.length} recent msgs kept verbatim`);
+
+  const result: vscode.LanguageModelChatMessage[] = [];
+
+  if (olderMessages.length > 0) {
+    const summary = summarizeOlderMessages(olderMessages);
+    result.push(vscode.LanguageModelChatMessage.User(summary));
+  }
+
+  for (const m of recentMessages) {
+    result.push(
+      m.role === 'user'
+        ? vscode.LanguageModelChatMessage.User(m.text)
+        : vscode.LanguageModelChatMessage.Assistant(m.text)
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Generates a compact summary of older conversation messages.
+ * Extracts topics, decisions, and key context. Caps at 2,000 characters.
+ *
+ * @param messages - The older messages to summarize
+ * @returns Formatted summary string
+ */
+function summarizeOlderMessages(
+  messages: Array<{ role: 'user' | 'assistant'; text: string }>
+): string {
+  const topics: string[] = [];
+  const decisions: string[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'user') {
+      // Extract topic from first ~MAX_TOPIC_LENGTH chars of each user message
+      const topic = msg.text.trim().substring(0, MAX_TOPIC_LENGTH).replace(/\n/g, ' ');
+      if (topic) {
+        topics.push(topic);
+      }
+    } else {
+      // Extract key points from assistant responses: look for bullet/numbered list items
+      const lines = msg.text.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (/^[-*•]\s+.+/.test(trimmed) || /^\d+\.\s+.+/.test(trimmed)) {
+          const point = trimmed.substring(0, MAX_DECISION_POINT_LENGTH);
+          if (point && decisions.length < MAX_DECISION_POINTS) {
+            decisions.push(point);
+          }
+        }
+      }
+    }
+  }
+
+  let summary = '[CONVERSATION SUMMARY - Earlier messages summarized to save context space]\n\n';
+
+  if (topics.length > 0) {
+    summary += 'Topics discussed:\n';
+    summary += topics.map(t => `- ${t}`).join('\n') + '\n\n';
+  }
+
+  if (decisions.length > 0) {
+    summary += 'Key points from earlier responses:\n';
+    summary += decisions.map(d => `- ${d}`).join('\n') + '\n\n';
+  }
+
+  // Cap at MAX_SUMMARY_CHARS characters
+  if (summary.length > MAX_SUMMARY_CHARS) {
+    summary = summary.substring(0, MAX_SUMMARY_CHARS - 3) + '...';
+  }
+
+  logInfo(`[Naide] History summary generated: ${summary.length} chars`);
+  return summary;
 }
 

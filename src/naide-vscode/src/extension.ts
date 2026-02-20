@@ -8,6 +8,7 @@
 import * as vscode from 'vscode';
 import { registerNaideParticipant } from './participant';
 import { registerLearningsTool } from './learnings';
+import { registerFeaturesTool } from './features';
 import { initializeLogger, logInfo, logError } from './logger';
 
 /**
@@ -31,6 +32,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Register the search_learnings language model tool
     registerLearningsTool(context);
+
+    // Register the search_features language model tool
+    registerFeaturesTool(context);
 
     logInfo('[Naide] Extension activated successfully');
   } catch (error) {
